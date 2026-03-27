@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-03-27T00:00:00Z",
+  "status": "conditional_go",
+  "summary": "Local fallback readiness report used when the myStarterKit overlay artifacts are not present.",
+  "findings": [
+    {
+      "control": "policy_coverage",
+      "status": "pass",
+      "summary": "Policy decision evidence is present in the local telemetry sample."
+    },
+    {
+      "control": "retrieval_safety",
+      "status": "pass",
+      "summary": "Retrieval decision evidence is present in the local telemetry sample."
+    },
+    {
+      "control": "tool_governance",
+      "status": "pass",
+      "summary": "Tool governance evidence is present in the local telemetry sample."
+    },
+    {
+      "control": "risky_config_defaults_disabled",
+      "status": "conditional_pass",
+      "summary": "Fallback local stack still carries development defaults that should be hardened before rollout."
+    }
+  ],
+  "remediation": [
+    "Disable risky development defaults before promotion beyond local environments.",
+    "Replace local fallback launch artifacts with overlay-generated evidence during bootstrap."
+  ]
+}

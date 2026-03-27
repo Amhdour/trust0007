@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from backend.integration_adapter.repository import load_reviewer_bundle, repo_root
+from backend.integration_adapter.repository import launch_report_relative_path, load_reviewer_bundle, repo_root
 
 
 def _raw_link(path: str) -> str:
@@ -29,7 +29,7 @@ def build_evidence_pack_summary(root: Path | None = None) -> dict[str, Any]:
             },
             {
                 "label": "Launch Readiness Report",
-                "href": _raw_link("overlays/myStarterKit/artifacts/logs/launch_gate/starter_launch_readiness_report.json"),
+                "href": _raw_link(launch_report_relative_path(resolved_root)),
                 "description": "myStarterKit readiness findings and remediation guidance.",
             },
             {

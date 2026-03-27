@@ -5,6 +5,9 @@ import re
 from pathlib import Path
 from typing import Any
 
+LAUNCH_REPORT_PRIMARY = "overlays/myStarterKit/artifacts/logs/launch_gate/starter_launch_readiness_report.json"
+LAUNCH_REPORT_FALLBACK = "launch-gate/starter_launch_readiness_report.json"
+
 
 def repo_root(explicit: Path | None = None) -> Path:
     return explicit or Path(__file__).resolve().parents[2]
@@ -69,8 +72,16 @@ def load_policy_bundle(root: Path | None = None) -> dict[str, Any]:
     return read_json(repo_root(root) / "overlays/myStarterKit/policies/bundles/default/policy.json")
 
 
+def launch_report_relative_path(root: Path | None = None) -> str:
+    resolved_root = repo_root(root)
+    primary = resolved_root / LAUNCH_REPORT_PRIMARY
+    if primary.exists():
+        return LAUNCH_REPORT_PRIMARY
+    return LAUNCH_REPORT_FALLBACK
+
+
 def load_launch_report(root: Path | None = None) -> dict[str, Any]:
-    return read_json(repo_root(root) / "overlays/myStarterKit/artifacts/logs/launch_gate/starter_launch_readiness_report.json")
+    return read_json(repo_root(root) / launch_report_relative_path(root))
 
 
 def load_reviewer_bundle(root: Path | None = None) -> dict[str, Any]:

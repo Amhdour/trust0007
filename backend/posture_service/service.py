@@ -9,6 +9,7 @@ from typing import Any
 from backend.activity_service.service import build_activity_snapshot
 from backend.evidence_service.service import build_evidence_pack_summary
 from backend.integration_adapter.repository import (
+    launch_report_relative_path,
     load_eval_summaries,
     load_policy_bundle,
     load_reviewer_bundle,
@@ -614,7 +615,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             },
             {
                 "label": "Launch gate report",
-                "href": _raw("overlays/myStarterKit/artifacts/logs/launch_gate/starter_launch_readiness_report.json"),
+                "href": _raw(launch_report_relative_path(resolved_root)),
                 "description": "Readiness findings consumed by the launch-gate section.",
             },
             {
