@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: myStarterKit dashboards
+    orgId: 1
+    folder: AI Trust Security
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

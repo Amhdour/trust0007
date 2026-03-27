@@ -1,0 +1,11 @@
+{
+  "tenant": "tenant-a",
+  "tool": {
+    "name": "search"
+  },
+  "requested_fields": ["title", "summary"],
+  "retrieval": {
+    "needed": true,
+    "source": "qdrant"
+  }
+}

@@ -1,0 +1,27 @@
+services:
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    command: ["envoy", "-c", "/etc/envoy/envoy.local.yaml", "-l", "info"]
+    volumes:
+      - ./compose/envoy/envoy.local.yaml:/etc/envoy/envoy.local.yaml:ro
+    ports:
+      - "10000:10000"
+      - "9901:9901"
+    depends_on:
+      - opa
+    networks:
+      - trust_stack
+
+  opa:
+    image: openpolicyagent/opa:0.70.0
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies/policy.rego"]
+    volumes:
+      - ./compose/opa/policy.rego:/policies/policy.rego:ro
+    ports:
+      - "8181:8181"
+    networks:
+      - trust_stack
+
+networks:
+  trust_stack:
+    external: true

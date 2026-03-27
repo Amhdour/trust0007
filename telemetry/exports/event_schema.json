@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TelemetryEvent",
+  "type": "object",
+  "required": [
+    "event_type",
+    "trace_id",
+    "request_id",
+    "timestamp",
+    "tenant_id",
+    "severity",
+    "payload"
+  ],
+  "properties": {
+    "event_type": { "type": "string" },
+    "trace_id": { "type": "string" },
+    "request_id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "tenant_id": { "type": "string" },
+    "severity": { "type": "string" },
+    "payload": { "type": "object" }
+  },
+  "additionalProperties": false
+}

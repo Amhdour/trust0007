@@ -1,0 +1,1 @@
+"""Umbrella adapters package."""

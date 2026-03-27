@@ -1,0 +1,9 @@
+{
+  "allow": false,
+  "default_deny": true,
+  "fallback_to_rag": true,
+  "kill_switch": false,
+  "reasons": [
+    "forbidden tool: shell.exec"
+  ]
+}

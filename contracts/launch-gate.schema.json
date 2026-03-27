@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LaunchGateSummary",
+  "type": "object",
+  "required": ["status", "readiness_score", "control_coverage", "missing_controls", "failed_tests", "residual_risks"],
+  "properties": {
+    "status": { "type": "string" },
+    "readiness_score": { "type": "integer" },
+    "control_coverage": { "type": "string" },
+    "missing_controls": { "type": "array", "items": { "type": "string" } },
+    "failed_tests": { "type": "integer" },
+    "residual_risks": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

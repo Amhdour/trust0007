@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvalSummary",
+  "type": "object",
+  "required": ["latest_suite", "total", "passed", "failed", "metrics"],
+  "properties": {
+    "latest_suite": { "type": "string" },
+    "total": { "type": "integer" },
+    "passed": { "type": "integer" },
+    "failed": { "type": "integer" },
+    "metrics": { "type": "object" }
+  },
+  "additionalProperties": false
+}

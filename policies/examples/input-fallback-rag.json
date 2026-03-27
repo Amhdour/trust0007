@@ -1,0 +1,11 @@
+{
+  "tenant": "tenant-a",
+  "tool": {
+    "name": "shell.exec"
+  },
+  "requested_fields": ["title"],
+  "retrieval": {
+    "needed": true,
+    "source": "qdrant"
+  }
+}

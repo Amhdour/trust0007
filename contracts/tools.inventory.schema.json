@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ToolsInventory",
+  "type": "object",
+  "required": ["registered_tools", "approved_tools", "blocked_tools", "confirmation_required_tools", "sandbox_required_tools", "mcp_servers"],
+  "properties": {
+    "registered_tools": { "type": "array", "items": { "type": "string" } },
+    "approved_tools": { "type": "array", "items": { "type": "string" } },
+    "blocked_tools": { "type": "array", "items": { "type": "string" } },
+    "confirmation_required_tools": { "type": "array", "items": { "type": "string" } },
+    "sandbox_required_tools": { "type": "array", "items": { "type": "string" } },
+    "mcp_servers": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

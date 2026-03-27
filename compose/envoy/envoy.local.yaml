@@ -1,0 +1,90 @@
+static_resources:
+  listeners:
+    - name: listener_http
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 10000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: app
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: onyx_runtime
+                http_filters:
+                  # 1) JWT authn belongs here (stub):
+                  # - name: envoy.filters.http.jwt_authn
+                  #   typed_config:
+                  #     providers: ...
+                  #     rules: ...
+
+                  # 2) External authz belongs here (active stub):
+                  # Envoy sends a CheckRequest to OPA via ext_authz.
+                  - name: envoy.filters.http.ext_authz
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+                      transport_api_version: V3
+                      with_request_body:
+                        max_request_bytes: 8192
+                        allow_partial_message: true
+                      http_service:
+                        server_uri:
+                          uri: http://opa:8181
+                          cluster: opa
+                          timeout: 0.5s
+                        path_prefix: /v1/data/envoy/authz
+                        authorization_response:
+                          allowed_upstream_headers:
+                            patterns:
+                              - exact: x-policy-decision-id
+                  # 3) Final router (request continues only after authz allow).
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    - name: onyx_runtime
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: onyx_runtime
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      # Local dev placeholder upstream service.
+                      address: host.docker.internal
+                      port_value: 8081
+
+    - name: opa
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: opa
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: opa
+                      port_value: 8181
+
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901

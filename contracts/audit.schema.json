@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AuditReplaySummary",
+  "type": "object",
+  "required": ["events", "trace_ids", "replay_ready_sessions", "deny_reasons", "evidence_links"],
+  "properties": {
+    "events": { "type": "array" },
+    "trace_ids": { "type": "array", "items": { "type": "string" } },
+    "replay_ready_sessions": { "type": "array", "items": { "type": "string" } },
+    "deny_reasons": { "type": "array", "items": { "type": "string" } },
+    "evidence_links": { "type": "array" }
+  },
+  "additionalProperties": false
+}

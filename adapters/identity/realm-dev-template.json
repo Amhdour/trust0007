@@ -1,0 +1,41 @@
+{
+  "realm": "umbrella-dev",
+  "enabled": true,
+  "displayName": "Umbrella Dev Realm",
+  "roles": {
+    "realm": [
+      { "name": "platform_admin" },
+      { "name": "security_operator" },
+      { "name": "tenant_admin" },
+      { "name": "tenant_user" },
+      { "name": "service_runtime" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "onyx-runtime",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false
+    },
+    {
+      "clientId": "dev-web-app",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:8080/*"
+      ],
+      "webOrigins": ["*"]
+    }
+  ],
+  "attributes": {
+    "note": "Development template only. Review before non-local usage."
+  }
+}

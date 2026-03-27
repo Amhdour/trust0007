@@ -1,0 +1,11 @@
+{
+  "tenant": "tenant-a",
+  "kill_switch": true,
+  "tool": {
+    "name": "search"
+  },
+  "retrieval": {
+    "needed": true,
+    "source": "qdrant"
+  }
+}

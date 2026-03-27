@@ -1,0 +1,45 @@
+views:
+  - name: policy_outcomes_by_tenant
+    description: "Policy outcome trend by tenant and time bucket."
+    sql: |
+      SELECT
+        tenant_id,
+        date_trunc('hour', timestamp) AS hour_bucket,
+        event_type,
+        COUNT(*) AS event_count
+      FROM telemetry_events
+      WHERE event_type IN ('policy.decision', 'deny.event', 'fallback.event')
+      GROUP BY 1,2,3
+
+  - name: retrieval_decision_distribution
+    description: "Retrieval decision counts by source and decision state."
+    sql: |
+      SELECT
+        payload->>'source' AS source,
+        payload->>'decision' AS decision,
+        COUNT(*) AS event_count
+      FROM telemetry_events
+      WHERE event_type = 'retrieval.decision'
+      GROUP BY 1,2
+
+  - name: tool_usage_summary
+    description: "Tool usage attempts by tenant and tool name."
+    sql: |
+      SELECT
+        tenant_id,
+        payload->>'tool_name' AS tool_name,
+        COUNT(*) AS attempts
+      FROM telemetry_events
+      WHERE event_type = 'tool.execution_attempt'
+      GROUP BY 1,2
+
+  - name: incident_signal_timeline
+    description: "Incident signal counts over time."
+    sql: |
+      SELECT
+        date_trunc('hour', timestamp) AS hour_bucket,
+        severity,
+        COUNT(*) AS signals
+      FROM telemetry_events
+      WHERE event_type = 'incident.signal'
+      GROUP BY 1,2

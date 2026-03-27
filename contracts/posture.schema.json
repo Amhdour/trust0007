@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ControlPlanePosture",
+  "type": "object",
+  "required": ["generated_at", "title", "subtitle", "tabs", "sections", "sources"],
+  "properties": {
+    "generated_at": { "type": "string", "format": "date-time" },
+    "title": { "type": "string" },
+    "subtitle": { "type": "string" },
+    "runtime_module": { "type": "string" },
+    "tabs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "description", "blocks"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "blocks": { "type": "array" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "href", "description"],
+        "properties": {
+          "label": { "type": "string" },
+          "href": { "type": "string" },
+          "description": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

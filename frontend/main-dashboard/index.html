@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Trust & Security Control Plane</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <p class="eyebrow">Dashboard-first control plane</p>
+        <h1>AI Trust and Security Business Dashboard</h1>
+        <p class="hero-copy">
+          This page gives business teams a simple view of system health, user access, data access, risk controls, and readiness to launch.
+        </p>
+        <div class="hero-meta" id="hero-meta"></div>
+        <div class="hero-actions">
+          <button class="hero-action-button" id="reset-dashboard-button" type="button">
+            Reset dashboard
+          </button>
+        </div>
+        <div class="hero-steps" id="hero-steps"></div>
+      </header>
+
+      <nav class="tab-strip" id="tab-strip" aria-label="Dashboard tabs"></nav>
+
+      <section class="live-log-panel" aria-labelledby="live-log-title">
+        <div class="section-head">
+          <p class="eyebrow">Recent activity</p>
+          <h2 id="live-log-title">Recent Activity and Alerts</h2>
+          <p class="section-description">
+            A live feed of recent requests, policy checks, alerts, and operating events.
+          </p>
+        </div>
+        <div id="live-log-root" class="live-log-root">
+          <section class="loading-panel">
+            <p class="eyebrow">Loading</p>
+            <h3>Loading recent activity</h3>
+            <p>Waiting for the latest business and operational events.</p>
+          </section>
+        </div>
+      </section>
+
+      <main id="dashboard-root" class="dashboard-root" aria-live="polite">
+        <section class="loading-panel">
+          <p class="eyebrow">Loading</p>
+          <h2>Building your dashboard</h2>
+          <p>Loading system status, controls, activity, and evidence summaries.</p>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div>
+          <p class="eyebrow">Control-plane sources</p>
+          <div id="sources" class="source-grid"></div>
+        </div>
+      </footer>
+    </div>
+
+    <noscript>This dashboard needs JavaScript enabled to show live activity and business summaries.</noscript>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

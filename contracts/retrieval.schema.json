@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RetrievalSummary",
+  "type": "object",
+  "required": ["indexed_sources", "tenant_boundaries", "retrieval_decisions", "blocked_attempts", "provenance_coverage", "connector_exposure"],
+  "properties": {
+    "indexed_sources": { "type": "array" },
+    "tenant_boundaries": { "type": "array" },
+    "retrieval_decisions": { "type": "array" },
+    "blocked_attempts": { "type": "integer" },
+    "provenance_coverage": { "type": "string" },
+    "connector_exposure": { "type": "array" }
+  },
+  "additionalProperties": false
+}

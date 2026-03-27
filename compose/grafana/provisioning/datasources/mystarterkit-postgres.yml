@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: myStarterKit Postgres
+    uid: mystarterkit-postgres
+    type: postgres
+    access: proxy
+    isDefault: false
+    url: db:5432
+    user: langfuse
+    secureJsonData:
+      password: langfuse
+    jsonData:
+      database: langfuse
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false

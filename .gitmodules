@@ -1,0 +1,42 @@
+[submodule "upstream/onyx"]
+	path = upstream/onyx
+	url = https://github.com/onyx-dot-app/onyx.git
+[submodule "upstream/keycloak"]
+	path = upstream/keycloak
+	url = https://github.com/keycloak/keycloak.git
+[submodule "upstream/keycloak-quickstarts"]
+	path = upstream/keycloak-quickstarts
+	url = https://github.com/keycloak/keycloak-quickstarts.git
+[submodule "upstream/envoy"]
+	path = upstream/envoy
+	url = https://github.com/envoyproxy/envoy.git
+[submodule "upstream/opa"]
+	path = upstream/opa
+	url = https://github.com/open-policy-agent/opa.git
+[submodule "upstream/opa-envoy-plugin"]
+	path = upstream/opa-envoy-plugin
+	url = https://github.com/open-policy-agent/opa-envoy-plugin.git
+[submodule "upstream/vault"]
+	path = upstream/vault
+	url = https://github.com/hashicorp/vault.git
+[submodule "upstream/qdrant"]
+	path = upstream/qdrant
+	url = https://github.com/qdrant/qdrant.git
+[submodule "upstream/gvisor"]
+	path = upstream/gvisor
+	url = https://github.com/google/gvisor.git
+[submodule "upstream/langfuse"]
+	path = upstream/langfuse
+	url = https://github.com/langfuse/langfuse.git
+[submodule "upstream/langfuse-python"]
+	path = upstream/langfuse-python
+	url = https://github.com/langfuse/langfuse-python.git
+[submodule "upstream/grafana"]
+	path = upstream/grafana
+	url = https://github.com/grafana/grafana.git
+[submodule "upstream/superset"]
+	path = upstream/superset
+	url = https://github.com/apache/superset.git
+[submodule "overlays/myStarterKit"]
+	path = overlays/myStarterKit
+	url = https://github.com/Amhdour/myStarterKit.git

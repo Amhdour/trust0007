@@ -1,0 +1,50 @@
+{
+  "title": "AI Trust & Security - Operational Overview (Scaffold)",
+  "description": "Development dashboard scaffold mapped to telemetry event schema.",
+  "panels": [
+    {
+      "id": "p1",
+      "title": "Request Volume",
+      "metric": "count(request.start)",
+      "group_by": ["time_bucket"]
+    },
+    {
+      "id": "p2",
+      "title": "Deny Rate",
+      "metric": "count(deny.event) / count(request.start)",
+      "group_by": ["time_bucket", "tenant_id"]
+    },
+    {
+      "id": "p3",
+      "title": "Fallback Rate",
+      "metric": "count(fallback.event) / count(request.start)",
+      "group_by": ["time_bucket", "tenant_id"]
+    },
+    {
+      "id": "p4",
+      "title": "Tool Execution Attempts",
+      "metric": "count(tool.execution_attempt)",
+      "group_by": ["time_bucket", "payload.tool_name"]
+    },
+    {
+      "id": "p5",
+      "title": "Retrieval Decision Mix",
+      "metric": "count(retrieval.decision)",
+      "group_by": ["payload.decision", "payload.source"]
+    },
+    {
+      "id": "p6",
+      "title": "Incident Signals",
+      "metric": "count(incident.signal)",
+      "group_by": ["time_bucket", "severity"]
+    }
+  ],
+  "filters": [
+    "time_range",
+    "tenant_id",
+    "event_type",
+    "severity",
+    "payload.tool_name",
+    "payload.source"
+  ]
+}

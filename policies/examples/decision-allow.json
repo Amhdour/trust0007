@@ -1,0 +1,7 @@
+{
+  "allow": true,
+  "default_deny": false,
+  "fallback_to_rag": false,
+  "kill_switch": false,
+  "reasons": []
+}

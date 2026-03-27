@@ -1,0 +1,24 @@
+# Example mapping from Keycloak JWT claims to internal authorization context.
+# This is a skeleton reference for adapter implementation.
+
+principal:
+  id: "sub"
+  username: "preferred_username"
+
+identity:
+  issuer: "iss"
+  audience: "aud"
+  client_id: "azp"
+
+tenancy:
+  tenant_id: "tenant_id"
+  tenant_roles: "tenant_roles"
+
+roles:
+  realm_roles: "realm_access.roles"
+  client_roles: "resource_access"
+
+session:
+  auth_time: "auth_time"
+  issued_at: "iat"
+  expires_at: "exp"
