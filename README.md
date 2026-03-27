@@ -62,6 +62,12 @@ Validate the primary runtime integration target:
 make test-onyx-target
 ```
 
+Test governance enforcement (live artifacts + handoff blocking):
+
+```bash
+make test-governance
+```
+
 Run the full test suite:
 
 ```bash
@@ -74,8 +80,28 @@ Serve the local control-plane dashboard API/UI shell:
 make serve-dashboard
 ```
 
+## Development vs Production Simulation
+
+**Development stack** (current default):
+```bash
+docker-compose -f compose/docker-compose.yml up
+```
+- Keycloak/Vault in dev mode
+- Localhost-only service exposure
+- Development defaults for rapid iteration
+
+**Production simulation** (hardened stack):
+```bash
+docker-compose -f compose/docker-compose.prod-sim.yml up
+```
+- Keycloak/Vault in production mode
+- Security hardening (read-only filesystems, no-new-privileges)
+- Proper initialization requirements
+- External certificate/trust store support
+
 ## Runtime Testing Model
 
 - `Onyx` is the primary sample runtime platform for real integration testing in this repo.
 - The in-repo demo is the fast fallback path when the upstream Onyx stack is not running.
 - The dashboard remains the product entrypoint, and Onyx is the governed runtime reached behind it.
+- **Governance enforcement** is now live: `/launch/onyx` blocks denied requests with audit trails.

@@ -1,4 +1,4 @@
-.PHONY: demo test-demo test-onyx-target serve-dashboard serve-onyx test bootstrap-submodules update-submodules
+.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules
 
 demo:
 	bash scripts/run-demo.sh
@@ -8,6 +8,9 @@ test-demo:
 
 test-onyx-target:
 	bash scripts/test-onyx-target.sh
+
+test-governance:
+	pytest tests/integration/test_governed_flow.py tests/integration/test_governance_denial.py tests/integration/test_live_end_to_end.py -v
 
 serve-dashboard:
 	bash scripts/start-control-plane.sh

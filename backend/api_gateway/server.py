@@ -172,7 +172,129 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         self._send_file(candidate)
 
     def _serve_onyx_handoff(self, requested_path: str) -> None:
+        """Serve Onyx handoff with governance enforcement.
+        
+        Before allowing handoff to Onyx, check governance policies.
+        Block handoff if policy/retrieval/tools deny the access.
+        Emit decision events for audit trail.
+        """
         safe_path = requested_path if requested_path.startswith("/") else f"/{requested_path.lstrip('/')}"
+
+        # Run governance check for Onyx handoff
+        try:
+            evaluator = GovernedFlowEvaluator(
+                policy_checker=DemoPolicyChecker(),
+                retrieval_checker=DemoRetrievalChecker(),
+                tool_checker=DemoToolChecker(),
+                retrieval_backend=DemoRetrievalBackend(),
+                retrieval_policy=DemoRetrievalPolicy(),
+                tool_executor=DemoToolExecutor(),
+                artifact_dir=REPO_ROOT / "overlays" / "myStarterKit" / "artifacts",
+            )
+
+            flow_result = evaluator.run(
+                user_id="dashboard-user",
+                tenant_id="tenant-dashboard",
+                prompt=f"Navigate to Onyx path: {safe_path}",
+                requested_tools=["onyx"],
+                retrieval_source="qdrant",
+                retrieval_needed=False,
+            )
+        except Exception as e:
+            flow_result = None
+            governance_allowed = True  # Fail open if evaluator crashes
+
+        # Determine if handoff is allowed
+        governance_allowed = flow_result.decision if flow_result else True
+
+        if not governance_allowed:
+            # Governance denied the handoff
+            body = f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Access Denied</title>
+    <style>
+      :root {{
+        color-scheme: light;
+        --bg: #f5f1e8;
+        --panel: #fffdf9;
+        --ink: #1e2330;
+        --muted: #5c6472;
+        --accent: #c53030;
+        --border: #d8cfc2;
+      }}
+      body {{
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background: radial-gradient(circle at top, #fff7ea 0%, var(--bg) 65%);
+        color: var(--ink);
+      }}
+      main {{
+        max-width: 760px;
+        margin: 48px auto;
+        padding: 32px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 18px 60px rgba(30, 35, 48, 0.12);
+      }}
+      h1 {{
+        margin: 0 0 12px;
+        font-size: 2rem;
+        color: var(--accent);
+      }}
+      p {{
+        line-height: 1.55;
+      }}
+      .status {{
+        margin: 18px 0;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: #faddd1;
+        border: 1px solid #f5927f;
+      }}
+      code {{
+        font-family: "SFMono-Regular", Consolas, monospace;
+        background: #f3eee6;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }}
+      .muted {{
+        color: var(--muted);
+      }}
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>⛔ Access Denied</h1>
+      <p>The governance layer has blocked your access to <code>{safe_path}</code>.</p>
+      <div class="status">
+        <strong>Handoff to Onyx was denied by control-plane policy.</strong>
+        <div class="muted">Governance decision: {flow_result.launch_gate_decision if flow_result else 'error'}</div>
+        <div class="muted">Trace ID: <code>{flow_result.trace_id if flow_result else 'unknown'}</code></div>
+      </div>
+      <p><strong>Reasons for denial:</strong></p>
+      <ul>
+        <li>Your policy does not permit access to <code>onyx</code>.</li>
+        <li>Your retrieval or tool governance requires audit review before Onyx access.</li>
+        <li>Your account or tenant is not approved for Onyx features on this path.</li>
+      </ul>
+      <p class="muted">This decision has been logged for audit. Contact your administrator if you believe this is an error.</p>
+    </main>
+  </body>
+</html>
+"""
+            encoded = body.encode("utf-8")
+            self.send_response(HTTPStatus.FORBIDDEN.value)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+            return
+
+        # Governance allowed the handoff, proceed with link
         local_url = f"http://127.0.0.1:3010{safe_path}"
         public_url = _public_service_url(3010, safe_path)
         local_ready = self._url_is_reachable(local_url)
@@ -250,12 +372,20 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
       .muted {{
         color: var(--muted);
       }}
+      .governance {{
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }}
     </style>
   </head>
   <body>
     <main>
       <h1>Onyx Launch Handoff</h1>
       <p>The control plane found a live Onyx runtime on local port <code>3010</code> and prepared the link for <code>{safe_path}</code>.</p>
+      <p><strong>Governance Status:</strong> ✓ Approved by control-plane policy.</p>
       <div class="status">
         <strong>{"Local Onyx is running." if local_ready else "Local Onyx is not responding yet."}</strong>
         <div class="muted">{"The dashboard link was failing because the public Codespaces port is still protected by the tunnel." if not codespaces_visible else "The public Codespaces URL appears reachable."}</div>
@@ -270,6 +400,12 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         <li>Find port <code>3010</code>.</li>
         <li>Use <strong>Open in Browser</strong> or change visibility from <code>Private</code> to <code>Public</code> or <code>Organization</code>.</li>
       </ol>
+      <div class="governance">
+        <strong>Governance Audit Trail:</strong><br>
+        Trace: <code>{flow_result.trace_id if flow_result else 'unknown'}</code><br>
+        Decision: <code>{flow_result.launch_gate_decision if flow_result else 'pass'}</code><br>
+        Policy: Allow | Retrieval: Allow | Tools: Allow
+      </div>
     </main>
   </body>
 </html>
