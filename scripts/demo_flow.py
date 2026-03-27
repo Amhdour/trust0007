@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -30,9 +31,9 @@ from telemetry.model import EventModel
 from telemetry.sinks import JsonlEventSink
 
 
-OUT_DIR = Path("artifacts/demo")
-EVENTS_PATH = OUT_DIR / "events.jsonl"
-LAUNCH_GATE_PATH = OUT_DIR / "launch-gate.json"
+def _artifact_dir() -> Path:
+    raw_dir = os.environ.get("CONTROL_PLANE_DEMO_ARTIFACTS_DIR", "artifacts/demo").strip()
+    return Path(raw_dir)
 
 
 class DemoPolicyChecker(PolicyChecker):
@@ -101,12 +102,15 @@ def emit(model: EventModel, sink: JsonlEventSink, event_type: str, trace_id: str
 
 
 def main() -> int:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    if EVENTS_PATH.exists():
-        EVENTS_PATH.unlink()
+    out_dir = _artifact_dir()
+    events_path = out_dir / "events.jsonl"
+    launch_gate_path = out_dir / "launch-gate.json"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if events_path.exists():
+        events_path.unlink()
 
     model = EventModel()
-    sink = JsonlEventSink(str(EVENTS_PATH))
+    sink = JsonlEventSink(str(events_path))
 
     trace_id = "demo-trace-1"
     request_id = "demo-req-1"
@@ -199,12 +203,12 @@ def main() -> int:
     artifact = {
         "machine": result.to_machine_readable(),
         "human": result.to_human_readable(),
-        "artifacts": {"events_jsonl": str(EVENTS_PATH)},
+        "artifacts": {"events_jsonl": str(events_path)},
     }
-    LAUNCH_GATE_PATH.write_text(json.dumps(artifact, indent=2, sort_keys=True), encoding="utf-8")
+    launch_gate_path.write_text(json.dumps(artifact, indent=2, sort_keys=True), encoding="utf-8")
 
-    print(f"Wrote {EVENTS_PATH}")
-    print(f"Wrote {LAUNCH_GATE_PATH}")
+    print(f"Wrote {events_path}")
+    print(f"Wrote {launch_gate_path}")
     return 0
 
 

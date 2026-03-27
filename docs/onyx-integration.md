@@ -3,6 +3,11 @@
 ## Purpose
 `adapters/onyx_gateway_adapter/` provides a boundary adapter that accepts normalized runtime requests and applies governance checks without depending on upstream Onyx internals.
 
+## Role in this repository
+- Onyx is the primary sample runtime platform for real integration testing.
+- The dashboard is still the main product entrypoint.
+- The in-repo demo is the fallback path when the upstream Onyx stack is unavailable.
+
 ## Responsibilities implemented
 - Accept normalized request input from runtime (`NormalizedRequest`).
 - Invoke policy checks (`PolicyChecker`).

@@ -33,6 +33,7 @@ The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and
 - `apps/`: logical runtime/governance grouping for Onyx and myStarterKit.
 - `infra/`: logical mapping for identity, policy, retrieval, telemetry, and evidence systems.
 - `evidence/`: dashboard-owned evidence export area.
+- `ai-trust-security-stack/`: managed compatibility submodule kept for migration/comparison workflows.
 - `upstream/`: pinned submodules for Keycloak, Envoy, Onyx, OPA, Vault, Qdrant, optional gVisor, Langfuse, Grafana, and Superset.
 - `overlays/myStarterKit/`: governance-overlay submodule.
 - `overlays/governance-overlay/`: local, additive overlay contracts and integration wiring (this repo).
@@ -46,3 +47,35 @@ The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and
 ## Phase status
 
 Execution plan tracking and phase notes are stored under `docs/phases/`.
+
+## Quickstart
+
+Run the minimal in-repo demo:
+
+```bash
+make demo
+```
+
+Validate the primary runtime integration target:
+
+```bash
+make test-onyx-target
+```
+
+Run the full test suite:
+
+```bash
+make test
+```
+
+Serve the local control-plane dashboard API/UI shell:
+
+```bash
+make serve-dashboard
+```
+
+## Runtime Testing Model
+
+- `Onyx` is the primary sample runtime platform for real integration testing in this repo.
+- The in-repo demo is the fast fallback path when the upstream Onyx stack is not running.
+- The dashboard remains the product entrypoint, and Onyx is the governed runtime reached behind it.

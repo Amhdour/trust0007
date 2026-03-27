@@ -10,6 +10,7 @@ if ! command -v git >/dev/null 2>&1; then
 fi
 
 declare -A SUBMODULES=(
+  ["ai-trust-security-stack"]="https://github.com/Amhdour/ai-trust-security-stack.git"
   ["upstream/onyx"]="https://github.com/onyx-dot-app/onyx.git"
   ["upstream/keycloak"]="https://github.com/keycloak/keycloak.git"
   ["upstream/keycloak-quickstarts"]="https://github.com/keycloak/keycloak-quickstarts.git"

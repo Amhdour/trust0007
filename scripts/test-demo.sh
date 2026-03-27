@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ARTIFACT_DIR="${CONTROL_PLANE_DEMO_ARTIFACTS_DIR:-artifacts/demo}"
+
 bash scripts/run-demo.sh
 
-python - <<'PY'
+ARTIFACT_DIR="$ARTIFACT_DIR" python - <<'PY'
 import json
+import os
 from pathlib import Path
 
-events_path = Path('artifacts/demo/events.jsonl')
-launch_path = Path('artifacts/demo/launch-gate.json')
+artifact_dir = Path(os.environ['ARTIFACT_DIR'])
+events_path = artifact_dir / 'events.jsonl'
+launch_path = artifact_dir / 'launch-gate.json'
 
 assert events_path.exists(), 'missing events artifact'
 assert launch_path.exists(), 'missing launch-gate artifact'
