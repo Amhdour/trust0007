@@ -131,3 +131,36 @@ def load_eval_summaries(root: Path | None = None) -> list[dict[str, Any]]:
         payload["artifact_path"] = str(path.relative_to(resolved_root))
         summaries.append(payload)
     return summaries
+
+
+def load_latest_governed_flow_events(root: Path | None = None) -> list[dict[str, Any]]:
+    """Load the most recent governed flow events from overlay artifacts.
+    
+    Returns empty list if no governed flow artifacts are available.
+    Governed flow artifacts are stored in overlays/myStarterKit/artifacts/events.jsonl
+    after a /api/control-plane/governed-flow request.
+    """
+    resolved_root = repo_root(root)
+    events_path = resolved_root / "overlays/myStarterKit/artifacts/events.jsonl"
+    return read_jsonl(events_path)
+
+
+def load_latest_governed_flow_launch_gate(root: Path | None = None) -> dict[str, Any]:
+    """Load the most recent governed flow launch-gate result from overlay artifacts.
+    
+    Returns empty dict if no governed flow artifacts are available.
+    """
+    resolved_root = repo_root(root)
+    gate_path = resolved_root / "overlays/myStarterKit/artifacts/launch-gate-result.json"
+    return read_json(gate_path)
+
+
+def has_live_governed_flow_artifacts(root: Path | None = None) -> bool:
+    """Check if live governed flow artifacts are available in the overlay directory."""
+    resolved_root = repo_root(root)
+    artifacts_dir = resolved_root / "overlays/myStarterKit/artifacts"
+    return (
+        artifacts_dir.exists()
+        and (artifacts_dir / "events.jsonl").exists()
+        and (artifacts_dir / "launch-gate-result.json").exists()
+    )

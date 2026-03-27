@@ -11,9 +11,12 @@ from backend.activity_service.service import build_activity_snapshot
 from backend.evidence_service.service import build_evidence_pack_summary
 from backend.integration_adapter.repository import (
     dashboard_ingestion_relative_path,
+    has_live_governed_flow_artifacts,
     launch_report_relative_path,
     load_dashboard_contract,
     load_eval_summaries,
+    load_latest_governed_flow_events,
+    load_latest_governed_flow_launch_gate,
     load_policy_bundle,
     load_reviewer_bundle,
     load_sample_events,
@@ -133,7 +136,13 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     resolved_root = repo_root(root)
     contract = load_dashboard_contract(resolved_root)
     services = load_service_inventory(resolved_root)
-    events = load_sample_events(resolved_root)
+    
+    # Prefer live governed flow artifacts if available, otherwise use sample events
+    if has_live_governed_flow_artifacts(resolved_root):
+        events = load_latest_governed_flow_events(resolved_root)
+    else:
+        events = load_sample_events(resolved_root)
+    
     counts = _count_events(events)
     policy = load_policy_bundle(resolved_root)
     reviewer = load_reviewer_bundle(resolved_root)

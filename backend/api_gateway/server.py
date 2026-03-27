@@ -11,6 +11,13 @@ from urllib.request import urlopen
 from urllib.parse import parse_qs, unquote, urlparse
 
 from backend.posture_service.service import build_control_plane_dashboard, build_control_plane_live_log
+from backend.governance_flow_evaluator import GovernedFlowEvaluator
+from adapters.onyx_gateway_adapter.interfaces import PolicyChecker, RetrievalChecker, ToolDecisionChecker
+from adapters.onyx_gateway_adapter.schemas import PolicyDecision, RetrievalDecision, ToolDecision, NormalizedRequest
+from adapters.retrieval.interfaces import RetrievalBackend, RetrievalPolicyEvaluator
+from adapters.retrieval.schemas import RetrievalDocument, RetrievalRequest
+from adapters.tools.interfaces import ToolExecutor
+from adapters.tools.schemas import ToolActionRequest
 
 
 REPO_ROOT = Path(os.environ.get("CONTROL_PLANE_REPO_ROOT", Path(__file__).resolve().parents[2])).resolve()
@@ -25,6 +32,47 @@ def _public_service_url(port: int, path: str = "") -> str:
     else:
         base = f"http://localhost:{port}"
     return f"{base}{path}"
+
+
+# Stub governance implementations for governed flow
+class DemoPolicyChecker(PolicyChecker):
+    def check_policy(self, request: NormalizedRequest) -> PolicyDecision:
+        return PolicyDecision(allow=True, reasons=["policy.allow"])
+
+
+class DemoRetrievalChecker(RetrievalChecker):
+    def check_retrieval(self, request: NormalizedRequest) -> RetrievalDecision:
+        return RetrievalDecision(allow=True, reasons=["retrieval.allow"])
+
+
+class DemoToolChecker(ToolDecisionChecker):
+    def check_tools(self, request: NormalizedRequest) -> ToolDecision:
+        return ToolDecision(allowed_tools=request.requested_tools, denied_tools=[], reasons=[])
+
+
+class DemoRetrievalBackend(RetrievalBackend):
+    def search(self, request: RetrievalRequest):
+        return [
+            RetrievalDocument(
+                doc_id="demo-doc-1",
+                tenant_id=request.tenant_id,
+                source=request.source,
+                content="Demo retrieval result for governed flow.",
+                trust_label="trusted",
+                quarantined=False,
+                provenance={"uri": "kb://demo-doc-1"},
+            )
+        ]
+
+
+class DemoRetrievalPolicy(RetrievalPolicyEvaluator):
+    def evaluate(self, request: RetrievalRequest) -> dict:
+        return {"allow": True, "mode": "allow", "reasons": []}
+
+
+class DemoToolExecutor(ToolExecutor):
+    def execute(self, request: ToolActionRequest) -> dict:
+        return {"result": "executed", "tool": request.tool_name}
 
 
 class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
@@ -45,6 +93,10 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/control-plane/live-log":
             limit = self._parse_int_query(parse_qs(parsed.query).get("limit", ["12"])[0], default=12, minimum=1, maximum=50)
             self._send_json(build_control_plane_live_log(REPO_ROOT, limit=limit))
+            return
+
+        if path == "/api/control-plane/governed-flow":
+            self._handle_governed_flow()
             return
 
         if path.startswith("/raw/"):
@@ -75,6 +127,35 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         except ValueError:
             return default
         return max(minimum, min(maximum, parsed))
+
+    def _handle_governed_flow(self) -> None:
+        """Execute a governed flow with demo governance checkers and emit artifacts."""
+        try:
+            evaluator = GovernedFlowEvaluator(
+                policy_checker=DemoPolicyChecker(),
+                retrieval_checker=DemoRetrievalChecker(),
+                tool_checker=DemoToolChecker(),
+                retrieval_backend=DemoRetrievalBackend(),
+                retrieval_policy=DemoRetrievalPolicy(),
+                tool_executor=DemoToolExecutor(),
+                artifact_dir=REPO_ROOT / "overlays" / "myStarterKit" / "artifacts",
+            )
+
+            result = evaluator.run(
+                user_id="api-user",
+                tenant_id="tenant-api",
+                prompt="Demonstrate governed flow through control plane API",
+                requested_tools=["search", "summarize"],
+                retrieval_source="qdrant",
+                retrieval_needed=True,
+            )
+
+            self._send_json(result.to_dict())
+        except Exception as e:
+            self._send_json(
+                {"error": str(e), "type": type(e).__name__},
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
 
     def _serve_static(self, request_path: str) -> None:
         relative_path = "index.html" if request_path in {"", "/"} else request_path.lstrip("/")
