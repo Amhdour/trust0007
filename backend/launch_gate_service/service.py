@@ -22,7 +22,7 @@ def _load_launch_gate_module(root: Path):
 def _map_status(raw_status: str) -> str:
     if raw_status == "pass":
         return "go"
-    if raw_status == "conditional_pass":
+    if raw_status in {"conditional_pass", "conditional_go"}:
         return "conditional"
     return "no-go"
 

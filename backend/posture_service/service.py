@@ -219,12 +219,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     sections = [
         {
             "id": "overview",
-            "title": "Business Overview",
-            "description": "A simple summary of platform health, controls, and launch readiness.",
+            "title": "Global Security Posture",
+            "description": "A control-plane summary of platform health, security controls, and launch readiness.",
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Key business signals",
+                    "title": "Key posture signals",
                     "items": [
                         _card(
                             "Overall platform",
@@ -268,8 +268,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "runtime",
-            "title": "Recent Activity",
-            "description": "A business-friendly view of recent requests, decisions, alerts, and approvals.",
+            "title": "Live Runtime Activity",
+            "description": "Recent governed requests, decisions, alerts, and approvals flowing through the runtime plane.",
             "blocks": [
                 {
                     "type": "cards",
@@ -302,8 +302,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "retrieval",
-            "title": "Data Access",
-            "description": "How company data is segmented, approved, and used by AI workflows.",
+            "title": "Retrieval Security View",
+            "description": "How retrieval sources are segmented, approved, and used by governed AI workflows.",
             "blocks": [
                 {
                     "type": "cards",
@@ -345,8 +345,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "tools-mcp",
-            "title": "Controls and Integrations",
-            "description": "Which tools are allowed, blocked, or require approval before use.",
+            "title": "Tool and MCP Control View",
+            "description": "Which tools and MCP surfaces are allowed, blocked, or require approval before use.",
             "blocks": [
                 {
                     "type": "cards",
@@ -398,8 +398,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "evals",
-            "title": "Quality and Safety",
-            "description": "How well the AI system performs in testing, tracing, and safety checks.",
+            "title": "AI Traces and Evals",
+            "description": "Trace coverage, evaluation results, and safety checks across the governed runtime.",
             "blocks": [
                 {
                     "type": "cards",
@@ -441,8 +441,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "audit-replay",
-            "title": "Audit and Evidence",
-            "description": "Audit trails, traceability, and evidence exports for review and reporting.",
+            "title": "Audit and Replay",
+            "description": "Audit trails, replay support, and evidence exports for review and reporting.",
             "blocks": [
                 {
                     "type": "table",
@@ -493,8 +493,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "launch-gate",
-            "title": "Launch Readiness",
-            "description": "A business view of coverage, risks, failed tests, and go-live readiness.",
+            "title": "Launch Gate and Readiness",
+            "description": "Coverage, risks, failed tests, and go-live readiness for the control plane.",
             "blocks": [
                 {
                     "type": "cards",
@@ -528,8 +528,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "entry-points",
-            "title": "Useful Links",
-            "description": "Direct links to the main business, operations, and evidence tools behind this dashboard.",
+            "title": "Entry Points",
+            "description": "Direct links to the main runtime, policy, evidence, and admin surfaces behind this dashboard.",
             "blocks": [
                 {
                     "type": "links",
@@ -585,18 +585,20 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "title": "AI Trust and Security Business Dashboard",
-        "subtitle": "Business overview -> access -> AI operations -> evidence and reporting",
+        "title": "Trust & Security Operations Dashboard for RAG and Autonomous Agents",
+        "subtitle": "Posture -> runtime -> retrieval -> tools -> evals -> audit -> launch gate",
         "runtime_module": "Onyx runs behind this dashboard as the managed AI workspace.",
         "tabs": [
             {"id": "overview", "label": "Overview"},
-            {"id": "runtime", "label": "Activity"},
-            {"id": "retrieval", "label": "Data Access"},
-            {"id": "tools-mcp", "label": "Controls"},
-            {"id": "evals", "label": "Quality"},
-            {"id": "audit-replay", "label": "Audit"},
-            {"id": "launch-gate", "label": "Readiness"},
-            {"id": "entry-points", "label": "Useful Links"},
+            {"id": "runtime", "label": "Runtime"},
+            {"id": "retrieval", "label": "Retrieval"},
+            {"id": "tools-mcp", "label": "Tools & MCP"},
+            {"id": "tools-mcp", "label": "Policies"},
+            {"id": "evals", "label": "Evals"},
+            {"id": "audit-replay", "label": "Audit & Replay"},
+            {"id": "launch-gate", "label": "Launch Gate"},
+            {"id": "audit-replay", "label": "Evidence Pack"},
+            {"id": "entry-points", "label": "Chat / Agents"},
         ],
         "sections": sections,
         "sources": [

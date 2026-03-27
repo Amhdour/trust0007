@@ -12,10 +12,10 @@ let liveLogTimer = 0;
 let lastDashboardPayload = null;
 
 const LANDING_STEPS = [
-  "Business overview",
-  "User access",
-  "AI operations",
-  "Evidence and reports",
+  "Security posture",
+  "Governed runtime",
+  "Evidence and evals",
+  "Launch readiness",
 ];
 
 function escapeHtml(value) {
