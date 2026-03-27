@@ -1,6 +1,7 @@
 """Repository-backed integration adapters for dashboard aggregation."""
 
 from .repository import (
+    load_dashboard_contract,
     load_eval_summaries,
     load_launch_report,
     load_policy_bundle,
@@ -11,6 +12,7 @@ from .repository import (
 )
 
 __all__ = [
+    "load_dashboard_contract",
     "load_eval_summaries",
     "load_launch_report",
     "load_policy_bundle",

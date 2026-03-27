@@ -2,11 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ControlPlanePosture",
   "type": "object",
-  "required": ["generated_at", "title", "subtitle", "tabs", "sections", "sources"],
+  "required": ["generated_at", "title", "subtitle", "hero_copy", "landing_steps", "tabs", "sections", "sources"],
   "properties": {
     "generated_at": { "type": "string", "format": "date-time" },
     "title": { "type": "string" },
     "subtitle": { "type": "string" },
+    "hero_copy": { "type": "string" },
+    "landing_steps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
     "runtime_module": { "type": "string" },
     "tabs": {
       "type": "array",

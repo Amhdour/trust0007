@@ -10,6 +10,7 @@ from backend.activity_service.service import build_activity_snapshot
 from backend.evidence_service.service import build_evidence_pack_summary
 from backend.integration_adapter.repository import (
     launch_report_relative_path,
+    load_dashboard_contract,
     load_eval_summaries,
     load_policy_bundle,
     load_reviewer_bundle,
@@ -117,6 +118,7 @@ def build_control_plane_live_log(root: Path | None = None, limit: int = 12) -> d
 
 def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     resolved_root = repo_root(root)
+    contract = load_dashboard_contract(resolved_root)
     services = load_service_inventory(resolved_root)
     events = load_sample_events(resolved_root)
     counts = _count_events(events)
@@ -151,6 +153,19 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     eval_total = int(latest_eval.get("total", 0))
     eval_failed = max(eval_total - eval_passed, 0)
     readiness_status = launch_summary["status"]
+    section_contracts = {
+        str(section.get("id", "")): section
+        for section in contract.get("sections", [])
+        if section.get("id")
+    }
+
+    def section_meta(section_id: str) -> dict[str, str]:
+        section = section_contracts.get(section_id, {})
+        return {
+            "id": section_id,
+            "title": str(section.get("title", section_id)),
+            "description": str(section.get("description", "")),
+        }
 
     retrieval_rows = []
     for tenant_id, sources in allowed_sources.items():
@@ -219,9 +234,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
 
     sections = [
         {
-            "id": "overview",
-            "title": "Global Security Posture",
-            "description": "A control-plane summary of platform health, security controls, and launch readiness.",
+            **section_meta("overview"),
             "blocks": [
                 {
                     "type": "cards",
@@ -268,9 +281,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            "id": "runtime",
-            "title": "Live Runtime Activity",
-            "description": "Recent governed requests, decisions, alerts, and approvals flowing through the runtime plane.",
+            **section_meta("runtime"),
             "blocks": [
                 {
                     "type": "cards",
@@ -302,9 +313,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            "id": "retrieval",
-            "title": "Retrieval Security View",
-            "description": "How retrieval sources are segmented, approved, and used by governed AI workflows.",
+            **section_meta("retrieval"),
             "blocks": [
                 {
                     "type": "cards",
@@ -345,9 +354,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            "id": "tools-mcp",
-            "title": "Tool and MCP Control View",
-            "description": "Which tools and MCP surfaces are allowed, blocked, or require approval before use.",
+            **section_meta("tools-mcp"),
             "blocks": [
                 {
                     "type": "cards",
@@ -398,9 +405,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            "id": "evals",
-            "title": "AI Traces and Evals",
-            "description": "Trace coverage, evaluation results, and safety checks across the governed runtime.",
+            **section_meta("evals"),
             "blocks": [
                 {
                     "type": "cards",
@@ -441,9 +446,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            "id": "audit-replay",
-            "title": "Audit and Replay",
-            "description": "Audit trails, replay support, and evidence exports for review and reporting.",
+            **section_meta("audit-replay"),
             "blocks": [
                 {
                     "type": "table",
@@ -493,9 +496,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            "id": "launch-gate",
-            "title": "Launch Gate and Readiness",
-            "description": "Coverage, risks, failed tests, and go-live readiness for the control plane.",
+            **section_meta("launch-gate"),
             "blocks": [
                 {
                     "type": "cards",
@@ -528,9 +529,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            "id": "entry-points",
-            "title": "Entry Points",
-            "description": "Direct links to the main runtime, policy, evidence, and admin surfaces behind this dashboard.",
+            **section_meta("entry-points"),
             "blocks": [
                 {
                     "type": "links",
@@ -586,21 +585,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "title": "Trust & Security Operations Dashboard for RAG and Autonomous Agents",
-        "subtitle": "Posture -> runtime -> retrieval -> tools -> evals -> audit -> launch gate",
+        "title": str(contract.get("title", "Trust & Security Operations Dashboard")),
+        "subtitle": str(contract.get("subtitle", "")),
+        "hero_copy": str(contract.get("hero_copy", "")),
+        "landing_steps": list(contract.get("landing_steps", [])),
         "runtime_module": "Onyx runs behind this dashboard as the managed AI workspace.",
-        "tabs": [
-            {"id": "overview", "label": "Overview"},
-            {"id": "runtime", "label": "Runtime"},
-            {"id": "retrieval", "label": "Retrieval"},
-            {"id": "tools-mcp", "label": "Tools & MCP"},
-            {"id": "tools-mcp", "label": "Policies"},
-            {"id": "evals", "label": "Evals"},
-            {"id": "audit-replay", "label": "Audit & Replay"},
-            {"id": "launch-gate", "label": "Launch Gate"},
-            {"id": "audit-replay", "label": "Evidence Pack"},
-            {"id": "entry-points", "label": "Chat / Agents"},
-        ],
+        "tabs": list(contract.get("tabs", [])),
         "sections": sections,
         "sources": [
             {

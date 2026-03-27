@@ -7,6 +7,7 @@ from typing import Any
 
 LAUNCH_REPORT_PRIMARY = "overlays/myStarterKit/artifacts/logs/launch_gate/starter_launch_readiness_report.json"
 LAUNCH_REPORT_FALLBACK = "launch-gate/starter_launch_readiness_report.json"
+DASHBOARD_CONTRACT_PATH = "contracts/control-plane-dashboard.json"
 
 
 def repo_root(explicit: Path | None = None) -> Path:
@@ -70,6 +71,10 @@ def load_sample_events(root: Path | None = None) -> list[dict[str, Any]]:
 
 def load_policy_bundle(root: Path | None = None) -> dict[str, Any]:
     return read_json(repo_root(root) / "overlays/myStarterKit/policies/bundles/default/policy.json")
+
+
+def load_dashboard_contract(root: Path | None = None) -> dict[str, Any]:
+    return read_json(repo_root(root) / DASHBOARD_CONTRACT_PATH)
 
 
 def launch_report_relative_path(root: Path | None = None) -> str:

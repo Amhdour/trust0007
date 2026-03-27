@@ -1,48 +1,46 @@
 import json
 from pathlib import Path
 
+from backend.integration_adapter.repository import load_dashboard_contract
 from backend.launch_gate_service.service import build_launch_gate_summary
 from backend.posture_service.service import build_control_plane_dashboard
 
 
 def test_dashboard_sections_follow_required_order() -> None:
     payload = build_control_plane_dashboard()
+    contract = load_dashboard_contract()
 
     assert [section["title"] for section in payload["sections"]] == [
-        "Global Security Posture",
-        "Live Runtime Activity",
-        "Retrieval Security View",
-        "Tool and MCP Control View",
-        "AI Traces and Evals",
-        "Audit and Replay",
-        "Launch Gate and Readiness",
-        "Entry Points",
+        section["title"] for section in contract["sections"]
     ]
 
 
 def test_dashboard_tabs_match_control_plane_story() -> None:
     payload = build_control_plane_dashboard()
+    contract = load_dashboard_contract()
 
-    assert [tab["label"] for tab in payload["tabs"]] == [
-        "Overview",
-        "Runtime",
-        "Retrieval",
-        "Tools & MCP",
-        "Policies",
-        "Evals",
-        "Audit & Replay",
-        "Launch Gate",
-        "Evidence Pack",
-        "Chat / Agents",
-    ]
+    assert [tab["label"] for tab in payload["tabs"]] == [tab["label"] for tab in contract["tabs"]]
 
 
 def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     html = Path("frontend/main-dashboard/index.html").read_text(encoding="utf-8")
     js = Path("frontend/main-dashboard/app.js").read_text(encoding="utf-8")
 
-    assert "Trust &amp; Security Operations Dashboard for RAG and Autonomous Agents" in html
+    assert 'id="hero-title"' in html
+    assert 'id="hero-copy"' in html
+    assert "payload.title" in js
+    assert "payload.landing_steps" in js
     assert "/api/control-plane/overview" in js
+
+
+def test_dashboard_payload_uses_shared_contract_fields() -> None:
+    payload = build_control_plane_dashboard()
+    contract = load_dashboard_contract()
+
+    assert payload["title"] == contract["title"]
+    assert payload["subtitle"] == contract["subtitle"]
+    assert payload["hero_copy"] == contract["hero_copy"]
+    assert payload["landing_steps"] == contract["landing_steps"]
 
 
 def test_launch_gate_summary_maps_existing_report() -> None:

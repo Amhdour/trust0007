@@ -1,5 +1,7 @@
 const root = document.getElementById("dashboard-root");
 const tabStrip = document.getElementById("tab-strip");
+const heroTitle = document.getElementById("hero-title");
+const heroCopy = document.getElementById("hero-copy");
 const heroMeta = document.getElementById("hero-meta");
 const heroSteps = document.getElementById("hero-steps");
 const sourcesRoot = document.getElementById("sources");
@@ -10,13 +12,6 @@ const LIVE_LOG_LIMIT = 12;
 const DEFAULT_LIVE_LOG_POLL_MS = 5000;
 let liveLogTimer = 0;
 let lastDashboardPayload = null;
-
-const LANDING_STEPS = [
-  "Security posture",
-  "Governed runtime",
-  "Evidence and evals",
-  "Launch readiness",
-];
 
 function escapeHtml(value) {
   return String(value)
@@ -45,12 +40,22 @@ function formatTimestamp(value) {
 }
 
 function renderHero(payload) {
+  if (heroTitle) {
+    heroTitle.textContent = payload.title || "Control plane dashboard";
+  }
+
+  if (heroCopy) {
+    heroCopy.textContent = payload.hero_copy || "Loading control-plane summary and governed runtime posture.";
+  }
+
   heroMeta.innerHTML = `
     <span class="chip">${escapeHtml(payload.runtime_module)}</span>
     <span class="chip">Generated ${escapeHtml(new Date(payload.generated_at).toLocaleString())}</span>
   `;
 
-  heroSteps.innerHTML = LANDING_STEPS.map(
+  const landingSteps = Array.isArray(payload.landing_steps) ? payload.landing_steps : [];
+
+  heroSteps.innerHTML = landingSteps.map(
     (label, index) => `
       <article class="step-card">
         <span class="step-index">${index + 1}</span>
@@ -61,6 +66,14 @@ function renderHero(payload) {
 }
 
 function renderResetState() {
+  if (heroTitle) {
+    heroTitle.textContent = "Control plane dashboard";
+  }
+
+  if (heroCopy) {
+    heroCopy.textContent = "Dashboard metadata cleared. Useful links and evidence sources remain available below.";
+  }
+
   heroMeta.innerHTML = "";
   heroSteps.innerHTML = "";
 
