@@ -51,6 +51,26 @@ def test_launch_gate_summary_maps_existing_report() -> None:
     assert "risky_config_defaults_disabled" in summary["missing_controls"]
 
 
+def test_dashboard_links_fallback_to_local_artifacts_when_overlay_is_missing() -> None:
+    payload = build_control_plane_dashboard()
+
+    source_hrefs = {source["label"]: source["href"] for source in payload["sources"]}
+    assert source_hrefs["Policy bundle"] == "/raw/policies/runtime-policy-fallback.json"
+    assert source_hrefs["Reviewer evidence bundle"] == "/raw/evidence/reviewer_evidence_bundle.json"
+
+    entry_points = next(section for section in payload["sections"] if section["id"] == "entry-points")
+    link_items = []
+    for block in entry_points["blocks"]:
+        if block["type"] == "links":
+            link_items.extend(block["items"])
+
+    links = {item["label"]: item for item in link_items}
+    assert links["Review Policies"]["href"].endswith("/raw/policies/runtime-policy-fallback.json")
+    assert links["Review Evidence Pack"]["href"].endswith("/raw/evidence/reviewer_evidence_bundle.json")
+    assert links["Review Evals"]["href"].endswith("/raw/docs/langfuse-integration.md")
+    assert links["Admin / Tenant Settings"]["href"].endswith("/raw/docs/keycloak-integration.md")
+
+
 def test_contract_files_present() -> None:
     for contract_path in (
         "contracts/posture.schema.json",

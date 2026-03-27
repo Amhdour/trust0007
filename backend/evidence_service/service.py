@@ -3,7 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from backend.integration_adapter.repository import launch_report_relative_path, load_reviewer_bundle, repo_root
+from backend.integration_adapter.repository import (
+    dashboard_ingestion_relative_path,
+    launch_report_relative_path,
+    load_reviewer_bundle,
+    repo_root,
+    reviewer_bundle_relative_path,
+)
 
 
 def _raw_link(path: str) -> str:
@@ -24,7 +30,7 @@ def build_evidence_pack_summary(root: Path | None = None) -> dict[str, Any]:
         "exports": [
             {
                 "label": "Reviewer Evidence Bundle",
-                "href": _raw_link("overlays/myStarterKit/artifacts/evidence/reviewer/reviewer_evidence_bundle.json"),
+                "href": _raw_link(reviewer_bundle_relative_path(resolved_root)),
                 "description": "Consolidated reviewer-ready trust evidence.",
             },
             {
@@ -34,7 +40,7 @@ def build_evidence_pack_summary(root: Path | None = None) -> dict[str, Any]:
             },
             {
                 "label": "Dashboard Ingestion Sample",
-                "href": _raw_link("overlays/myStarterKit/artifacts/dashboard/dashboard_ingestion.json"),
+                "href": _raw_link(dashboard_ingestion_relative_path(resolved_root)),
                 "description": "Export shape used for dashboard-level ingestion and replay views.",
             },
             {

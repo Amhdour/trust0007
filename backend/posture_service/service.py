@@ -5,10 +5,12 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from backend.activity_service.service import build_activity_snapshot
 from backend.evidence_service.service import build_evidence_pack_summary
 from backend.integration_adapter.repository import (
+    dashboard_ingestion_relative_path,
     launch_report_relative_path,
     load_dashboard_contract,
     load_eval_summaries,
@@ -16,7 +18,10 @@ from backend.integration_adapter.repository import (
     load_reviewer_bundle,
     load_sample_events,
     load_service_inventory,
+    path_has_files,
+    policy_bundle_relative_path,
     repo_root,
+    reviewer_bundle_relative_path,
 )
 from backend.launch_gate_service.service import build_launch_gate_summary
 
@@ -45,6 +50,14 @@ def _public_service_url(port: int, fallback_path: str = "") -> str:
 
 def _dashboard_url(path: str = "") -> str:
     return _public_service_url(3000, path)
+
+
+def _doc_link(path: str) -> str:
+    return _dashboard_url(f"/raw/{path}")
+
+
+def _launch_handoff_url(path: str) -> str:
+    return _dashboard_url(f"/launch/onyx?path={quote(path, safe='/?=&')}")
 
 
 def _status_from_launch(verdict: str) -> str:
@@ -153,6 +166,19 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     eval_total = int(latest_eval.get("total", 0))
     eval_failed = max(eval_total - eval_passed, 0)
     readiness_status = launch_summary["status"]
+    onyx_available = path_has_files(resolved_root, "upstream/onyx")
+    langfuse_available = path_has_files(resolved_root, "upstream/langfuse")
+    keycloak_available = path_has_files(resolved_root, "upstream/keycloak")
+    policy_href = _dashboard_url(f"/raw/{policy_bundle_relative_path(resolved_root)}")
+    reviewer_href = _dashboard_url(f"/raw/{reviewer_bundle_relative_path(resolved_root)}")
+
+    def runtime_link(*, label: str, href: str, fallback_href: str, available: bool, description: str, fallback_description: str) -> dict[str, str]:
+        return {
+            "label": label,
+            "href": href if available else fallback_href,
+            "description": description if available else fallback_description,
+            "status": "healthy" if available else "warning",
+        }
     section_contracts = {
         str(section.get("id", "")): section
         for section in contract.get("sections", [])
@@ -536,46 +562,74 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "title": "Open tools",
                     "items": [
                         {
-                            "label": "Open Chat",
-                            "href": _public_service_url(3010, "/app"),
-                            "description": "Open the Onyx chat workspace as the governed runtime module behind the control plane.",
-                            "status": "healthy",
+                            **runtime_link(
+                                label="Open Chat",
+                                href=_launch_handoff_url("/app"),
+                                fallback_href=_doc_link("docs/onyx-integration.md"),
+                                available=onyx_available,
+                                description="Open the Onyx chat workspace as the governed runtime module behind the control plane.",
+                                fallback_description="Onyx is not populated locally yet; open the integration guide instead.",
+                            )
                         },
                         {
-                            "label": "Open Agents",
-                            "href": _public_service_url(3010, "/app/agents"),
-                            "description": "Open the Onyx agents workspace behind the dashboard-first control plane.",
-                            "status": "healthy",
+                            **runtime_link(
+                                label="Open Agents",
+                                href=_launch_handoff_url("/app/agents"),
+                                fallback_href=_doc_link("docs/onyx-integration.md"),
+                                available=onyx_available,
+                                description="Open the Onyx agents workspace behind the dashboard-first control plane.",
+                                fallback_description="Onyx is not populated locally yet; open the integration guide instead.",
+                            )
                         },
                         {
-                            "label": "Search Knowledge",
-                            "href": _public_service_url(3010, "/app?chatMode=search"),
-                            "description": "Open the Onyx search experience backed by the governed retrieval stack.",
-                            "status": "healthy",
+                            **runtime_link(
+                                label="Search Knowledge",
+                                href=_launch_handoff_url("/app?chatMode=search"),
+                                fallback_href=_doc_link("docs/onyx-integration.md"),
+                                available=onyx_available,
+                                description="Open the Onyx search experience backed by the governed retrieval stack.",
+                                fallback_description="Onyx is not populated locally yet; open the integration guide instead.",
+                            )
                         },
                         {
-                            "label": "Review Policies",
-                            "href": _dashboard_url("/raw/overlays/myStarterKit/policies/bundles/default/policy.json"),
-                            "description": "Review the active runtime policy bundle and integration inventory.",
-                            "status": "healthy",
+                            **runtime_link(
+                                label="Review Policies",
+                                href=policy_href,
+                                fallback_href=policy_href,
+                                available=policy_bundle_relative_path(resolved_root).startswith("overlays/"),
+                                description="Review the active runtime policy bundle and integration inventory.",
+                                fallback_description="Open the local fallback policy bundle used when the overlay policy bundle is unavailable.",
+                            )
                         },
                         {
-                            "label": "Review Evals",
-                            "href": _public_service_url(3002),
-                            "description": "Open Langfuse for trace and eval drill-down.",
-                            "status": "healthy",
+                            **runtime_link(
+                                label="Review Evals",
+                                href=_public_service_url(3002),
+                                fallback_href=_doc_link("docs/langfuse-integration.md"),
+                                available=langfuse_available,
+                                description="Open Langfuse for trace and eval drill-down.",
+                                fallback_description="Langfuse is not populated locally yet; open the integration guide instead.",
+                            )
                         },
                         {
-                            "label": "Review Evidence Pack",
-                            "href": _dashboard_url("/raw/overlays/myStarterKit/artifacts/evidence/reviewer/reviewer_evidence_bundle.json"),
-                            "description": "Open the reviewer evidence bundle exported by myStarterKit.",
-                            "status": "healthy",
+                            **runtime_link(
+                                label="Review Evidence Pack",
+                                href=reviewer_href,
+                                fallback_href=reviewer_href,
+                                available=reviewer_bundle_relative_path(resolved_root).startswith("overlays/"),
+                                description="Open the reviewer evidence bundle exported by myStarterKit.",
+                                fallback_description="Open the local fallback reviewer evidence bundle used when the overlay evidence pack is unavailable.",
+                            )
                         },
                         {
-                            "label": "Admin / Tenant Settings",
-                            "href": _public_service_url(8080),
-                            "description": "Identity and tenant administration entry point via Keycloak.",
-                            "status": "healthy",
+                            **runtime_link(
+                                label="Admin / Tenant Settings",
+                                href=_public_service_url(8080),
+                                fallback_href=_doc_link("docs/keycloak-integration.md"),
+                                available=keycloak_available,
+                                description="Identity and tenant administration entry point via Keycloak.",
+                                fallback_description="Keycloak is not populated locally yet; open the integration guide instead.",
+                            )
                         },
                     ],
                 }
@@ -595,7 +649,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "sources": [
             {
                 "label": "Policy bundle",
-                "href": _raw("overlays/myStarterKit/policies/bundles/default/policy.json"),
+                "href": _raw(policy_bundle_relative_path(resolved_root)),
                 "description": "Policy, retrieval, tool, and integration inventory.",
             },
             {
@@ -610,8 +664,13 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             },
             {
                 "label": "Reviewer evidence bundle",
-                "href": _raw("overlays/myStarterKit/artifacts/evidence/reviewer/reviewer_evidence_bundle.json"),
+                "href": _raw(reviewer_bundle_relative_path(resolved_root)),
                 "description": "Audit and evidence-pack source material.",
+            },
+            {
+                "label": "Dashboard ingestion sample",
+                "href": _raw(dashboard_ingestion_relative_path(resolved_root)),
+                "description": "Dashboard feed artifact used for fallback ingestion and replay views.",
             },
             {
                 "label": "Grafana operational dashboard spec",

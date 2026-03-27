@@ -1,0 +1,29 @@
+{
+  "integrations": {
+    "allowed_integrations": [
+      "mcp_server.dashboard_control_plane",
+      "retrieval.qdrant",
+      "identity.keycloak"
+    ]
+  },
+  "retrieval": {
+    "tenant_allowed_sources": {
+      "tenant-a": [
+        "knowledge-base",
+        "incident-runbooks"
+      ]
+    }
+  },
+  "tools": {
+    "allowed_tools": [
+      "search",
+      "summarize"
+    ],
+    "forbidden_tools": [
+      "admin_shell"
+    ],
+    "confirmation_required_tools": [
+      "export_evidence"
+    ]
+  }
+}

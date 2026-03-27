@@ -1,4 +1,4 @@
-.PHONY: demo test-demo test-onyx-target serve-dashboard test bootstrap-submodules update-submodules
+.PHONY: demo test-demo test-onyx-target serve-dashboard serve-onyx test bootstrap-submodules update-submodules
 
 demo:
 	bash scripts/run-demo.sh
@@ -11,6 +11,9 @@ test-onyx-target:
 
 serve-dashboard:
 	bash scripts/start-control-plane.sh
+
+serve-onyx:
+	bash scripts/start-onyx-lite.sh
 
 test:
 	pytest -q
