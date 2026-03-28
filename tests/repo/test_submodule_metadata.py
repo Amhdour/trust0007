@@ -29,8 +29,8 @@ def test_gitlinks_are_declared_in_gitmodules() -> None:
     assert set(_gitlinks()) <= declared_paths
 
 
-def test_compatibility_snapshot_submodule_is_managed() -> None:
+def test_compatibility_snapshot_submodule_is_not_managed() -> None:
     gitmodules = (ROOT / ".gitmodules").read_text(encoding="utf-8")
 
-    assert '[submodule "ai-trust-security-stack"]' in gitmodules
-    assert "path = ai-trust-security-stack" in gitmodules
+    assert '[submodule "ai-trust-security-stack"]' not in gitmodules
+    assert "path = ai-trust-security-stack" not in gitmodules

@@ -1,6 +1,3 @@
 [submodule "overlays/myStarterKit"]
 	path = overlays/myStarterKit
 	url = https://github.com/Amhdour/myStarterKit.git
-[submodule "ai-trust-security-stack"]
-	path = ai-trust-security-stack
-	url = https://github.com/Amhdour/ai-trust-security-stack.git

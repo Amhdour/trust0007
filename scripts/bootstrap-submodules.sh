@@ -10,7 +10,6 @@ if ! command -v git >/dev/null 2>&1; then
 fi
 
 declare -A SUBMODULES=(
-  ["ai-trust-security-stack"]="https://github.com/Amhdour/ai-trust-security-stack.git"
   ["overlays/myStarterKit"]="https://github.com/Amhdour/myStarterKit.git"
 )
 

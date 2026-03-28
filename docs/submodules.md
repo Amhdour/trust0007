@@ -1,10 +1,8 @@
 # Submodule Bootstrap & Update Guide
 
 This repository vendors third-party projects via git submodules under `upstream/` and overlay sources under `overlays/`.
-It also keeps one compatibility snapshot submodule at the repo root for migration/comparison work.
 
 ## Managed submodule paths
-- `ai-trust-security-stack`
 - `upstream/onyx`
 - `upstream/keycloak`
 - `upstream/keycloak-quickstarts`
@@ -48,5 +46,4 @@ Behavior:
 
 ## Notes
 - `upstream/*` is treated as third-party code.
-- `ai-trust-security-stack` is a compatibility submodule, not the primary implementation surface.
 - Avoid direct modifications in upstream repositories unless strictly necessary.

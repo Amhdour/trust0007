@@ -33,7 +33,6 @@ The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and
 - `apps/`: logical runtime/governance grouping for Onyx and myStarterKit.
 - `infra/`: logical mapping for identity, policy, retrieval, telemetry, and evidence systems.
 - `evidence/`: dashboard-owned evidence export area.
-- `ai-trust-security-stack/`: managed compatibility submodule kept for migration/comparison workflows.
 - `upstream/`: vendored copies of Keycloak, Envoy, Onyx, OPA, Vault, Qdrant, optional gVisor, Langfuse, Grafana, and Superset sources.
 - `overlays/myStarterKit/`: governance-overlay submodule.
 - `overlays/governance-overlay/`: local, additive overlay contracts and integration wiring (this repo).
