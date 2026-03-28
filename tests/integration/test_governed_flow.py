@@ -175,7 +175,7 @@ def test_governed_flow_artifact_to_overlay_path():
     )
 
     # Check that the artifact dir is set to overlay path
-    expected_overlay_dir = Path(__file__).resolve().parent.parent / "overlays" / "myStarterKit" / "artifacts"
+    expected_overlay_dir = Path(__file__).resolve().parents[2] / "overlays" / "myStarterKit" / "artifacts"
     assert evaluator._artifact_dir == expected_overlay_dir
 
 

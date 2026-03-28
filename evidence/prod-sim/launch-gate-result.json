@@ -1,0 +1,24 @@
+{
+  "flow_metadata": {
+    "artifacts": {
+      "events_jsonl": "myStarterKit/artifacts/events.jsonl"
+    },
+    "request_id": "req-7436902878db",
+    "trace_id": "flow-144dbb81ae7f"
+  },
+  "human": "Launch Gate Decision: pass\nScore: 8/8\nBlockers: none\nMissing evidence: none\nControls passed: incident_visibility, policy_coverage, retrieval_safety, tool_governance\nControls failed: none",
+  "machine": {
+    "blockers": [],
+    "controls_failed": [],
+    "controls_passed": [
+      "incident_visibility",
+      "policy_coverage",
+      "retrieval_safety",
+      "tool_governance"
+    ],
+    "decision": "pass",
+    "max_score": 8,
+    "missing_evidence": [],
+    "score": 8
+  }
+}

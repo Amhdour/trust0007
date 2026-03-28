@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Access Denied</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f1e8;
+        --panel: #fffdf9;
+        --ink: #1e2330;
+        --muted: #5c6472;
+        --accent: #c53030;
+        --border: #d8cfc2;
+      }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background: radial-gradient(circle at top, #fff7ea 0%, var(--bg) 65%);
+        color: var(--ink);
+      }
+      main {
+        max-width: 760px;
+        margin: 48px auto;
+        padding: 32px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 18px 60px rgba(30, 35, 48, 0.12);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 2rem;
+        color: var(--accent);
+      }
+      p {
+        line-height: 1.55;
+      }
+      .status {
+        margin: 18px 0;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: #faddd1;
+        border: 1px solid #f5927f;
+      }
+      code {
+        font-family: "SFMono-Regular", Consolas, monospace;
+        background: #f3eee6;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>⛔ Access Denied</h1>
+      <p>The governance layer has blocked your access to <code>/app/bypass</code>.</p>
+      <div class="status">
+        <strong>Handoff to Onyx was denied by control-plane policy.</strong>
+        <div class="muted">Governance decision: no_go</div>
+        <div class="muted">Trace ID: <code>flow-04bc78269869</code></div>
+      </div>
+      <p><strong>Reasons for denial:</strong></p>
+      <ul>
+        <li>policy.forbidden_content</li><li>retrieval.not_needed</li>
+      </ul>
+      <p><strong>Evidence generated for this decision:</strong></p>
+      <ul>
+        <li><a href="/raw/overlays/myStarterKit/artifacts/events.jsonl">events_jsonl</a>: <code>overlays/myStarterKit/artifacts/events.jsonl</code></li><li><a href="/raw/overlays/myStarterKit/artifacts/launch-gate-result.json">launch_gate_result</a>: <code>overlays/myStarterKit/artifacts/launch-gate-result.json</code></li>
+      </ul>
+      <p class="muted">This decision has been logged for audit. Contact your administrator if you believe this is an error.</p>
+    </main>
+  </body>
+</html>

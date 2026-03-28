@@ -5,6 +5,7 @@ services:
     command: ["python", "-m", "backend.api_gateway.server"]
     environment:
       CONTROL_PLANE_REPO_ROOT: /workspace
+      CONTROL_PLANE_ARTIFACT_DIR: /workspace/overlays/myStarterKit/artifacts
       CONTROL_PLANE_HOST: 0.0.0.0
       CONTROL_PLANE_PORT: 3000
       CODESPACE_NAME: ${CODESPACE_NAME:-}
@@ -13,6 +14,7 @@ services:
       - "3000:3000"
     volumes:
       - ..:/workspace:ro
+      - control_plane_artifacts:/workspace/overlays/myStarterKit/artifacts
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - keycloak
@@ -245,3 +247,4 @@ volumes:
   qdrant_data:
   grafana_data:
   superset_home:
+  control_plane_artifacts:

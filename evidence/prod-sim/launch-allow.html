@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Open Onyx</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f1e8;
+        --panel: #fffdf9;
+        --ink: #1e2330;
+        --muted: #5c6472;
+        --accent: #a03d26;
+        --border: #d8cfc2;
+      }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background: radial-gradient(circle at top, #fff7ea 0%, var(--bg) 65%);
+        color: var(--ink);
+      }
+      main {
+        max-width: 760px;
+        margin: 48px auto;
+        padding: 32px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 18px 60px rgba(30, 35, 48, 0.12);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 2rem;
+      }
+      p {
+        line-height: 1.55;
+      }
+      .status {
+        margin: 18px 0;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: #fff4e5;
+        border: 1px solid #d8cfc2;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 24px 0 16px;
+      }
+      a.button {
+        display: inline-block;
+        padding: 12px 18px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: white;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      code {
+        font-family: "SFMono-Regular", Consolas, monospace;
+        background: #f3eee6;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+      ol {
+        padding-left: 20px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .governance {
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Onyx Launch Handoff</h1>
+      <p>The control plane found a live Onyx runtime on local port <code>3010</code> and prepared the link for <code>/app</code>.</p>
+      <p><strong>Governance Status:</strong> ✓ Approved by control-plane policy.</p>
+      <div class="status">
+        <strong>Local Onyx is not responding yet.</strong>
+        <div class="muted">The public Codespaces URL appears reachable.</div>
+      </div>
+      <div class="actions">
+        <a class="button" href="https://shiny-space-train-g494rwqqr9q6cq9v-3010.app.github.dev/app">Open Onyx</a>
+      </div>
+      <p class="muted">Target URL: <code>https://shiny-space-train-g494rwqqr9q6cq9v-3010.app.github.dev/app</code></p>
+      <p>If this still opens a <code>401 tunnel</code> page, expose port <code>3010</code> in the Codespaces <strong>Ports</strong> tab and then try again.</p>
+      <ol>
+        <li>Open the <strong>Ports</strong> tab in Codespaces.</li>
+        <li>Find port <code>3010</code>.</li>
+        <li>Use <strong>Open in Browser</strong> or change visibility from <code>Private</code> to <code>Public</code> or <code>Organization</code>.</li>
+      </ol>
+      <div class="governance">
+        <strong>Governance Audit Trail:</strong><br>
+        Trace: <code>flow-389ab004dfbb</code><br>
+        Decision: <code>pass</code><br>
+        Policy: Allow |
+        Retrieval: Allow |
+        Tools: Allow<br>
+        Reasons: <code>policy.allow, retrieval.not_needed</code><br>
+        Evidence:
+        <ul>
+          <li><a href="/raw/overlays/myStarterKit/artifacts/events.jsonl">events_jsonl</a>: <code>overlays/myStarterKit/artifacts/events.jsonl</code></li><li><a href="/raw/overlays/myStarterKit/artifacts/launch-gate-result.json">launch_gate_result</a>: <code>overlays/myStarterKit/artifacts/launch-gate-result.json</code></li>
+        </ul>
+      </div>
+    </main>
+  </body>
+</html>

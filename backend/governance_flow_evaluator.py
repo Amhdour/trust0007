@@ -14,7 +14,9 @@ The flow is:
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,12 +30,32 @@ from adapters.retrieval.engine import RetrievalSecurityLayer
 from adapters.retrieval.interfaces import InMemoryRetrievalTelemetry, RetrievalBackend, RetrievalPolicyEvaluator
 from adapters.retrieval.schemas import RetrievalDocument, RetrievalRequest
 from adapters.tools.engine import ToolGovernanceEngine
-from adapters.tools.interfaces import InMemoryAuditSink, ToolExecutor
+from adapters.tools.interfaces import InMemoryAuditSink, ToolExecutor, ToolPolicyEvaluator
 from adapters.tools.policy_model import StaticToolPolicyEvaluator, default_policy_config
 from adapters.tools.schemas import ToolActionRequest
-from launch_gate.evaluator import default_controls, evaluate_launch_gate
 from telemetry.model import EventModel
 from telemetry.sinks import JsonlEventSink
+
+
+def _load_launch_gate_module():
+    module_path = Path(__file__).resolve().parent.parent / "launch-gate" / "evaluator.py"
+    spec = importlib.util.spec_from_file_location("governed_flow_launch_gate", module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load launch gate evaluator from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+LAUNCH_GATE = _load_launch_gate_module()
+
+
+def _artifact_reference(path: Path, root: Path) -> str:
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
 
 
 @dataclass
@@ -43,6 +65,11 @@ class GovernedFlowResult:
     decision: bool
     trace_id: str
     request_id: str
+    reasons: list[str]
+    policy_allow: bool
+    retrieval_allow: bool
+    allowed_tools: list[str]
+    denied_tools: list[str]
     launch_gate_decision: str
     launch_gate_score: int
     launch_gate_max_score: int
@@ -56,6 +83,13 @@ class GovernedFlowResult:
             "decision": self.decision,
             "trace_id": self.trace_id,
             "request_id": self.request_id,
+            "reasons": self.reasons,
+            "governance": {
+                "policy_allow": self.policy_allow,
+                "retrieval_allow": self.retrieval_allow,
+                "allowed_tools": self.allowed_tools,
+                "denied_tools": self.denied_tools,
+            },
             "launch_gate": {
                 "decision": self.launch_gate_decision,
                 "score": self.launch_gate_score,
@@ -78,6 +112,7 @@ class GovernedFlowEvaluator:
         retrieval_backend: RetrievalBackend,
         retrieval_policy: RetrievalPolicyEvaluator,
         tool_executor: ToolExecutor,
+        tool_policy_evaluator: ToolPolicyEvaluator | None = None,
         artifact_dir: Optional[Path] = None,
     ):
         """Initialize the flow evaluator with governance components.
@@ -89,6 +124,7 @@ class GovernedFlowEvaluator:
             retrieval_backend: Document retrieval backend.
             retrieval_policy: Retrieval policy evaluation.
             tool_executor: Tool execution engine.
+            tool_policy_evaluator: Tool-level policy evaluator for execution-time checks.
             artifact_dir: Directory to write artifacts. Defaults to overlays/myStarterKit/artifacts/.
         """
         self._policy_checker = policy_checker
@@ -97,6 +133,7 @@ class GovernedFlowEvaluator:
         self._retrieval_backend = retrieval_backend
         self._retrieval_policy = retrieval_policy
         self._tool_executor = tool_executor
+        self._tool_policy_evaluator = tool_policy_evaluator or StaticToolPolicyEvaluator(default_policy_config())
 
         if artifact_dir is None:
             # Default to overlay path
@@ -189,8 +226,7 @@ class GovernedFlowEvaluator:
         emit("policy.decision", {"allow": gateway_decision.policy_allow, "reasons": gateway_decision.reasons})
 
         # 3) Retrieval decision
-        retrieval_decision_made = False
-        filtered_docs_count = 0
+        retrieval_reasons: list[str] = []
 
         if retrieval_needed and gateway_decision.retrieval_allow:
             retrieval_layer = RetrievalSecurityLayer(
@@ -209,29 +245,47 @@ class GovernedFlowEvaluator:
                 )
             )
 
-            retrieval_decision_made = True
-            filtered_docs_count = len(retrieval_result.filtered_documents)
+            retrieval_reasons = list(retrieval_result.reasons)
             emit(
                 "retrieval.decision",
                 {
                     "decision": retrieval_result.mode,
                     "source": retrieval_source,
-                    "docs_filtered": filtered_docs_count,
+                    "docs_filtered": len(retrieval_result.filtered_documents),
+                    "reasons": retrieval_result.reasons,
+                },
+            )
+        elif retrieval_needed:
+            retrieval_reasons = [reason for reason in gateway_decision.reasons if reason.startswith("retrieval.")]
+            emit(
+                "retrieval.decision",
+                {
+                    "decision": "deny",
+                    "source": retrieval_source,
+                    "docs_filtered": 0,
+                    "reasons": retrieval_reasons or ["retrieval.denied_by_gateway"],
+                },
+            )
+        else:
+            retrieval_reasons = ["retrieval.not_needed"]
+            emit(
+                "retrieval.decision",
+                {
+                    "decision": "skipped",
+                    "source": retrieval_source,
+                    "docs_filtered": 0,
+                    "reasons": retrieval_reasons,
                 },
             )
 
-        if retrieval_decision_made:
-            emit("retrieval.decision", {"result": "completed"})
-        else:
-            emit("retrieval.decision", {"result": "skipped"})
-
         # 4) Tool execution decision
         tools_allowed = []
-        tools_denied = gateway_decision.denied_tools
+        tools_denied = list(gateway_decision.denied_tools)
+        tool_reasons = [reason for reason in gateway_decision.reasons if reason.startswith("tool.")]
 
         if gateway_decision.allow and not tools_denied:
             tool_engine = ToolGovernanceEngine(
-                policy_evaluator=StaticToolPolicyEvaluator(default_policy_config()),
+                policy_evaluator=self._tool_policy_evaluator,
                 executor=self._tool_executor,
                 audit_sink=InMemoryAuditSink(),
             )
@@ -246,41 +300,59 @@ class GovernedFlowEvaluator:
                         arguments={"query": prompt},
                     )
                 )
-                if result.status == "allowed":
+                if result.status == "allow":
                     tools_allowed.append(tool_name)
                     emit(
                         "tool.execution_attempt",
                         {"tool_name": tool_name, "status": "executed"},
                     )
                 else:
-                    tools_denied.append(tool_name)
-                    emit("tool.execution_attempt", {"tool_name": tool_name, "status": "denied"})
+                    if tool_name not in tools_denied:
+                        tools_denied.append(tool_name)
+                    denial_reasons = [f"tool.{tool_name}:{reason}" for reason in result.reason_codes] or [f"tool.{tool_name}:{result.status}"]
+                    tool_reasons.extend(denial_reasons)
+                    emit(
+                        "tool.execution_attempt",
+                        {
+                            "tool_name": tool_name,
+                            "status": result.status,
+                            "reasons": result.reason_codes,
+                        },
+                    )
 
         emit(
             "tool.decision",
             {
                 "allowed": tools_allowed,
                 "denied": tools_denied,
+                "reasons": tool_reasons,
             },
         )
 
+        final_reasons = list(dict.fromkeys(gateway_decision.reasons + retrieval_reasons + tool_reasons))
+        final_decision = gateway_decision.allow and not tools_denied
+
         # 5) Fallback/deny hooks (not triggered in happy path)
         emit("fallback.event", {"applied": False})
-        emit("deny.event", {"blocked": not gateway_decision.allow})
+        emit("deny.event", {"blocked": not final_decision, "reasons": final_reasons})
         emit("incident.signal", {"signal": "none"})
 
         # End request
-        emit("request.end", {"status": "ok", "decision": gateway_decision.allow})
+        emit("request.end", {"status": "ok" if final_decision else "denied", "decision": final_decision})
 
         # 6) Launch-gate evaluation
         evidence = {
             "policy.decision": True,
-            "retrieval.decision": retrieval_decision_made,
+            "retrieval.decision": True,
             "tool.decision": True,
             "incident.signal": True,
         }
 
-        gate_result = evaluate_launch_gate(evidence=evidence, controls=default_controls())
+        gate_result = LAUNCH_GATE.evaluate_launch_gate(
+            evidence=evidence,
+            controls=LAUNCH_GATE.default_controls(),
+            kill_switch=not final_decision,
+        )
 
         launch_gate_artifact = {
             "machine": gate_result.to_machine_readable(),
@@ -288,7 +360,7 @@ class GovernedFlowEvaluator:
             "flow_metadata": {
                 "trace_id": trace_id,
                 "request_id": request_id,
-                "artifacts": {"events_jsonl": str(events_path.relative_to(self._artifact_dir.parent.parent))},
+                "artifacts": {"events_jsonl": _artifact_reference(events_path, self._artifact_dir.parent.parent)},
             },
         }
 
@@ -296,20 +368,25 @@ class GovernedFlowEvaluator:
 
         # Build result with relative artifact paths (from repo root)
         repo_root = Path(__file__).resolve().parent.parent
-        relative_events = events_path.relative_to(repo_root)
-        relative_gate = launch_gate_path.relative_to(repo_root)
+        relative_events = _artifact_reference(events_path, repo_root)
+        relative_gate = _artifact_reference(launch_gate_path, repo_root)
 
         return GovernedFlowResult(
-            decision=gateway_decision.allow,
+            decision=final_decision,
             trace_id=trace_id,
             request_id=request_id,
+            reasons=final_reasons,
+            policy_allow=gateway_decision.policy_allow,
+            retrieval_allow=gateway_decision.retrieval_allow,
+            allowed_tools=tools_allowed,
+            denied_tools=tools_denied,
             launch_gate_decision=gate_result.decision,
             launch_gate_score=gate_result.score,
             launch_gate_max_score=gate_result.max_score,
             launch_gate_blockers=gate_result.blockers,
             launch_gate_missing_evidence=gate_result.missing_evidence,
             artifacts={
-                "events_jsonl": str(relative_events),
-                "launch_gate_result": str(relative_gate),
+                "events_jsonl": relative_events,
+                "launch_gate_result": relative_gate,
             },
         )

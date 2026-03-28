@@ -12,25 +12,39 @@ This test:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
-import threading
 from pathlib import Path
-import tempfile
-import requests
-from urllib3.exceptions import InsecureRequestWarning
-
-# Disable SSL warnings for local testing
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 import pytest
+
+
+class HTTPResponse:
+    def __init__(self, status_code: int, text: str):
+        self.status_code = status_code
+        self.text = text
+
+    def json(self):
+        return json.loads(self.text)
+
+
+def http_get(url: str, timeout: int = 10) -> HTTPResponse:
+    try:
+        with urlopen(url, timeout=timeout) as response:
+            return HTTPResponse(getattr(response, "status", 200), response.read().decode("utf-8"))
+    except HTTPError as exc:
+        return HTTPResponse(exc.code, exc.read().decode("utf-8"))
 
 
 class APIServer:
     """Helper to start/stop the API server for testing."""
 
-    def __init__(self, repo_root: Path):
+    def __init__(self, repo_root: Path, extra_env: dict[str, str] | None = None):
         self.repo_root = repo_root
+        self.extra_env = extra_env or {}
         self.process = None
         self.port = 3001  # Use different port for testing
 
@@ -46,7 +60,7 @@ class APIServer:
         self.process = subprocess.Popen(
             ["python", "-m", "backend.api_gateway.server"],
             cwd=self.repo_root,
-            env={**dict(os.environ), **env},
+            env={**dict(os.environ), **env, **self.extra_env},
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -54,10 +68,10 @@ class APIServer:
         # Wait for server to start
         for _ in range(30):  # 30 seconds timeout
             try:
-                response = requests.get(f"http://127.0.0.1:{self.port}/api/health", timeout=1)
+                response = http_get(f"http://127.0.0.1:{self.port}/api/health", timeout=1)
                 if response.status_code == 200:
                     return
-            except requests.exceptions.RequestException:
+            except URLError:
                 pass
             time.sleep(1)
 
@@ -80,239 +94,96 @@ class APIServer:
 
 def test_live_governed_flow_end_to_end():
     """Test the complete governed flow from API call to artifact consumption."""
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = Path(__file__).resolve().parents[2]
+    artifacts_dir = repo_root / "overlays" / "myStarterKit" / "artifacts"
 
-    # Use a temporary directory for artifacts to avoid polluting the real overlay
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_artifacts = Path(temp_dir) / "artifacts"
-        temp_artifacts.mkdir()
+    server = APIServer(repo_root)
+    server.start()
 
-        # Override the artifact directory in the evaluator
-        import backend.governance_flow_evaluator
-        original_init = backend.governance_flow_evaluator.GovernedFlowEvaluator.__init__
+    try:
+        response = http_get(server.url("/api/control-plane/governed-flow"), timeout=30)
+        assert response.status_code == 200
 
-        def patched_init(self, *args, artifact_dir=temp_artifacts, **kwargs):
-            return original_init(self, *args, artifact_dir=artifact_dir, **kwargs)
+        flow_result = response.json()
+        assert flow_result["decision"] is True
+        assert "trace_id" in flow_result
+        assert "launch_gate" in flow_result
+        assert "artifacts" in flow_result
 
-        backend.governance_flow_evaluator.GovernedFlowEvaluator.__init__ = patched_init
+        events_file = repo_root / flow_result["artifacts"]["events_jsonl"]
+        gate_file = repo_root / flow_result["artifacts"]["launch_gate_result"]
 
-        try:
-            server = APIServer(repo_root)
-            server.start()
+        assert events_file.exists(), "events.jsonl should be created"
+        assert gate_file.exists(), "launch-gate-result.json should be created"
+        assert events_file.parent == artifacts_dir
+        assert gate_file.parent == artifacts_dir
 
-            # 1. Call governed flow API
-            response = requests.get(server.url("/api/control-plane/governed-flow"), timeout=30)
-            assert response.status_code == 200
+        events = [json.loads(line) for line in events_file.read_text().splitlines()]
+        event_types = {e["event_type"] for e in events}
+        required_events = {
+            "request.start",
+            "identity.established",
+            "policy.decision",
+            "retrieval.decision",
+            "tool.decision",
+            "request.end",
+        }
+        assert required_events.issubset(event_types), f"Missing events: {required_events - event_types}"
+        assert flow_result["trace_id"] in {e["trace_id"] for e in events}
 
-            flow_result = response.json()
-            assert "decision" in flow_result
-            assert "trace_id" in flow_result
-            assert "launch_gate" in flow_result
-            assert "artifacts" in flow_result
-
-            # 2. Verify artifacts were created
-            events_file = temp_artifacts / "events.jsonl"
-            gate_file = temp_artifacts / "launch-gate-result.json"
-
-            assert events_file.exists(), "events.jsonl should be created"
-            assert gate_file.exists(), "launch-gate-result.json should be created"
-
-            # 3. Verify events content
-            events = [json.loads(line) for line in events_file.read_text().splitlines()]
-            assert len(events) > 0
-
-            event_types = {e["event_type"] for e in events}
-            required_events = {
-                "request.start",
-                "identity.established",
-                "policy.decision",
-                "retrieval.decision",
-                "tool.decision",
-                "request.end"
-            }
-            assert required_events.issubset(event_types), f"Missing events: {required_events - event_types}"
-
-            # 4. Verify launch-gate result
-            gate_data = json.loads(gate_file.read_text())
-            assert "machine" in gate_data
-            assert "human" in gate_data
-            assert "flow_metadata" in gate_data
-
-            # 5. Verify trace_id consistency
-            flow_trace_id = flow_result["trace_id"]
-            event_trace_ids = {e["trace_id"] for e in events}
-            assert flow_trace_id in event_trace_ids, "Trace ID should appear in events"
-
-            print(f"✅ Governed flow completed with trace_id: {flow_trace_id}")
-            print(f"✅ Artifacts created: {events_file}, {gate_file}")
-            print(f"✅ Launch gate decision: {flow_result['launch_gate']['decision']}")
-
-        finally:
-            server.stop()
-            # Restore original init
-            backend.governance_flow_evaluator.GovernedFlowEvaluator.__init__ = original_init
+        gate_data = json.loads(gate_file.read_text())
+        assert gate_data["machine"]["decision"] == "pass"
+        assert gate_data["flow_metadata"]["trace_id"] == flow_result["trace_id"]
+    finally:
+        server.stop()
 
 
 def test_live_onyx_handoff_enforcement():
     """Test that Onyx handoff is governed and can be blocked."""
-    repo_root = Path(__file__).resolve().parent.parent
-
-    # Mock the evaluator to deny all requests for this test
-    import backend.api_gateway.server
-    original_evaluator = backend.api_gateway.server.GovernedFlowEvaluator
-
-    class DenyAllEvaluator:
-        def run(self, *args, **kwargs):
-            from backend.governance_flow_evaluator import GovernedFlowResult
-            return GovernedFlowResult(
-                decision=False,
-                trace_id="deny-test-trace",
-                request_id="deny-test-req",
-                launch_gate_decision="no_go",
-                launch_gate_score=0,
-                launch_gate_max_score=9,
-                launch_gate_blockers=["policy.deny_all"],
-                launch_gate_missing_evidence=[],
-                artifacts={"events_jsonl": "test", "launch_gate_result": "test"},
-            )
-
-    backend.api_gateway.server.GovernedFlowEvaluator = DenyAllEvaluator
+    repo_root = Path(__file__).resolve().parents[2]
+    server = APIServer(repo_root)
+    server.start()
 
     try:
-        server = APIServer(repo_root)
-        server.start()
+        response = http_get(server.url("/launch/onyx?path=/app/bypass"), timeout=10)
 
-        # Call handoff endpoint - should be denied
-        response = requests.get(server.url("/launch/onyx?path=/app"), timeout=10)
-
-        # Should return 403 Forbidden
         assert response.status_code == 403, f"Expected 403, got {response.status_code}"
 
-        # Should contain denial message
         content = response.text
         assert "Access Denied" in content
         assert "governance layer has blocked" in content
-        assert "deny-test-trace" in content
-
-        print("✅ Onyx handoff correctly blocked by governance")
-
+        assert "policy.forbidden_content" in content
     finally:
         server.stop()
-        # Restore original evaluator
-        backend.api_gateway.server.GovernedFlowEvaluator = original_evaluator
 
 
 def test_live_dashboard_consumes_artifacts():
     """Test that dashboard API consumes live governed flow artifacts."""
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = Path(__file__).resolve().parents[2]
+    server = APIServer(repo_root)
+    server.start()
 
-    # Create fake live artifacts
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_artifacts = Path(temp_dir) / "artifacts"
-        temp_artifacts.mkdir()
+    try:
+        governed_flow = http_get(server.url("/api/control-plane/governed-flow"), timeout=30)
+        assert governed_flow.status_code == 200
+        trace_id = governed_flow.json()["trace_id"]
 
-        # Create events.jsonl
-        events_data = [
-            {
-                "event_type": "request.start",
-                "trace_id": "live-test-trace",
-                "request_id": "live-test-req",
-                "timestamp": "2026-03-27T18:00:00Z",
-                "payload": {"path": "/governed-flow"}
-            },
-            {
-                "event_type": "policy.decision",
-                "trace_id": "live-test-trace",
-                "request_id": "live-test-req",
-                "timestamp": "2026-03-27T18:00:01Z",
-                "payload": {"allow": True}
-            }
-        ]
-        events_file = temp_artifacts / "events.jsonl"
-        events_file.write_text("\n".join(json.dumps(e) for e in events_data))
+        response = http_get(server.url("/api/control-plane"), timeout=10)
+        assert response.status_code == 200
 
-        # Create launch-gate-result.json
-        gate_data = {
-            "machine": {
-                "decision": "pass",
-                "score": 9,
-                "max_score": 9,
-                "blockers": [],
-                "missing_evidence": [],
-                "controls_passed": ["policy_coverage", "retrieval_safety", "tool_governance"],
-                "controls_failed": []
-            },
-            "human": "Launch Gate Decision: pass\nScore: 9/9\n...",
-            "flow_metadata": {
-                "trace_id": "live-test-trace",
-                "request_id": "live-test-req"
-            }
-        }
-        gate_file = temp_artifacts / "launch-gate-result.json"
-        gate_file.write_text(json.dumps(gate_data))
-
-        # Mock the repository functions to use our temp artifacts
-        import backend.integration_adapter.repository
-        original_has_live = backend.integration_adapter.repository.has_live_governed_flow_artifacts
-        original_load_events = backend.integration_adapter.repository.load_latest_governed_flow_events
-        original_load_gate = backend.integration_adapter.repository.load_latest_governed_flow_launch_gate
-
-        def mock_has_live(root=None):
-            return True
-
-        def mock_load_events(root=None):
-            return [json.loads(line) for line in events_file.read_text().splitlines()]
-
-        def mock_load_gate(root=None):
-            return json.loads(gate_file.read_text())
-
-        backend.integration_adapter.repository.has_live_governed_flow_artifacts = mock_has_live
-        backend.integration_adapter.repository.load_latest_governed_flow_events = mock_load_events
-        backend.integration_adapter.repository.load_latest_governed_flow_launch_gate = mock_load_gate
-
-        try:
-            server = APIServer(repo_root)
-            server.start()
-
-            # Call dashboard API
-            response = requests.get(server.url("/api/control-plane"), timeout=10)
-            assert response.status_code == 200
-
-            dashboard_data = response.json()
-
-            # Should contain live events, not fallback
-            assert "sections" in dashboard_data
-            # Find the activity section
-            activity_section = None
-            for section in dashboard_data["sections"]:
-                if section.get("id") == "activity":
-                    activity_section = section
-                    break
-
-            assert activity_section is not None, "Should have activity section"
-            assert "items" in activity_section
-
-            # Should contain our live events
-            items = activity_section["items"]
-            event_summaries = [item.get("detail", "") for item in items]
-
-            # Should see our live events
-            assert any("Started /governed-flow" in summary for summary in event_summaries)
-            assert any("Policy allow" in summary for summary in event_summaries)
-
-            print("✅ Dashboard correctly consumed live governed flow artifacts")
-
-        finally:
-            server.stop()
-            # Restore originals
-            backend.integration_adapter.repository.has_live_governed_flow_artifacts = original_has_live
-            backend.integration_adapter.repository.load_latest_governed_flow_events = original_load_events
-            backend.integration_adapter.repository.load_latest_governed_flow_launch_gate = original_load_gate
+        dashboard_data = response.json()
+        assert "sections" in dashboard_data
+        dashboard_text = json.dumps(dashboard_data)
+        assert trace_id in dashboard_text
+        assert "Recent traces and evals" in dashboard_text
+        assert "Replay and deny posture" in dashboard_text
+    finally:
+        server.stop()
 
 
 if __name__ == "__main__":
     import os
-    os.chdir(Path(__file__).parent.parent)
+    os.chdir(Path(__file__).resolve().parents[2])
 
     print("Running live end-to-end tests...")
     test_live_governed_flow_end_to_end()

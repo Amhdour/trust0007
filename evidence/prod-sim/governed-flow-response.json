@@ -1,0 +1,31 @@
+{
+  "decision": true,
+  "trace_id": "flow-144dbb81ae7f",
+  "request_id": "req-7436902878db",
+  "reasons": [
+    "policy.allow",
+    "retrieval.allow",
+    "retrieval.integration_allowed:qdrant",
+    "retrieval.tenant_scoped:tenant-a"
+  ],
+  "governance": {
+    "policy_allow": true,
+    "retrieval_allow": true,
+    "allowed_tools": [
+      "search",
+      "summarize"
+    ],
+    "denied_tools": []
+  },
+  "launch_gate": {
+    "decision": "pass",
+    "score": 8,
+    "max_score": 8,
+    "blockers": [],
+    "missing_evidence": []
+  },
+  "artifacts": {
+    "events_jsonl": "overlays/myStarterKit/artifacts/events.jsonl",
+    "launch_gate_result": "overlays/myStarterKit/artifacts/launch-gate-result.json"
+  }
+}

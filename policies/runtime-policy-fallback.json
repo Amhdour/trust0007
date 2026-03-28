@@ -9,13 +9,23 @@
   "retrieval": {
     "tenant_allowed_sources": {
       "tenant-a": [
+        "qdrant",
         "knowledge-base",
         "incident-runbooks"
+      ],
+      "tenant-dashboard": [
+        "qdrant",
+        "knowledge-base"
+      ],
+      "tenant-api": [
+        "qdrant",
+        "knowledge-base"
       ]
     }
   },
   "tools": {
     "allowed_tools": [
+      "onyx",
       "search",
       "summarize"
     ],
