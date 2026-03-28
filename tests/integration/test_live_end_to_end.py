@@ -171,6 +171,8 @@ def test_live_onyx_search_handoff_allowed() -> None:
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         assert "Governance Status:</strong> ✓ Approved" in response.text
         assert "Policy Source" in response.text
+        assert "Local Onyx is not responding yet." in response.text
+        assert "found a live Onyx runtime" not in response.text
     finally:
         server.stop()
 

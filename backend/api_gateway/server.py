@@ -566,6 +566,58 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         local_ready = self._url_is_reachable(local_url)
         codespaces_visible = self._url_is_reachable(_public_service_url(3010))
 
+        if local_ready and codespaces_visible:
+            runtime_summary = (
+                "The control plane found a reachable Onyx runtime on local port <code>3010</code> "
+                f"and prepared the link for <code>{safe_path_html}</code>."
+            )
+            status_headline = "Local Onyx is running."
+            status_detail = "The public Codespaces URL appears reachable."
+            next_steps = """
+      <p>The governed runtime looks reachable from both the local service and the public Codespaces URL.</p>
+"""
+        elif local_ready and not codespaces_visible:
+            runtime_summary = (
+                "The control plane found a reachable Onyx runtime on local port <code>3010</code> "
+                f"and prepared the link for <code>{safe_path_html}</code>."
+            )
+            status_headline = "Local Onyx is running."
+            status_detail = "The public Codespaces port for 3010 is still protected by the tunnel."
+            next_steps = """
+      <p>If this still opens a <code>401 tunnel</code> page, expose port <code>3010</code> in the Codespaces <strong>Ports</strong> tab and then try again.</p>
+      <ol>
+        <li>Open the <strong>Ports</strong> tab in Codespaces.</li>
+        <li>Find port <code>3010</code>.</li>
+        <li>Use <strong>Open in Browser</strong> or change visibility from <code>Private</code> to <code>Public</code> or <code>Organization</code>.</li>
+      </ol>
+"""
+        elif not local_ready and codespaces_visible:
+            runtime_summary = (
+                "Governance approved the handoff, but the configured Onyx runtime on local port <code>3010</code> "
+                f"is not responding for <code>{safe_path_html}</code>."
+            )
+            status_headline = "Local Onyx is not responding yet."
+            status_detail = "The public Codespaces URL is reachable, so the remaining issue is the local Onyx service itself."
+            next_steps = """
+      <p>Port exposure is not the blocker here. Start or repair the local Onyx runtime bound to port <code>3010</code>, then retry the governed handoff.</p>
+"""
+        else:
+            runtime_summary = (
+                "Governance approved the handoff, but the configured Onyx runtime on local port <code>3010</code> "
+                f"is not responding for <code>{safe_path_html}</code>."
+            )
+            status_headline = "Local Onyx is not responding yet."
+            status_detail = "The public Codespaces port is also not reachable, but exposing the port alone will not fix this until the Onyx service is running."
+            next_steps = """
+      <p>Start the local Onyx runtime on port <code>3010</code> first. After that, if the public URL still shows a tunnel page, expose port <code>3010</code> in the Codespaces <strong>Ports</strong> tab.</p>
+      <ol>
+        <li>Start or repair the Onyx runtime bound to port <code>3010</code>.</li>
+        <li>Open the <strong>Ports</strong> tab in Codespaces.</li>
+        <li>Find port <code>3010</code>.</li>
+        <li>Use <strong>Open in Browser</strong> or change visibility from <code>Private</code> to <code>Public</code> or <code>Organization</code>.</li>
+      </ol>
+"""
+
         body = f"""<!doctype html>
 <html lang="en">
   <head>
@@ -650,22 +702,17 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
   <body>
     <main>
       <h1>Onyx Launch Handoff</h1>
-      <p>The control plane found a live Onyx runtime on local port <code>3010</code> and prepared the link for <code>{safe_path_html}</code>.</p>
+      <p>{runtime_summary}</p>
       <p><strong>Governance Status:</strong> ✓ Approved by control-plane policy.</p>
       <div class="status">
-        <strong>{"Local Onyx is running." if local_ready else "Local Onyx is not responding yet."}</strong>
-        <div class="muted">{"The dashboard link was failing because the public Codespaces port is still protected by the tunnel." if not codespaces_visible else "The public Codespaces URL appears reachable."}</div>
+        <strong>{status_headline}</strong>
+        <div class="muted">{status_detail}</div>
       </div>
       <div class="actions">
         <a class="button" href="{public_url}">Open Onyx</a>
       </div>
       <p class="muted">Target URL: <code>{public_url}</code></p>
-      <p>If this still opens a <code>401 tunnel</code> page, expose port <code>3010</code> in the Codespaces <strong>Ports</strong> tab and then try again.</p>
-      <ol>
-        <li>Open the <strong>Ports</strong> tab in Codespaces.</li>
-        <li>Find port <code>3010</code>.</li>
-        <li>Use <strong>Open in Browser</strong> or change visibility from <code>Private</code> to <code>Public</code> or <code>Organization</code>.</li>
-      </ol>
+      {next_steps}
       <div class="governance">
         <strong>Governance Audit Trail:</strong><br>
         Trace: <code>{flow_result.trace_id if flow_result else 'unknown'}</code><br>
