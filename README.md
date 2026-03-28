@@ -4,6 +4,9 @@ This repository is now shaped as a **dashboard-first control plane** for an AI T
 
 The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and Autonomous Agents**. Onyx is treated as a governed runtime module behind that dashboard instead of the primary visible entry.
 
+Suggested short repository description:
+`Dashboard-first AI Trust & Security Stack Control Plane for governed AI runtime launch readiness, policy enforcement, evidence integrity, and auditable Onyx handoffs.`
+
 ## Design intent
 
 - Lead with the dashboard, then identity/session, then governed AI runtime, then evidence/analytics.
@@ -46,6 +49,18 @@ The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and
 ## Phase status
 
 Execution plan tracking and phase notes are stored under `docs/phases/`.
+
+## Homepage Information Architecture
+
+The homepage is now optimized to answer the reviewer questions in under 10 seconds:
+
+- What is protected: asset and protection coverage across surfaces, tenants, roles, retrieval sources, tools, MCP servers, and the governed Onyx runtime.
+- What was blocked: denied retrievals, denied tool attempts, confirmation-required actions, and blocked `/launch/onyx` handoffs.
+- Why it was blocked: surfaced reason codes, policy source, policy path, trace IDs, tenants, actors, and surfaces.
+- What evidence exists: reviewer bundles, governed flow traces, launch-gate outputs, telemetry exports, and replay-ready artifacts.
+- Is the system launch-ready: dominant launch gate panel with readiness status, control-family summaries, top failing controls, and residual risks.
+
+See `docs/control-plane-dashboard-homepage.md` for the homepage structure, data sources, and real-versus-demo notes.
 
 ## Quickstart
 

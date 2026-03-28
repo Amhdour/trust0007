@@ -205,10 +205,11 @@ def test_live_dashboard_consumes_artifacts():
 
         dashboard_data = response.json()
         assert "sections" in dashboard_data
+        assert "readiness_panel" in dashboard_data
         dashboard_text = json.dumps(dashboard_data)
         assert trace_id in dashboard_text
-        assert "Recent traces and evals" in dashboard_text
-        assert "Replay and deny posture" in dashboard_text
+        assert "Blocked / Governed Actions" in dashboard_text
+        assert "Onyx Governed Runtime" in dashboard_text
     finally:
         server.stop()
 

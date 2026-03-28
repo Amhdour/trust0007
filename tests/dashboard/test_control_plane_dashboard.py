@@ -29,8 +29,12 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
 
     assert 'id="hero-title"' in html
     assert 'id="hero-copy"' in html
+    assert 'id="briefing-root"' in html
+    assert 'id="readiness-root"' in html
     assert "payload.title" in js
     assert "payload.landing_steps" in js
+    assert "payload.operator_briefing" in js
+    assert "payload.readiness_panel" in js
     assert "/api/control-plane/overview" in js
 
 
@@ -42,6 +46,17 @@ def test_dashboard_payload_uses_shared_contract_fields() -> None:
     assert payload["subtitle"] == contract["subtitle"]
     assert payload["hero_copy"] == contract["hero_copy"]
     assert payload["landing_steps"] == contract["landing_steps"]
+    assert payload["repo_description_suggestion"] == contract["repo_description_suggestion"]
+
+
+def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
+    payload = build_control_plane_dashboard()
+
+    assert len(payload["operator_briefing"]) == 5
+    assert len(payload["kpis"]) >= 10
+    assert payload["readiness_panel"]["status_label"] in {"GO", "CONDITIONAL", "NO-GO"}
+    assert payload["readiness_panel"]["control_families"]
+    assert payload["data_mode"]["label"]
 
 
 def test_launch_gate_summary_maps_existing_report() -> None:
@@ -59,17 +74,17 @@ def test_dashboard_prefers_overlay_policy_bundle_when_present() -> None:
     assert source_hrefs["Policy bundle"] == "/raw/overlays/myStarterKit/policies/bundles/default/policy.json"
     assert source_hrefs["Reviewer evidence bundle"] == "/raw/evidence/reviewer_evidence_bundle.json"
 
-    entry_points = next(section for section in payload["sections"] if section["id"] == "entry-points")
+    onyx_runtime = next(section for section in payload["sections"] if section["id"] == "entry-points")
     link_items = []
-    for block in entry_points["blocks"]:
+    for block in onyx_runtime["blocks"]:
         if block["type"] == "links":
             link_items.extend(block["items"])
 
     links = {item["label"]: item for item in link_items}
-    assert links["Review Policies"]["href"].endswith("/raw/overlays/myStarterKit/policies/bundles/default/policy.json")
-    assert links["Review Evidence Pack"]["href"].endswith("/raw/evidence/reviewer_evidence_bundle.json")
-    assert links["Review Evals"]["href"].endswith("/raw/docs/langfuse-integration.md")
-    assert links["Admin / Tenant Settings"]["href"].endswith("/raw/docs/keycloak-integration.md")
+    assert links["Open Chat"]["href"].endswith("/launch/onyx?path=/app")
+    assert links["Open Agents"]["href"].endswith("/launch/onyx?path=/app/agents")
+    assert links["Search Knowledge"]["href"].endswith("/launch/onyx?path=/app?chatMode=search")
+    assert links["Onyx integration note"]["href"].endswith("/raw/docs/onyx-integration.md")
 
 
 def test_runtime_policy_bundle_falls_back_when_overlay_is_missing() -> None:
@@ -84,6 +99,18 @@ def test_runtime_policy_bundle_falls_back_when_overlay_is_missing() -> None:
         assert bundle.source == "fallback"
         assert bundle.relative_path == "policies/runtime-policy-fallback.json"
         assert bundle.document["tools"]["allowed_tools"] == ["search"]
+
+
+def test_blocked_actions_section_includes_reason_codes() -> None:
+    payload = build_control_plane_dashboard()
+    blocked = next(section for section in payload["sections"] if section["id"] == "blocked-actions")
+
+    records_block = next(block for block in blocked["blocks"] if block["type"] == "records")
+    table_block = next(block for block in blocked["blocks"] if block["type"] == "table")
+
+    assert records_block["items"]
+    assert any(column["key"] == "reason" for column in table_block["columns"])
+    assert any(row["reason"] for row in table_block["rows"])
 
 
 def test_contract_files_present() -> None:

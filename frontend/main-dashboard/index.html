@@ -3,50 +3,100 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Trust & Security Control Plane</title>
+    <title>AI Trust &amp; Security Stack Control Plane</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="page-shell">
       <header class="hero">
-        <p class="eyebrow">Dashboard-first control plane</p>
-        <h1 id="hero-title">Control plane dashboard</h1>
-        <p id="hero-copy" class="hero-copy">Loading control-plane summary and governed runtime posture.</p>
-        <div class="hero-meta" id="hero-meta"></div>
-        <div class="hero-actions">
-          <button class="hero-action-button" id="reset-dashboard-button" type="button">
-            Reset dashboard
-          </button>
+        <div class="hero-head">
+          <div>
+            <p class="eyebrow">Trust &amp; Security Operations Dashboard</p>
+            <h1 id="hero-title">AI Trust &amp; Security Stack Control Plane</h1>
+            <p id="hero-copy" class="hero-copy">
+              Loading governed runtime posture, blocked actions, evidence quality, and launch readiness.
+            </p>
+            <div class="hero-meta" id="hero-meta"></div>
+          </div>
+          <div class="hero-actions">
+            <button class="hero-action-button" id="refresh-dashboard-button" type="button">
+              Refresh evidence
+            </button>
+          </div>
         </div>
         <div class="hero-steps" id="hero-steps"></div>
       </header>
 
-      <nav class="tab-strip" id="tab-strip" aria-label="Dashboard tabs"></nav>
+      <section class="briefing-panel" aria-labelledby="briefing-title">
+        <div class="section-head">
+          <p class="eyebrow">Operator briefing</p>
+          <h2 id="briefing-title">Answer The Reviewer Questions First</h2>
+          <p class="section-description">
+            What is protected, what was blocked, why it was blocked, what evidence exists, and whether the platform is ready to launch.
+          </p>
+        </div>
+        <div id="briefing-root" class="briefing-grid">
+          <section class="loading-panel">
+            <p class="eyebrow">Loading</p>
+            <h3>Preparing operator briefing</h3>
+            <p>Gathering enforcement, evidence, and readiness signals.</p>
+          </section>
+        </div>
+      </section>
+
+      <section class="kpi-panel" aria-labelledby="kpi-title">
+        <div class="section-head">
+          <p class="eyebrow">Governance KPIs</p>
+          <h2 id="kpi-title">Security Operations Metrics</h2>
+          <p class="section-description">
+            Launch readiness, deny posture, retrieval boundaries, tool governance, audit coverage, and evidence freshness.
+          </p>
+        </div>
+        <div id="kpi-root" class="cards-grid">
+          <section class="loading-panel">
+            <p class="eyebrow">Loading</p>
+            <h3>Preparing governance KPIs</h3>
+            <p>Waiting for policy, audit, retrieval, and launch data.</p>
+          </section>
+        </div>
+      </section>
+
+      <section class="readiness-panel" id="launch-gate-top" aria-labelledby="readiness-title">
+        <div id="readiness-root">
+          <section class="loading-panel">
+            <p class="eyebrow">Loading</p>
+            <h2 id="readiness-title">Security Readiness / Launch Gate</h2>
+            <p>Preparing readiness state, failing controls, residual risks, and evidence links.</p>
+          </section>
+        </div>
+      </section>
+
+      <nav class="tab-strip" id="tab-strip" aria-label="Dashboard sections"></nav>
+
+      <main id="dashboard-root" class="dashboard-root" aria-live="polite">
+        <section class="loading-panel">
+          <p class="eyebrow">Loading</p>
+          <h2>Building dashboard sections</h2>
+          <p>Loading protection coverage, blocked actions, auditability, and governed runtime details.</p>
+        </section>
+      </main>
 
       <section class="live-log-panel" aria-labelledby="live-log-title">
         <div class="section-head">
           <p class="eyebrow">Recent activity</p>
-          <h2 id="live-log-title">Recent Activity and Alerts</h2>
+          <h2 id="live-log-title">Recent Activity And Alerts</h2>
           <p class="section-description">
-            A live feed of recent requests, policy checks, alerts, and operating events.
+            Live request, alert, and runtime telemetry from the governed stack.
           </p>
         </div>
         <div id="live-log-root" class="live-log-root">
           <section class="loading-panel">
             <p class="eyebrow">Loading</p>
             <h3>Loading recent activity</h3>
-            <p>Waiting for the latest business and operational events.</p>
+            <p>Waiting for the latest runtime and observability events.</p>
           </section>
         </div>
       </section>
-
-      <main id="dashboard-root" class="dashboard-root" aria-live="polite">
-        <section class="loading-panel">
-          <p class="eyebrow">Loading</p>
-          <h2>Building your dashboard</h2>
-          <p>Loading system status, controls, activity, and evidence summaries.</p>
-        </section>
-      </main>
 
       <footer class="footer">
         <div>
@@ -56,7 +106,7 @@
       </footer>
     </div>
 
-    <noscript>This dashboard needs JavaScript enabled to show live activity and control-plane summaries.</noscript>
+    <noscript>This dashboard needs JavaScript enabled to show governance posture, evidence, and launch readiness.</noscript>
     <script src="/app.js" defer></script>
   </body>
 </html>

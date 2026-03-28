@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -16,28 +17,52 @@ from backend.integration_adapter.repository import (
     load_dashboard_contract,
     load_eval_summaries,
     load_latest_governed_flow_events,
-    load_latest_governed_flow_launch_gate,
     load_runtime_policy_bundle,
     load_reviewer_bundle,
     load_sample_events,
     load_service_inventory,
     path_has_files,
+    read_json,
+    read_jsonl,
     repo_root,
     reviewer_bundle_relative_path,
 )
 from backend.launch_gate_service.service import build_launch_gate_summary
 
 
-def _card(label: str, value: str, status: str, detail: str) -> dict[str, str]:
-    return {"label": label, "value": value, "status": status, "detail": detail}
+POLICY_BUNDLE_PATH = "overlays/myStarterKit/policies/bundles/default/policy.json"
+INSPECTABLE_ALLOWED_FLOW = "evidence/reviewer/inspectable-live-runtime/allowed-flow.json"
+INSPECTABLE_DENIED_FLOW = "evidence/reviewer/inspectable-live-runtime/denied-flow.json"
+PROD_SIM_EVENTS = "evidence/prod-sim/events.jsonl"
+PROD_SIM_GOVERNED_FLOW = "evidence/prod-sim/governed-flow-response.json"
+PROD_SIM_LAUNCH_GATE = "evidence/prod-sim/launch-gate-result.json"
+SAMPLE_EVENTS = "telemetry/exports/sample_events.jsonl"
 
 
-def _record(title: str, meta: str, detail: str, status: str = "neutral") -> dict[str, str]:
-    return {"title": title, "meta": meta, "detail": detail, "status": status}
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _card(label: str, value: str, status: str, detail: str, href: str = "") -> dict[str, str]:
+    item = {"label": label, "value": value, "status": status, "detail": detail}
+    if href:
+        item["href"] = href
+    return item
+
+
+def _record(title: str, meta: str, detail: str, status: str = "neutral", href: str = "") -> dict[str, str]:
+    item = {"title": title, "meta": meta, "detail": detail, "status": status}
+    if href:
+        item["href"] = href
+    return item
+
+
+def _link(label: str, href: str, description: str, status: str = "neutral") -> dict[str, str]:
+    return {"label": label, "href": href, "description": description, "status": status}
 
 
 def _raw(path: str) -> str:
-    return f"/raw/{path}"
+    return f"/raw/{quote(path)}"
 
 
 def _public_service_url(port: int, fallback_path: str = "") -> str:
@@ -54,10 +79,6 @@ def _dashboard_url(path: str = "") -> str:
     return _public_service_url(3000, path)
 
 
-def _doc_link(path: str) -> str:
-    return _dashboard_url(f"/raw/{path}")
-
-
 def _launch_handoff_url(path: str) -> str:
     return _dashboard_url(f"/launch/onyx?path={quote(path, safe='/?=&')}")
 
@@ -70,60 +91,437 @@ def _status_from_launch(verdict: str) -> str:
     }.get(verdict, "neutral")
 
 
-def _count_events(events: list[dict[str, Any]]) -> Counter[str]:
-    return Counter(str(event.get("event_type", "")) for event in events)
-
-
-def _latest(items: list[dict[str, Any]]) -> dict[str, Any]:
-    return items[-1] if items else {}
-
-
-def _unique(values: list[str]) -> list[str]:
-    ordered: list[str] = []
-    for value in values:
-        if value and value not in ordered:
-            ordered.append(value)
-    return ordered
-
-
-def _severity_status(value: str) -> str:
+def _status_from_severity(value: str) -> str:
     normalized = value.strip().lower()
     return {
-        "error": "critical",
         "critical": "critical",
+        "error": "critical",
         "warning": "warning",
         "warn": "warning",
+        "healthy": "healthy",
         "info": "neutral",
+        "neutral": "neutral",
         "debug": "neutral",
     }.get(normalized, "neutral")
 
 
-def _summarize_event(event: dict[str, Any]) -> str:
-    event_type = str(event.get("event_type", "event"))
+def _parse_timestamp(value: str) -> datetime | None:
+    if not value:
+        return None
+    candidate = value.strip()
+    if candidate.endswith("Z"):
+        candidate = f"{candidate[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _payload(event: dict[str, Any]) -> dict[str, Any]:
     payload = event.get("payload", {})
-    if not isinstance(payload, dict):
-        payload = {}
+    return payload if isinstance(payload, dict) else {}
 
-    if event_type == "request.start":
-        return f"Started {payload.get('path', '/runtime')}"
-    if event_type == "request.end":
-        return f"Completed with status {payload.get('status', 'unknown')}"
-    if event_type == "policy.decision":
-        decision = "allow" if payload.get("allow") else "deny"
-        return f"Policy {decision} via {payload.get('policy', 'policy bundle')}"
-    if event_type == "retrieval.decision":
-        return f"{payload.get('decision', 'allow').upper()} retrieval from {payload.get('source', 'unknown source')}"
-    if event_type == "tool.execution_attempt":
-        return f"Attempted tool {payload.get('tool_name', 'unknown')}"
-    if event_type == "fallback.event":
-        return f"Fallback triggered: {payload.get('reason', 'degraded runtime')}"
-    if event_type == "deny.event":
-        return f"Denied by governance: {payload.get('reason', 'policy_denied')}"
-    if event_type == "incident.signal":
-        return f"Incident signal: {payload.get('signal', 'anomaly_detected')}"
 
-    details = [f"{key}={value}" for key, value in payload.items() if value not in {"", None}]
-    return ", ".join(details[:3]) if details else "No payload details recorded."
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item)]
+    return []
+
+
+def _humanize_reason(reason: str) -> str:
+    code = reason.strip()
+    if not code:
+        return "Governance reason unavailable"
+    if ":" in code:
+        head, tail = code.split(":", 1)
+        head = head.replace(".", " ").replace("_", " ").strip().title()
+        tail = tail.replace("_", " ").strip()
+        return f"{head}: {tail}"
+    return code.replace(".", " ").replace("_", " ").strip().title()
+
+
+def _reason_codes(event: dict[str, Any]) -> list[str]:
+    payload = _payload(event)
+    codes = _string_list(payload.get("reason_codes"))
+    if codes:
+        return codes
+    codes = _string_list(payload.get("reasons"))
+    if codes:
+        return codes
+    if payload.get("reason"):
+        return [str(payload["reason"])]
+    return []
+
+
+def _actor_for_event(event: dict[str, Any]) -> str:
+    payload = _payload(event)
+    for key in ("actor", "user_id", "sub", "actor_id"):
+        if payload.get(key):
+            return str(payload[key])
+    return ""
+
+
+def _surface_for_event(event: dict[str, Any]) -> str:
+    payload = _payload(event)
+    if payload.get("surface"):
+        return str(payload["surface"])
+    if payload.get("path"):
+        return str(payload["path"])
+    if payload.get("requested_path"):
+        return str(payload["requested_path"])
+    return ""
+
+
+def _policy_path_for_event(event: dict[str, Any], fallback: str) -> str:
+    payload = _payload(event)
+    return str(payload.get("policy_path") or fallback)
+
+
+def _policy_source_for_event(event: dict[str, Any], fallback: str) -> str:
+    payload = _payload(event)
+    return str(payload.get("policy_source") or fallback)
+
+
+def _top_reason(reason_counter: Counter[str]) -> str:
+    if not reason_counter:
+        return "No dominant deny reason recorded"
+    reason, count = reason_counter.most_common(1)[0]
+    return f"{_humanize_reason(reason)} ({count})"
+
+
+def _format_age_bucket(timestamp: str) -> tuple[str, str]:
+    parsed = _parse_timestamp(timestamp)
+    if parsed is None:
+        return "warning", "timestamp unavailable"
+
+    age = datetime.now(timezone.utc) - parsed
+    if age.total_seconds() <= 48 * 3600:
+        return "healthy", "fresh"
+    if age.total_seconds() <= 7 * 24 * 3600:
+        return "warning", "aging"
+    return "critical", "stale"
+
+
+def _artifact_timestamp(path: Path) -> str:
+    if not path.exists():
+        return ""
+
+    if path.suffix == ".json":
+        document = read_json(path)
+        if isinstance(document, dict):
+            for key in ("generated_at", "captured_at", "created_at", "timestamp"):
+                if document.get(key):
+                    return str(document[key])
+            machine = document.get("machine", {})
+            if isinstance(machine, dict) and machine.get("generated_at"):
+                return str(machine["generated_at"])
+        if isinstance(document, list) and document:
+            candidate = document[-1]
+            if isinstance(candidate, dict):
+                for key in ("event_time", "generated_at", "captured_at", "timestamp"):
+                    if candidate.get(key):
+                        return str(candidate[key])
+
+    if path.suffix == ".jsonl":
+        records = read_jsonl(path)
+        timestamps = sorted(
+            value
+            for value in (str(record.get("timestamp", "")) for record in records)
+            if value
+        )
+        if timestamps:
+            return timestamps[-1]
+
+    return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
+
+
+def _artifact_integrity(path: Path, relative_path: str, root: Path) -> tuple[str, str]:
+    if not path.exists():
+        return "critical", "Artifact missing from checkout"
+
+    if relative_path in {INSPECTABLE_ALLOWED_FLOW, INSPECTABLE_DENIED_FLOW}:
+        document = read_json(path)
+        referenced = [root / artifact for artifact in _string_list(document.get("artifacts"))]
+        missing = [artifact for artifact in referenced if not artifact.exists()]
+        if missing:
+            return "warning", f"{len(missing)} referenced artifacts missing"
+        return "healthy", "Referenced artifact bundle present"
+
+    if relative_path == reviewer_bundle_relative_path(root):
+        reviewer = read_json(path)
+        if isinstance(reviewer, dict):
+            inspectable = reviewer.get("inspectable_evidence", {})
+            bundles = [root / bundle for bundle in _string_list(inspectable.get("bundles"))]
+            if bundles and all(bundle.exists() for bundle in bundles):
+                return "healthy", "Reviewer bundle references inspectable evidence"
+            return "warning", "Reviewer bundle present but referenced artifacts are incomplete"
+
+    if path.suffix == ".json":
+        try:
+            json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return "critical", "JSON artifact is malformed"
+        return "healthy", "JSON structure verified"
+
+    if path.suffix == ".jsonl":
+        records = read_jsonl(path)
+        return ("healthy", f"{len(records)} structured events present") if records else ("warning", "No events recorded")
+
+    return "neutral", "Raw artifact available"
+
+
+def _event_feed(root: Path) -> tuple[list[dict[str, Any]], str, str]:
+    if has_live_governed_flow_artifacts(root):
+        return (
+            load_latest_governed_flow_events(root),
+            "Live governed flow artifacts",
+            "overlays/myStarterKit/artifacts/events.jsonl",
+        )
+    return (
+        load_sample_events(root),
+        "Demo-derived governed telemetry",
+        SAMPLE_EVENTS,
+    )
+
+
+def _control_family_name(control: str) -> str:
+    mapping = {
+        "policy_coverage": "Policy Enforcement",
+        "retrieval_safety": "Retrieval Boundaries",
+        "tool_governance": "Tool / MCP Governance",
+        "incident_visibility": "Audit & Replay",
+        "risky_config_defaults_disabled": "Launch Hygiene",
+    }
+    return mapping.get(control, control.replace("_", " ").title())
+
+
+def _control_family_summary(findings: list[dict[str, Any]]) -> list[dict[str, str]]:
+    families: dict[str, dict[str, float]] = defaultdict(lambda: {"score": 0.0, "total": 0.0, "pass": 0.0, "conditional": 0.0, "fail": 0.0})
+    for finding in findings:
+        family = _control_family_name(str(finding.get("control", "control")))
+        status = str(finding.get("status", "unknown"))
+        families[family]["total"] += 1
+        if status == "pass":
+            families[family]["score"] += 1.0
+            families[family]["pass"] += 1
+        elif status in {"conditional_pass", "conditional_go"}:
+            families[family]["score"] += 0.5
+            families[family]["conditional"] += 1
+        else:
+            families[family]["fail"] += 1
+
+    summaries: list[dict[str, str]] = []
+    for family, values in sorted(families.items()):
+        percent = round((values["score"] / values["total"]) * 100) if values["total"] else 0
+        status = "healthy"
+        if values["fail"]:
+            status = "critical"
+        elif values["conditional"]:
+            status = "warning"
+        summaries.append(
+            {
+                "family": family,
+                "score": str(percent),
+                "status": status,
+                "detail": f"{int(values['pass'])} pass, {int(values['conditional'])} conditional, {int(values['fail'])} fail",
+            }
+        )
+    return summaries
+
+
+def _section_meta(contract: dict[str, Any]) -> dict[str, dict[str, str]]:
+    return {
+        str(section.get("id", "")): {
+            "id": str(section.get("id", "")),
+            "title": str(section.get("title", "")),
+            "description": str(section.get("description", "")),
+        }
+        for section in contract.get("sections", [])
+        if section.get("id")
+    }
+
+
+def _build_artifact_inventory(root: Path) -> tuple[list[dict[str, str]], Counter[str]]:
+    reviewer_path = reviewer_bundle_relative_path(root)
+    launch_path = launch_report_relative_path(root)
+    ingestion_path = dashboard_ingestion_relative_path(root)
+
+    artifact_specs = [
+        ("Reviewer evidence bundle", reviewer_path, "review"),
+        ("Launch readiness report", launch_path, "launch gate"),
+        ("Dashboard ingestion feed", ingestion_path, "telemetry export"),
+        ("Governed telemetry sample", SAMPLE_EVENTS, "telemetry feed"),
+        ("Prod-sim governed flow", PROD_SIM_GOVERNED_FLOW, "governed flow"),
+        ("Prod-sim launch result", PROD_SIM_LAUNCH_GATE, "launch gate"),
+        ("Prod-sim events", PROD_SIM_EVENTS, "audit trail"),
+        ("Inspectable allowed flow", INSPECTABLE_ALLOWED_FLOW, "inspectable evidence"),
+        ("Inspectable denied flow", INSPECTABLE_DENIED_FLOW, "inspectable evidence"),
+    ]
+
+    inventory: list[dict[str, str]] = []
+    counts: Counter[str] = Counter()
+    for label, relative_path, category in artifact_specs:
+        path = root / relative_path
+        timestamp = _artifact_timestamp(path)
+        freshness_status, freshness = _format_age_bucket(timestamp) if path.exists() else ("critical", "missing")
+        integrity_status, integrity_detail = _artifact_integrity(path, relative_path, root)
+        status = integrity_status if integrity_status == "critical" else freshness_status
+        if not path.exists():
+            counts["missing"] += 1
+        elif freshness == "fresh":
+            counts["fresh"] += 1
+        elif freshness == "aging":
+            counts["aging"] += 1
+        elif freshness == "stale":
+            counts["stale"] += 1
+        if integrity_status == "healthy":
+            counts["verified"] += 1
+
+        inventory.append(
+            {
+                "label": label,
+                "category": category,
+                "status": status,
+                "freshness": freshness,
+                "integrity": integrity_detail,
+                "last_updated": timestamp or "timestamp unavailable",
+                "path": relative_path,
+                "href": _raw(relative_path),
+                "detail": "Artifact present" if path.exists() else "Artifact missing",
+            }
+        )
+
+    return inventory, counts
+
+
+def _build_blocked_actions(
+    events: list[dict[str, Any]],
+    *,
+    event_feed_path: str,
+    policy_path: str,
+    policy_source: str,
+    denied_flow: dict[str, Any],
+) -> list[dict[str, str]]:
+    actions: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    def append_action(kind: str, title: str, reason_code: str, detail: str, event: dict[str, Any], status: str) -> None:
+        trace_id = str(event.get("trace_id", ""))
+        key = (str(event.get("request_id", "")), kind, reason_code)
+        if key in seen:
+            return
+        seen.add(key)
+        meta = " | ".join(
+            value
+            for value in (
+                str(event.get("tenant_id", "")),
+                _surface_for_event(event),
+                trace_id,
+                str(event.get("timestamp", "")),
+            )
+            if value
+        )
+        actions.append(
+            {
+                "kind": kind,
+                "title": title,
+                "meta": meta,
+                "detail": detail,
+                "status": status,
+                "reason_code": reason_code or "reason unavailable",
+                "reason": _humanize_reason(reason_code) if reason_code else "Reason unavailable",
+                "policy_source": _policy_source_for_event(event, policy_source),
+                "policy_path": _policy_path_for_event(event, policy_path),
+                "trace_id": trace_id,
+                "request_id": str(event.get("request_id", "")),
+                "tenant": str(event.get("tenant_id", "")),
+                "actor": _actor_for_event(event),
+                "surface": _surface_for_event(event),
+                "timestamp": str(event.get("timestamp", "")),
+                "href": _raw(event_feed_path),
+            }
+        )
+
+    for event in events:
+        payload = _payload(event)
+        event_type = str(event.get("event_type", ""))
+        reasons = _reason_codes(event)
+        primary_reason = reasons[0] if reasons else ""
+
+        if event_type == "retrieval.decision" and str(payload.get("decision", "")).lower() in {"deny", "blocked"}:
+            source = str(payload.get("source", "unknown source"))
+            append_action(
+                "Denied retrieval",
+                f"Retrieval blocked from {source}",
+                primary_reason or f"retrieval.source_not_allowed:{source}",
+                f"{_humanize_reason(primary_reason or f'retrieval.source_not_allowed:{source}')}. Tenant retrieval boundary prevented access to {source}.",
+                event,
+                "critical",
+            )
+
+        if event_type == "tool.decision" and _string_list(payload.get("denied")):
+            denied_tools = ", ".join(_string_list(payload.get("denied")))
+            append_action(
+                "Denied tool call",
+                f"Tool execution denied: {denied_tools}",
+                primary_reason or f"tool.forbidden:{denied_tools}",
+                f"{_humanize_reason(primary_reason or f'tool.forbidden:{denied_tools}')}. Governance prevented execution of {denied_tools}.",
+                event,
+                "critical",
+            )
+
+        if event_type == "confirmation.required":
+            action_name = str(payload.get("action") or payload.get("tool_name") or "governed action")
+            append_action(
+                "Confirmation required",
+                f"Operator approval required for {action_name}",
+                primary_reason or f"tool.confirmation_required:{action_name}",
+                f"{_humanize_reason(primary_reason or f'tool.confirmation_required:{action_name}')}. This action stays governed until a human confirms it.",
+                event,
+                "warning",
+            )
+
+        if event_type == "deny.event" and payload.get("blocked") is True:
+            surface = _surface_for_event(event)
+            requested_path = str(payload.get("requested_path", ""))
+            kind = "Blocked /launch/onyx handoff" if "launch/onyx" in surface or requested_path.startswith("/app") else "Governed deny event"
+            title = "Onyx handoff blocked by governance" if kind == "Blocked /launch/onyx handoff" else "Governance deny event recorded"
+            append_action(
+                kind,
+                title,
+                primary_reason or str(payload.get("reason_code", payload.get("reason", "policy.denied"))),
+                f"{_humanize_reason(primary_reason or str(payload.get('reason_code', payload.get('reason', 'policy.denied'))))}. Surface {surface or requested_path or 'unknown'} was denied.",
+                event,
+                "critical",
+            )
+
+    if denied_flow:
+        actions.append(
+            {
+                "kind": "Blocked /launch/onyx handoff",
+                "title": "Inspectable denied Onyx handoff",
+                "meta": "Reviewer evidence bundle | governed runtime",
+                "detail": str(denied_flow.get("summary", "Denied runtime handoff evidence available.")),
+                "status": "critical",
+                "reason_code": "policy.surface_role_denied:onyx.agents",
+                "reason": _humanize_reason("policy.surface_role_denied:onyx.agents"),
+                "policy_source": policy_source,
+                "policy_path": policy_path,
+                "trace_id": "",
+                "request_id": "",
+                "tenant": "",
+                "actor": "",
+                "surface": "/launch/onyx -> /app/agents",
+                "timestamp": str(denied_flow.get("captured_at", "")),
+                "href": _raw(INSPECTABLE_DENIED_FLOW),
+            }
+        )
+
+    actions.sort(key=lambda item: item.get("timestamp", ""), reverse=True)
+    return actions[:8]
 
 
 def build_control_plane_live_log(root: Path | None = None, limit: int = 12) -> dict[str, Any]:
@@ -134,119 +532,272 @@ def build_control_plane_live_log(root: Path | None = None, limit: int = 12) -> d
 def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     resolved_root = repo_root(root)
     contract = load_dashboard_contract(resolved_root)
+    section_contracts = _section_meta(contract)
     services = load_service_inventory(resolved_root)
-    
-    # Prefer live governed flow artifacts if available, otherwise use sample events
-    if has_live_governed_flow_artifacts(resolved_root):
-        events = load_latest_governed_flow_events(resolved_root)
-    else:
-        events = load_sample_events(resolved_root)
-    
-    counts = _count_events(events)
+    events, event_feed_label, event_feed_path = _event_feed(resolved_root)
     policy_bundle = load_runtime_policy_bundle(resolved_root)
     policy = policy_bundle.document
     reviewer = load_reviewer_bundle(resolved_root)
-    evidence_summary = build_evidence_pack_summary(resolved_root)
     launch_summary = build_launch_gate_summary(resolved_root)
+    evidence_summary = build_evidence_pack_summary(resolved_root)
     eval_summaries = load_eval_summaries(resolved_root)
-    latest_eval = _latest(eval_summaries)
+    latest_eval = eval_summaries[-1] if eval_summaries else {}
     activity_snapshot = build_activity_snapshot(resolved_root, limit=12)
+    artifact_inventory, artifact_counts = _build_artifact_inventory(resolved_root)
+    denied_flow = read_json(resolved_root / INSPECTABLE_DENIED_FLOW)
+    allowed_flow = read_json(resolved_root / INSPECTABLE_ALLOWED_FLOW)
 
-    request_events = [event for event in events if event.get("event_type") == "request.start"]
+    policy_path = policy_bundle.relative_path
+    policy_source = "overlay" if policy_bundle.source == "overlay" else "fallback"
+    policy_href = _raw(policy_path)
+    reviewer_href = _raw(reviewer_bundle_relative_path(resolved_root))
+    launch_report_href = _raw(launch_report_relative_path(resolved_root))
+    ingestion_href = _raw(dashboard_ingestion_relative_path(resolved_root))
+
     policy_events = [event for event in events if event.get("event_type") == "policy.decision"]
     retrieval_events = [event for event in events if event.get("event_type") == "retrieval.decision"]
+    tool_attempts = [event for event in events if event.get("event_type") == "tool.execution_attempt"]
+    tool_decisions = [event for event in events if event.get("event_type") == "tool.decision"]
+    confirmation_events = [event for event in events if event.get("event_type") == "confirmation.required"]
     deny_events = [event for event in events if event.get("event_type") == "deny.event"]
-    tool_events = [event for event in events if event.get("event_type") == "tool.execution_attempt"]
-    fallback_events = [event for event in events if event.get("event_type") == "fallback.event"]
-    trace_ids = _unique([str(event.get("trace_id", "")) for event in events])
+    identity_events = [event for event in events if event.get("event_type") == "identity.established"]
+    request_starts = [event for event in events if event.get("event_type") == "request.start"]
+    request_ends = [event for event in events if event.get("event_type") == "request.end"]
+    trace_ids = sorted({str(event.get("trace_id", "")) for event in events if event.get("trace_id")})
     audit_events = reviewer.get("sample_audit_events", {}).get("events", [])
     blocked_attacks = reviewer.get("blocked_attack_summary", {}).get("blocked_attacks", [])
 
-    allowed_sources = policy.get("retrieval", {}).get("tenant_allowed_sources", {})
-    allowed_integrations = policy.get("integrations", {}).get("allowed_integrations", [])
-    mcp_servers = [value for value in allowed_integrations if str(value).startswith("mcp_server.")]
-    registered_tools = _unique(
-        list(policy.get("tools", {}).get("allowed_tools", []))
-        + list(policy.get("tools", {}).get("forbidden_tools", []))
+    blocked_actions = _build_blocked_actions(
+        events,
+        event_feed_path=event_feed_path,
+        policy_path=policy_path,
+        policy_source=policy_source,
+        denied_flow=denied_flow,
     )
-    confirmation_required = list(policy.get("tools", {}).get("confirmation_required_tools", []))
-    sandbox_required_tools = ["admin_shell"] if (resolved_root / "overlays/myStarterKit/artifacts/logs/sandbox/demo-admin_shell-evidence.json").exists() else []
+
+    denied_policy_decisions = sum(1 for event in policy_events if _payload(event).get("allow") is False)
+    blocked_retrievals = sum(
+        1
+        for event in retrieval_events
+        if str(_payload(event).get("decision", "")).lower() in {"deny", "blocked"}
+    )
+    denied_tool_attempts = sum(1 for event in tool_decisions if _string_list(_payload(event).get("denied")))
+    retrieval_pairs = sorted(
+        {
+            f"{event.get('tenant_id', '')}:{_payload(event).get('source', '')}"
+            for event in retrieval_events
+            if _payload(event).get("source")
+        }
+    )
+    retrieval_sources = sorted(
+        {
+            source
+            for sources in policy.get("retrieval", {}).get("tenant_allowed_sources", {}).values()
+            for source in sources
+        }
+    )
+    policy_reason_counts: Counter[str] = Counter()
+    for event in policy_events + deny_events:
+        for reason in _reason_codes(event):
+            policy_reason_counts[reason] += 1
+
+    surfaces = list(policy.get("surfaces", {}).get("path_policies", []))
+    tenants = sorted(policy.get("identity", {}).get("tenant_roles", {}).keys())
+    roles = sorted(
+        {
+            role
+            for tenant_roles in policy.get("identity", {}).get("tenant_roles", {}).values()
+            for role in tenant_roles
+        }
+    )
+    mcp_servers = sorted(
+        value
+        for value in policy.get("integrations", {}).get("allowed_integrations", [])
+        if str(value).startswith("mcp_server.")
+    )
+    allowed_tools = list(policy.get("tools", {}).get("allowed_tools", []))
+    forbidden_tools = list(policy.get("tools", {}).get("forbidden_tools", []))
+    confirmation_required_tools = list(policy.get("tools", {}).get("confirmation_required_tools", []))
+    all_tools = sorted(set(allowed_tools + forbidden_tools + confirmation_required_tools))
+    onyx_available = path_has_files(resolved_root, "upstream/onyx")
+
+    audit_trace_ids = {
+        str(event.get("trace_id", ""))
+        for event in audit_events
+        if str(event.get("trace_id", ""))
+    }
+    audit_coverage = round((len(audit_trace_ids & set(trace_ids)) / max(1, len(trace_ids))) * 100)
+    trace_coverage = round((len(request_ends) / max(1, len(request_starts))) * 100)
+    launch_findings = launch_summary.get("findings", [])
+    control_families = _control_family_summary(launch_findings)
+    failing_controls = [finding for finding in launch_findings if finding.get("status") != "pass"]
+    residual_risks = [str(item) for item in launch_summary.get("residual_risks", [])]
     eval_passed = int(latest_eval.get("passed_count", 0))
     eval_total = int(latest_eval.get("total", 0))
-    eval_failed = max(eval_total - eval_passed, 0)
-    readiness_status = launch_summary["status"]
-    onyx_available = path_has_files(resolved_root, "upstream/onyx")
-    langfuse_available = path_has_files(resolved_root, "upstream/langfuse")
-    keycloak_available = path_has_files(resolved_root, "upstream/keycloak")
-    policy_href = _dashboard_url(f"/raw/{policy_bundle.relative_path}")
-    reviewer_href = _dashboard_url(f"/raw/{reviewer_bundle_relative_path(resolved_root)}")
-    policy_source_label = "Overlay bundle" if policy_bundle.source == "overlay" else "Local fallback"
-    policy_source_detail = f"{policy_source_label} from {policy_bundle.relative_path}"
 
-    def runtime_link(*, label: str, href: str, fallback_href: str, available: bool, description: str, fallback_description: str) -> dict[str, str]:
-        return {
-            "label": label,
-            "href": href if available else fallback_href,
-            "description": description if available else fallback_description,
-            "status": "healthy" if available else "warning",
-        }
-    section_contracts = {
-        str(section.get("id", "")): section
-        for section in contract.get("sections", [])
-        if section.get("id")
+    readiness_panel = {
+        "status": _status_from_launch(launch_summary["status"]),
+        "status_label": launch_summary["status"].upper(),
+        "score": str(launch_summary["readiness_score"]),
+        "coverage": str(launch_summary["control_coverage"]),
+        "summary": f"{launch_summary['status'].upper()} launch posture with {launch_summary['readiness_score']} readiness score and {len(failing_controls)} non-pass controls.",
+        "generated_at": artifact_inventory[1]["last_updated"] if len(artifact_inventory) > 1 else _iso_now(),
+        "control_families": control_families,
+        "top_failing_controls": [
+            _record(
+                title=str(finding.get("control", "control")).replace("_", " "),
+                meta=str(finding.get("status", "unknown")),
+                detail=str(finding.get("summary", "Control summary unavailable.")),
+                status="warning" if str(finding.get("status")) in {"conditional_pass", "conditional_go"} else "critical",
+                href=launch_report_href,
+            )
+            for finding in failing_controls[:4]
+        ],
+        "residual_risks": [
+            _record(
+                title=f"Residual risk {index + 1}",
+                meta="Launch remediation",
+                detail=risk,
+                status="warning",
+                href=launch_report_href,
+            )
+            for index, risk in enumerate(residual_risks[:4])
+        ],
+        "evidence_links": [
+            _link("Launch report", launch_report_href, "Underlying launch-gate findings and remediation guidance.", "warning"),
+            _link("Reviewer bundle", reviewer_href, "Reviewer-ready evidence pack tied to readiness posture.", "healthy"),
+            _link("Prod-sim launch result", _raw(PROD_SIM_LAUNCH_GATE), "Machine-readable governed launch result captured from the prod-sim flow.", "healthy"),
+        ],
     }
 
-    def section_meta(section_id: str) -> dict[str, str]:
-        section = section_contracts.get(section_id, {})
-        return {
-            "id": section_id,
-            "title": str(section.get("title", section_id)),
-            "description": str(section.get("description", "")),
-        }
+    quick_answers = [
+        {
+            "question": "What is protected?",
+            "answer": f"{len(surfaces)} governed surfaces, {len(tenants)} tenants, {len(retrieval_sources)} retrieval sources, {len(all_tools)} governed tools, and Onyx behind governed handoffs.",
+            "detail": "Identity, policy, retrieval, tools, audit, and launch controls are modeled on the homepage.",
+            "href": "#asset-coverage",
+            "status": "healthy",
+        },
+        {
+            "question": "What was blocked?",
+            "answer": f"{len(blocked_actions)} recent governed interventions are visible, including retrieval, tool, confirmation, and runtime handoff outcomes.",
+            "detail": "Blocked /launch/onyx handoffs and denied tool paths are called out with trace context.",
+            "href": "#blocked-actions",
+            "status": "critical" if blocked_actions else "healthy",
+        },
+        {
+            "question": "Why was it blocked?",
+            "answer": _top_reason(policy_reason_counts),
+            "detail": "Reason codes are surfaced with policy source, policy path, surface, and trace identifiers.",
+            "href": "#policy-enforcement",
+            "status": "warning" if policy_reason_counts else "neutral",
+        },
+        {
+            "question": "What evidence exists?",
+            "answer": f"{len(artifact_inventory) - artifact_counts['missing']} artifacts are present across reviewer bundles, governed traces, launch reports, and dashboard exports.",
+            "detail": "Every critical section includes drill-through links to raw evidence.",
+            "href": "#evidence-integrity",
+            "status": "healthy" if artifact_counts["missing"] == 0 else "warning",
+        },
+        {
+            "question": "Is the system launch-ready?",
+            "answer": f"{launch_summary['status'].upper()} with readiness score {launch_summary['readiness_score']}.",
+            "detail": f"{len(failing_controls)} controls still need attention and {len(residual_risks)} residual risks remain visible to reviewers.",
+            "href": "#launch-gate",
+            "status": _status_from_launch(launch_summary["status"]),
+        },
+    ]
 
-    retrieval_rows = []
-    for tenant_id, sources in allowed_sources.items():
-        for source in sources:
-            retrieval_rows.append(
-                {
-                    "tenant": tenant_id,
-                    "source": source,
-                    "boundary": "tenant-scoped",
-                    "trust": "trust metadata + provenance required",
-                }
-            )
+    kpis = [
+        _card("Total policy decisions", str(len(policy_events)), "healthy" if policy_events else "warning", "Observed policy decisions in the current governed dataset.", "#policy-enforcement"),
+        _card("Denied policy decisions", str(denied_policy_decisions), "critical" if denied_policy_decisions else "healthy", "Explicit policy denies before runtime handoff or action execution.", "#blocked-actions"),
+        _card("Conditional actions", str(len(confirmation_events)), "warning" if confirmation_events else "healthy", "Actions paused for human approval before execution.", "#blocked-actions"),
+        _card("Retrieval by tenant/source", f"{len(retrieval_events)} / {len(retrieval_pairs)}", "healthy" if retrieval_events else "warning", "Retrieval requests observed across tenant/source boundary pairs.", "#retrieval-boundaries"),
+        _card("Blocked retrievals", str(blocked_retrievals), "critical" if blocked_retrievals else "healthy", "Retrieval requests denied by source or tenant policy.", "#blocked-actions"),
+        _card("Tool execution attempts", str(len(tool_attempts)), "healthy" if tool_attempts else "warning", "Observed governed tool execution attempts.", "#tool-mcp-governance"),
+        _card("Denied tool attempts", str(denied_tool_attempts), "critical" if denied_tool_attempts else "healthy", "Tool invocations blocked by tool policy.", "#blocked-actions"),
+        _card("Audit coverage", f"{audit_coverage}%", "healthy" if audit_coverage >= 60 else "warning", "Observed traces that map to explicit audit records.", "#audit-replay"),
+        _card("Trace coverage", f"{trace_coverage}%", "healthy" if trace_coverage >= 80 else "warning", "Requests with visible end-state telemetry.", "#audit-replay"),
+        _card("Evidence freshness", f"{artifact_counts['fresh']} fresh / {artifact_counts['aging']} aging", "healthy" if artifact_counts["stale"] == 0 else "warning", "Artifact recency across reviewer bundles, launch reports, and telemetry exports.", "#evidence-integrity"),
+        _card("Launch-gate status", launch_summary["status"].upper(), _status_from_launch(launch_summary["status"]), f"Readiness score {launch_summary['readiness_score']} with {launch_summary['control_coverage']} control coverage.", "#launch-gate"),
+        _card("Failing controls / residual risks", f"{len(failing_controls)} / {len(residual_risks)}", "critical" if failing_controls else "healthy", "Non-pass controls and remaining risks still visible to launch reviewers.", "#launch-gate"),
+    ]
+
+    overview_blocks = [
+        {
+            "type": "cards",
+            "title": "Operating posture",
+            "items": [
+                _card("Dashboard mode", "Governance-first", "healthy", "This homepage leads with governance outcomes and readiness, not raw runtime usage.", "#overview"),
+                _card("Data source", event_feed_label, "healthy" if has_live_governed_flow_artifacts(resolved_root) else "warning", f"Primary feed: {event_feed_path}.", _raw(event_feed_path)),
+                _card("Runtime position", "Onyx behind governed handoffs", "healthy", "Onyx remains visible as a governed runtime reached through dashboard-controlled surfaces.", "#entry-points"),
+                _card("Portfolio framing", "Layer Retrofit + Launch Gate", "healthy", "The homepage is tuned for evaluator review of enforcement, evidence, and launch readiness.", _raw("docs/control-plane-dashboard-homepage.md")),
+            ],
+        },
+        {
+            "type": "records",
+            "title": "Portfolio note",
+            "items": [
+                _record(
+                    title="Suggested repository description",
+                    meta="README and portfolio positioning",
+                    detail=str(contract.get("repo_description_suggestion", "")),
+                    status="neutral",
+                    href=_raw("README.md"),
+                )
+            ],
+        },
+        {
+            "type": "links",
+            "title": "Primary evidence links",
+            "items": [
+                _link("Reviewer evidence bundle", reviewer_href, "Reviewer-ready proof pack for blocked actions, auditability, and launch posture.", "healthy"),
+                _link("Launch readiness report", launch_report_href, "Raw control findings and residual risk guidance.", "warning"),
+                _link("Governed telemetry feed", _raw(event_feed_path), "The event feed used to power the blocked-actions and domain sections.", "healthy"),
+                _link("Homepage structure note", _raw("docs/control-plane-dashboard-homepage.md"), "What changed, how the homepage is structured, and what is demo-derived.", "neutral"),
+            ],
+        },
+    ]
+
+    blocked_rows = [
+        {
+            "kind": action["kind"],
+            "reason": action["reason_code"],
+            "surface": action["surface"] or "surface unavailable",
+            "tenant": action["tenant"] or "tenant unavailable",
+            "trace": action["trace_id"] or "trace unavailable",
+            "timestamp": action["timestamp"] or "timestamp unavailable",
+        }
+        for action in blocked_actions
+    ]
+
+    identity_rows = [
+        {
+            "surface": str(rule.get("surface", "")),
+            "path": str(rule.get("path", "")),
+            "query": json.dumps(rule.get("query", {}), sort_keys=True) if rule.get("query") else "none",
+            "allowed_roles": ", ".join(_string_list(rule.get("allowed_roles"))),
+        }
+        for rule in surfaces
+    ]
+
+    retrieval_rows = [
+        {
+            "tenant": tenant_id,
+            "source": source,
+            "boundary": "tenant-scoped",
+            "trust": ", ".join(policy.get("retrieval", {}).get("source_trust_labels", {}).get(source, [])) or "trust metadata required",
+        }
+        for tenant_id, sources in policy.get("retrieval", {}).get("tenant_allowed_sources", {}).items()
+        for source in sources
+    ]
 
     tool_rows = [
-        {
-            "control": "Registered tools",
-            "value": str(len(registered_tools)),
-            "notes": ", ".join(registered_tools) or "none",
-        },
-        {
-            "control": "Approved tools",
-            "value": str(len(policy.get("tools", {}).get("allowed_tools", []))),
-            "notes": ", ".join(policy.get("tools", {}).get("allowed_tools", [])) or "none",
-        },
-        {
-            "control": "Blocked tools",
-            "value": str(len(policy.get("tools", {}).get("forbidden_tools", []))),
-            "notes": ", ".join(policy.get("tools", {}).get("forbidden_tools", [])) or "none",
-        },
-        {
-            "control": "Confirmation-required tools",
-            "value": str(len(confirmation_required)),
-            "notes": ", ".join(confirmation_required) or "none",
-        },
-        {
-            "control": "Sandbox-required tools",
-            "value": str(len(sandbox_required_tools)),
-            "notes": ", ".join(sandbox_required_tools) or "none",
-        },
-        {
-            "control": "MCP server inventory",
-            "value": str(len(mcp_servers)),
-            "notes": ", ".join(mcp_servers) or "none",
-        },
+        {"control": "Allowed tools", "value": str(len(allowed_tools)), "notes": ", ".join(allowed_tools) or "none"},
+        {"control": "Forbidden tools", "value": str(len(forbidden_tools)), "notes": ", ".join(forbidden_tools) or "none"},
+        {"control": "Confirmation required", "value": str(len(confirmation_required_tools)), "notes": ", ".join(confirmation_required_tools) or "none"},
+        {"control": "MCP servers", "value": str(len(mcp_servers)), "notes": ", ".join(mcp_servers) or "none"},
+        {"control": "Governed runtime", "value": "1", "notes": "Onyx is reached through governed surfaces."},
     ]
 
     audit_rows = [
@@ -256,164 +807,262 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "request_id": str(event.get("request_id", "")),
             "summary": str(event.get("event_payload", {}).get("action", "captured")),
         }
-        for event in audit_events[:5]
+        for event in audit_events[:6]
     ]
 
-    launch_records = [
-        _record(
-            title=str(finding.get("control", "control")),
-            meta=str(finding.get("status", "unknown")),
-            detail=str(finding.get("summary", "")),
-            status="healthy" if finding.get("status") == "pass" else "warning",
-        )
-        for finding in launch_summary.get("findings", [])
+    asset_rows = [
+        {"asset_class": "Surfaces", "count": str(len(surfaces)), "governed_by": "surface path policy", "evidence": policy_path},
+        {"asset_class": "Tenants", "count": str(len(tenants)), "governed_by": "identity tenant roles", "evidence": policy_path},
+        {"asset_class": "Roles", "count": str(len(roles)), "governed_by": "identity role allowlists", "evidence": policy_path},
+        {"asset_class": "Policy bundles", "count": "1", "governed_by": policy_source, "evidence": policy_path},
+        {"asset_class": "Retrieval sources", "count": str(len(retrieval_sources)), "governed_by": "retrieval source policy", "evidence": policy_path},
+        {"asset_class": "Tools", "count": str(len(all_tools)), "governed_by": "tool policy", "evidence": policy_path},
+        {"asset_class": "MCP servers", "count": str(len(mcp_servers)), "governed_by": "integration inventory", "evidence": policy_path},
+        {"asset_class": "Governed runtimes", "count": "1", "governed_by": "launch gate + onyx surface policy", "evidence": INSPECTABLE_ALLOWED_FLOW},
     ]
+
+    evidence_rows = [
+        {
+            "artifact": artifact["label"],
+            "category": artifact["category"],
+            "freshness": artifact["freshness"],
+            "integrity": artifact["integrity"],
+            "updated": artifact["last_updated"],
+        }
+        for artifact in artifact_inventory
+    ]
+
+    onyx_handoffs = [
+        _record(
+            title="Allowed governed handoff",
+            meta=str(allowed_flow.get("captured_at", "runtime evidence")),
+            detail=str(allowed_flow.get("summary", "Allowed governed handoff evidence available.")),
+            status="healthy",
+            href=_raw(INSPECTABLE_ALLOWED_FLOW),
+        ),
+        _record(
+            title="Denied governed handoff",
+            meta=str(denied_flow.get("captured_at", "runtime evidence")),
+            detail=str(denied_flow.get("summary", "Denied governed handoff evidence available.")),
+            status="critical",
+            href=_raw(INSPECTABLE_DENIED_FLOW),
+        ),
+    ]
+    for event in events:
+        payload = _payload(event)
+        if str(event.get("event_type")) != "request.start":
+            continue
+        path = str(payload.get("path", ""))
+        if "/launch/onyx" not in path:
+            continue
+        onyx_handoffs.append(
+            _record(
+                title="Recent Onyx handoff request",
+                meta=" | ".join(
+                    value
+                    for value in (
+                        str(event.get("tenant_id", "")),
+                        path,
+                        str(event.get("trace_id", "")),
+                    )
+                    if value
+                ),
+                detail="Governed launch surface requested through the dashboard entry path.",
+                status="neutral",
+                href=_raw(event_feed_path),
+            )
+        )
+    onyx_handoffs = onyx_handoffs[:5]
 
     sections = [
         {
-            **section_meta("overview"),
-            "blocks": [
-                {
-                    "type": "cards",
-                    "title": "Key posture signals",
-                    "items": [
-                        _card(
-                            "Overall platform",
-                            "Platform running",
-                            "healthy",
-                            f"{len(services)} services inventoried across the local stack.",
-                        ),
-                        _card(
-                            "Policy checks",
-                            "Rules active" if "opa" in services else "Rules pending",
-                            "healthy" if "opa" in services else "warning",
-                            f"{len(allowed_integrations)} governed integrations in policy inventory.",
-                        ),
-                        _card(
-                            "Policy source",
-                            policy_source_label,
-                            "healthy" if policy_bundle.source == "overlay" else "warning",
-                            policy_source_detail,
-                        ),
-                        _card(
-                            "User access",
-                            "Access controls active" if "keycloak" in services else "Access setup pending",
-                            "healthy" if "keycloak" in services else "warning",
-                            "Business access starts with identity and session controls.",
-                        ),
-                        _card(
-                            "Company data access",
-                            "Data access active" if "qdrant" in services else "Data inventory only",
-                            "healthy" if "qdrant" in services else "warning",
-                            f"{sum(len(sources) for sources in allowed_sources.values())} source boundaries are modeled.",
-                        ),
-                        _card(
-                            "Monitoring",
-                            "Monitoring active",
-                            "healthy" if {"langfuse", "grafana", "superset"}.issubset(set(services)) else "warning",
-                            f"{len(events)} recent events are available for dashboard reporting.",
-                        ),
-                        _card(
-                            "Launch readiness",
-                            readiness_status.upper(),
-                            _status_from_launch(readiness_status),
-                            f"Readiness score {launch_summary['readiness_score']} with {launch_summary['control_coverage']} controls passing.",
-                        ),
-                    ],
-                }
-            ],
+            **section_contracts["overview"],
+            "blocks": overview_blocks,
         },
         {
-            **section_meta("runtime"),
+            **section_contracts["blocked-actions"],
             "blocks": [
-                {
-                    "type": "cards",
-                    "title": "Activity summary",
-                    "items": [
-                        _card("Combined activity", str(activity_snapshot["counts"]["combined"]), "healthy" if activity_snapshot["counts"]["combined"] else "warning", "Recent Onyx and Langfuse items visible to the dashboard."),
-                        _card("Onyx activity", str(activity_snapshot["counts"]["onyx"]), "healthy" if activity_snapshot["counts"]["onyx"] else "warning", "Recent requests and runtime events coming from Onyx."),
-                        _card("Langfuse traces", str(activity_snapshot["counts"]["langfuse_traces"]), "healthy" if activity_snapshot["counts"]["langfuse_traces"] else "warning", "Recent trace items captured by Langfuse."),
-                        _card("Langfuse sessions", str(activity_snapshot["counts"]["langfuse_sessions"]), "neutral", "Recent sessions recorded by Langfuse."),
-                        _card("Recent alerts", str(activity_snapshot["counts"]["alerts"]), "warning" if activity_snapshot["counts"]["alerts"] else "healthy", "Warnings or critical items in the combined activity feed."),
-                        _card("Source coverage", "2 sources", "healthy" if all(status.startswith("connected") for status in activity_snapshot["sources"].values()) else "warning", "The dashboard is reading from both Onyx and Langfuse activity sources."),
-                    ],
-                },
                 {
                     "type": "records",
-                    "title": "Recent activity details",
+                    "title": "Recent governed interventions",
                     "items": [
-                        *[
-                            _record(
-                                title=str(entry.get("event_type", "activity")),
-                                meta=f"{entry.get('source_label', '')} | {entry.get('timestamp', '')}",
-                                detail=str(entry.get("summary", "")),
-                                status=str(entry.get("status", "neutral")),
-                            )
-                            for entry in activity_snapshot["entries"]
-                        ],
-                    ],
-                },
-            ],
-        },
-        {
-            **section_meta("retrieval"),
-            "blocks": [
-                {
-                    "type": "cards",
-                    "title": "Data access summary",
-                    "items": [
-                        _card("Indexed sources", str(len(retrieval_rows)), "healthy", "Sources currently modeled for tenant-scoped retrieval."),
-                        _card("Tenant/source boundaries", str(len(allowed_sources)), "healthy", "Per-tenant source segmentation is declared in policy."),
-                        _card("Retrieval decisions", str(len(retrieval_events)), "neutral", "Observed retrieval allow/deny decisions."),
-                        _card("Blocked retrieval attempts", "0", "healthy", "No blocked retrieval attempts in the current telemetry sample."),
-                        _card("Provenance coverage", "Required", "healthy", "Provenance and trust metadata checks are enforced in policy."),
-                        _card("Connector exposure", "Scoped", "healthy", "Retrieval connectors are surfaced through allowed integration inventory only."),
+                        _record(action["title"], action["meta"], action["detail"], action["status"], action["href"])
+                        for action in blocked_actions
+                    ] or [
+                        _record("No recent blocked actions", "Governance posture", "No denies or confirmation-required actions are visible in the current dataset.", "healthy")
                     ],
                 },
                 {
                     "type": "table",
-                    "title": "Source boundaries",
+                    "title": "Blocked action timeline",
+                    "columns": [
+                        {"key": "kind", "label": "Kind"},
+                        {"key": "reason", "label": "Reason code"},
+                        {"key": "surface", "label": "Surface / path"},
+                        {"key": "tenant", "label": "Tenant"},
+                        {"key": "trace", "label": "Trace ID"},
+                        {"key": "timestamp", "label": "Timestamp"},
+                    ],
+                    "rows": blocked_rows,
+                },
+                {
+                    "type": "links",
+                    "title": "Blocked action evidence",
+                    "items": [
+                        _link("Governed telemetry feed", _raw(event_feed_path), "Raw reason codes, trace IDs, and timestamps for current governed actions.", "healthy"),
+                        _link("Inspectable denied runtime flow", _raw(INSPECTABLE_DENIED_FLOW), "Denied /launch/onyx handoff bundle with linked artifacts.", "critical"),
+                        _link("Reviewer evidence bundle", reviewer_href, "Reviewer-facing evidence pack containing blocked attack summary and audit signals.", "healthy"),
+                    ],
+                },
+            ],
+        },
+        {
+            **section_contracts["identity-session"],
+            "blocks": [
+                {
+                    "type": "cards",
+                    "title": "Identity and session coverage",
+                    "items": [
+                        _card("Tenants under governance", str(len(tenants)), "healthy", "Tenants with explicit role mappings in the runtime policy bundle.", policy_href),
+                        _card("Roles under governance", str(len(roles)), "healthy", "Roles allowed to reach governed surfaces.", policy_href),
+                        _card("Identity assertions observed", str(len(identity_events)), "healthy" if identity_events else "warning", "Identity establishment events visible in current telemetry.", _raw(event_feed_path)),
+                        _card("Governed surfaces", str(len(surfaces)), "healthy", "Registered runtime surfaces protected by policy path rules.", "#entry-points"),
+                    ],
+                },
+                {
+                    "type": "table",
+                    "title": "Surface access policy",
+                    "columns": [
+                        {"key": "surface", "label": "Surface"},
+                        {"key": "path", "label": "Path"},
+                        {"key": "query", "label": "Query match"},
+                        {"key": "allowed_roles", "label": "Allowed roles"},
+                    ],
+                    "rows": identity_rows,
+                },
+                {
+                    "type": "links",
+                    "title": "Identity evidence",
+                    "items": [
+                        _link("Policy bundle", policy_href, "Tenant roles and surface access rules used by runtime governance.", "healthy"),
+                        _link("Keycloak integration note", _raw("docs/keycloak-integration.md"), "Identity/session wiring and integration notes for the dashboard-first stack.", "neutral"),
+                        _link("Governed telemetry feed", _raw(event_feed_path), "Identity-established events with tenant and actor context.", "healthy"),
+                    ],
+                },
+            ],
+        },
+        {
+            **section_contracts["policy-enforcement"],
+            "blocks": [
+                {
+                    "type": "cards",
+                    "title": "Policy decision summary",
+                    "items": [
+                        _card("Policy decisions", str(len(policy_events)), "healthy" if policy_events else "warning", "Observed policy decision events in current governed telemetry.", _raw(event_feed_path)),
+                        _card("Explicit denies", str(denied_policy_decisions), "critical" if denied_policy_decisions else "healthy", "Policy decisions that directly denied access or handoff.", "#blocked-actions"),
+                        _card("Top deny reason", _top_reason(policy_reason_counts), "warning" if policy_reason_counts else "neutral", "Dominant governance rationale across denies and blocked runtime handoffs.", "#blocked-actions"),
+                        _card("Policy source", policy_source.upper(), "healthy" if policy_source == "overlay" else "warning", f"Current runtime policy bundle path: {policy_path}.", policy_href),
+                    ],
+                },
+                {
+                    "type": "records",
+                    "title": "Recent policy outcomes",
+                    "items": [
+                        _record(
+                            title="Allow" if _payload(event).get("allow") else "Deny",
+                            meta=" | ".join(
+                                value
+                                for value in (
+                                    str(event.get("tenant_id", "")),
+                                    _surface_for_event(event),
+                                    str(event.get("trace_id", "")),
+                                )
+                                if value
+                            ),
+                            detail=", ".join(_reason_codes(event)) or "Policy reasons unavailable.",
+                            status="healthy" if _payload(event).get("allow") else "critical",
+                            href=_raw(event_feed_path),
+                        )
+                        for event in policy_events[:6]
+                    ],
+                },
+                {
+                    "type": "links",
+                    "title": "Policy drill-through",
+                    "items": [
+                        _link("Runtime policy bundle", policy_href, "Raw runtime policy bundle governing surfaces, retrieval, and tools.", "healthy"),
+                        _link("Policy rego", _raw("policies/rego/policy.rego"), "Underlying policy rule definitions used for the local stack.", "neutral"),
+                        _link("Tool governance note", _raw("docs/tool-governance.md"), "Documentation for tool policy posture and runtime enforcement.", "neutral"),
+                    ],
+                },
+            ],
+        },
+        {
+            **section_contracts["retrieval-boundaries"],
+            "blocks": [
+                {
+                    "type": "cards",
+                    "title": "Retrieval enforcement summary",
+                    "items": [
+                        _card("Retrieval requests", str(len(retrieval_events)), "healthy" if retrieval_events else "warning", "Observed governed retrieval requests.", _raw(event_feed_path)),
+                        _card("Blocked retrievals", str(blocked_retrievals), "critical" if blocked_retrievals else "healthy", "Denied retrievals by source or tenant boundary.", "#blocked-actions"),
+                        _card("Allowed sources", str(len(retrieval_sources)), "healthy", "Sources explicitly modeled in policy.", policy_href),
+                        _card("Tenant/source pairs", str(len(retrieval_rows)), "healthy", "Tenant-scoped retrieval boundaries declared in policy.", policy_href),
+                    ],
+                },
+                {
+                    "type": "table",
+                    "title": "Retrieval source coverage",
                     "columns": [
                         {"key": "tenant", "label": "Tenant"},
-                        {"key": "source", "label": "Indexed source"},
+                        {"key": "source", "label": "Source"},
                         {"key": "boundary", "label": "Boundary"},
-                        {"key": "trust", "label": "Trust requirements"},
+                        {"key": "trust", "label": "Trust requirement"},
                     ],
                     "rows": retrieval_rows,
                 },
                 {
                     "type": "records",
-                    "title": "Recent retrieval decisions",
+                    "title": "Recent retrieval outcomes",
                     "items": [
                         _record(
-                            title=f"{event.get('payload', {}).get('decision', 'allow').upper()} retrieval",
-                            meta=f"{event.get('tenant_id', '')} | {event.get('timestamp', '')}",
-                            detail=f"Backend {event.get('payload', {}).get('source', 'unknown')}",
-                            status="healthy" if event.get("payload", {}).get("decision") == "allow" else "warning",
+                            title=f"{str(_payload(event).get('decision', 'allow')).upper()} retrieval",
+                            meta=" | ".join(
+                                value
+                                for value in (
+                                    str(event.get("tenant_id", "")),
+                                    str(_payload(event).get("source", "")),
+                                    str(event.get("trace_id", "")),
+                                )
+                                if value
+                            ),
+                            detail=", ".join(_reason_codes(event)) or "Retrieval reason unavailable.",
+                            status="critical" if str(_payload(event).get("decision", "")).lower() in {"deny", "blocked"} else "healthy",
+                            href=_raw(event_feed_path),
                         )
-                        for event in retrieval_events
+                        for event in retrieval_events[:6]
                     ],
                 },
             ],
         },
         {
-            **section_meta("tools-mcp"),
+            **section_contracts["tool-mcp-governance"],
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Control summary",
+                    "title": "Tool and MCP posture",
                     "items": [
-                        _card("Registered tools", str(len(registered_tools)), "neutral", "Union of approved and blocked tool inventory."),
-                        _card("Approved tools", str(len(policy.get("tools", {}).get("allowed_tools", []))), "healthy", "Tools allowed for governed execution."),
-                        _card("Blocked tools", str(len(policy.get("tools", {}).get("forbidden_tools", []))), "warning", "Tools denied by policy bundle."),
-                        _card("Confirmation-required", str(len(confirmation_required)), "warning", "High-impact tools requiring user approval."),
-                        _card("Sandbox-required", str(len(sandbox_required_tools)), "warning" if sandbox_required_tools else "healthy", "Tools routed through isolated execution when needed."),
-                        _card("MCP servers", str(len(mcp_servers)), "neutral", "Registered MCP runtime surfaces in policy inventory."),
+                        _card("Tool inventory", str(len(all_tools)), "healthy", "Union of allowed, forbidden, and confirmation-required tools.", policy_href),
+                        _card("Tool attempts", str(len(tool_attempts)), "healthy" if tool_attempts else "warning", "Observed governed tool execution attempts.", _raw(event_feed_path)),
+                        _card("Denied tool attempts", str(denied_tool_attempts), "critical" if denied_tool_attempts else "healthy", "Blocked tool invocations recorded in telemetry.", "#blocked-actions"),
+                        _card("Confirmation required", str(len(confirmation_events)), "warning" if confirmation_events else "healthy", "High-impact tool actions paused pending approval.", "#blocked-actions"),
+                        _card("MCP servers", str(len(mcp_servers)), "healthy" if mcp_servers else "warning", "MCP surfaces explicitly present in integration policy.", policy_href),
+                        _card("Governed runtime", "Onyx", "healthy" if onyx_available else "warning", "Onyx is reached through governed launch surfaces only.", "#entry-points"),
                     ],
                 },
                 {
                     "type": "table",
-                    "title": "Tool controls",
+                    "title": "Tool / MCP inventory",
                     "columns": [
                         {"key": "control", "label": "Control"},
                         {"key": "value", "label": "Value"},
@@ -427,73 +1076,54 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "items": [
                         *[
                             _record(
-                                title=f"Tool attempt: {event.get('payload', {}).get('tool_name', 'unknown')}",
-                                meta=f"{event.get('request_id', '')} | {event.get('timestamp', '')}",
-                                detail="Observed from runtime activity stream.",
-                                status="neutral",
+                                title=f"Tool attempt: {str(_payload(event).get('tool_name', 'unknown'))}",
+                                meta=" | ".join(
+                                    value
+                                    for value in (
+                                        str(_payload(event).get("status", "")),
+                                        _surface_for_event(event),
+                                        str(event.get("trace_id", "")),
+                                    )
+                                    if value
+                                ),
+                                detail="Tool execution attempt observed through the governed runtime.",
+                                status="warning" if str(_payload(event).get("status", "")) == "confirmation_required" else "neutral",
+                                href=_raw(event_feed_path),
                             )
-                            for event in tool_events
+                            for event in tool_attempts[:4]
                         ],
                         *[
                             _record(
-                                title=f"Blocked tool path: {event.get('payload', {}).get('reason', 'forbidden_tool')}",
-                                meta=f"{event.get('request_id', '')} | deny.event",
-                                detail="Governance denied the attempted action.",
-                                status="warning",
+                                title=f"Tool decision: {', '.join(_string_list(_payload(event).get('denied')))}",
+                                meta=str(event.get("trace_id", "")),
+                                detail=", ".join(_reason_codes(event)) or "Tool reason unavailable.",
+                                status="critical",
+                                href=_raw(event_feed_path),
                             )
-                            for event in deny_events
+                            for event in tool_decisions[:4]
+                            if _string_list(_payload(event).get("denied"))
                         ],
                     ],
                 },
             ],
         },
         {
-            **section_meta("evals"),
+            **section_contracts["audit-replay"],
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Quality summary",
+                    "title": "Auditability summary",
                     "items": [
-                        _card("Recent traces", str(len(trace_ids)), "neutral", "Unique traces observed in the telemetry sample."),
-                        _card("Prompt/response paths", f"{counts.get('request.start', 0)}/{counts.get('request.end', 0)}", "healthy", "Request starts versus completed responses."),
-                        _card("Eval pass/fail counts", f"{eval_passed}/{eval_failed}", "healthy" if eval_failed == 0 else "warning", "Latest red-team summary snapshot."),
-                        _card("Red-team scenario status", f"{reviewer.get('blocked_attack_summary', {}).get('blocked_count', 0)} blocked", "healthy", "Known hostile scenarios are being intercepted."),
-                        _card("Safety metrics", f"{eval_passed}/{eval_total}", "healthy", "Latest suite reports security-redteam pass coverage."),
-                        _card("Quality views", "Per runtime module", "neutral", "Split between control-plane summary and drill-down tooling."),
+                        _card("Audit coverage", f"{audit_coverage}%", "healthy" if audit_coverage >= 60 else "warning", "Observed traces tied to explicit audit events in the reviewer bundle.", reviewer_href),
+                        _card("Trace coverage", f"{trace_coverage}%", "healthy" if trace_coverage >= 80 else "warning", "Requests with visible completion telemetry in the current feed.", _raw(event_feed_path)),
+                        _card("Replay bundles", "2", "healthy", "Inspectable allowed and denied runtime bundles are available for evaluator review.", _raw(INSPECTABLE_ALLOWED_FLOW)),
+                        _card("Blocked attacks", str(evidence_summary.get("blocked_count", 0)), "healthy", "Reviewer evidence bundle records blocked hostile scenarios.", reviewer_href),
+                        _card("Eval pass / total", f"{eval_passed} / {eval_total}", "healthy" if eval_total == 0 or eval_passed == eval_total else "warning", "Latest available evaluation summary for the governed stack.", ingestion_href),
                     ],
                 },
-                {
-                    "type": "records",
-                    "title": "Recent traces and evals",
-                    "items": [
-                        *[
-                            _record(
-                                title=f"Trace {trace_id}",
-                                meta="Langfuse-ready telemetry",
-                                detail="Prompt/response path is available for downstream drill-down.",
-                                status="neutral",
-                            )
-                            for trace_id in trace_ids
-                        ],
-                        *[
-                            _record(
-                                title=scenario.get("scenario", "Red-team scenario"),
-                                meta=scenario.get("decision", "blocked"),
-                                detail=scenario.get("control_triggered", ""),
-                                status="healthy",
-                            )
-                            for scenario in blocked_attacks
-                        ],
-                    ],
-                },
-            ],
-        },
-        {
-            **section_meta("audit-replay"),
-            "blocks": [
                 {
                     "type": "table",
-                    "title": "Recent audit records",
+                    "title": "Audit event sample",
                     "columns": [
                         {"key": "event", "label": "Audit event"},
                         {"key": "trace_id", "label": "Trace ID"},
@@ -504,195 +1134,223 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 },
                 {
                     "type": "records",
-                    "title": "Replay and deny posture",
+                    "title": "Replay and reviewer evidence",
                     "items": [
-                        _record(
-                            title="Replay-ready sessions",
-                            meta=str(len(_unique([str(event.get("request_id", "")) for event in audit_events]))),
-                            detail="Audit sample includes request identifiers needed for replay correlation.",
-                            status="healthy",
-                        ),
                         *[
                             _record(
-                                title=f"Deny reason: {event.get('payload', {}).get('reason', 'policy_denied')}",
-                                meta=str(event.get("trace_id", "")),
-                                detail="Visible to operators from the audit and runtime deny stream.",
-                                status="warning",
+                                title=str(attack.get("scenario", "Blocked scenario")).replace("_", " "),
+                                meta=str(attack.get("decision", "blocked")),
+                                detail=str(attack.get("control_triggered", "control triggered")),
+                                status="healthy",
+                                href=reviewer_href,
                             )
-                            for event in deny_events
+                            for attack in blocked_attacks
                         ],
+                        _record(
+                            title="Inspectable allowed flow",
+                            meta="Reviewer evidence",
+                            detail="Allowed governed runtime flow with linked launch and event artifacts.",
+                            status="healthy",
+                            href=_raw(INSPECTABLE_ALLOWED_FLOW),
+                        ),
+                        _record(
+                            title="Inspectable denied flow",
+                            meta="Reviewer evidence",
+                            detail="Denied runtime handoff with inspectable reasons and linked artifacts.",
+                            status="critical",
+                            href=_raw(INSPECTABLE_DENIED_FLOW),
+                        ),
                     ],
                 },
                 {
                     "type": "links",
-                    "title": "Evidence exports",
+                    "title": "Audit drill-through",
                     "items": [
-                        {
-                            "label": export["label"],
-                            "href": export["href"],
-                            "description": export["description"],
-                            "status": "healthy",
-                        }
-                        for export in evidence_summary["exports"]
+                        _link("Reviewer evidence bundle", reviewer_href, "Audit sample, blocked attack summary, and inspectable evidence references.", "healthy"),
+                        _link("Dashboard ingestion feed", ingestion_href, "Export used for dashboard-level ingestion and replay views.", "neutral"),
+                        _link("Prod-sim governed flow response", _raw(PROD_SIM_GOVERNED_FLOW), "Governed flow response with trace, reasons, and launch-gate outcome.", "healthy"),
                     ],
                 },
             ],
         },
         {
-            **section_meta("launch-gate"),
+            **section_contracts["launch-gate"],
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Readiness summary",
+                    "title": "Launch decision summary",
                     "items": [
-                        _card("Control coverage", launch_summary["control_coverage"], "neutral", "Fully passing controls versus total control checks."),
-                        _card("Missing controls", str(len(launch_summary["missing_controls"])), "warning" if launch_summary["missing_controls"] else "healthy", "Controls not fully satisfied in the current readiness report."),
-                        _card("Failed tests", str(launch_summary["failed_tests"]), "healthy", "Known failed tests in the control-plane summary."),
-                        _card("Residual risks", str(len(launch_summary["residual_risks"])), "warning" if launch_summary["residual_risks"] else "healthy", "Outstanding remediation or deployment caveats."),
-                        _card("Readiness score", str(launch_summary["readiness_score"]), _status_from_launch(readiness_status), "Weighted readiness score derived from current findings."),
-                        _card("Verdict", launch_summary["status"].upper(), _status_from_launch(readiness_status), "Go, conditional, or no-go summary for launch gate review."),
+                        _card("Readiness status", launch_summary["status"].upper(), _status_from_launch(launch_summary["status"]), "Current launch verdict from the launch-gate summary.", launch_report_href),
+                        _card("Readiness score", str(launch_summary["readiness_score"]), _status_from_launch(launch_summary["status"]), "Readiness score synthesized from the launch report findings.", launch_report_href),
+                        _card("Control coverage", str(launch_summary["control_coverage"]), "healthy", "Passing controls over total launch findings.", launch_report_href),
+                        _card("Failing controls", str(len(failing_controls)), "critical" if failing_controls else "healthy", "Controls that are not in a full pass state.", launch_report_href),
+                        _card("Residual risks", str(len(residual_risks)), "warning" if residual_risks else "healthy", "Remaining launch caveats or hardening tasks.", launch_report_href),
                     ],
                 },
                 {
                     "type": "records",
-                    "title": "Findings and residual risks",
+                    "title": "Top failing controls",
+                    "items": readiness_panel["top_failing_controls"] or [
+                        _record("No failing controls", "Launch gate", "All controls are in a pass state.", "healthy", launch_report_href)
+                    ],
+                },
+                {
+                    "type": "records",
+                    "title": "Residual risks",
+                    "items": readiness_panel["residual_risks"] or [
+                        _record("No residual risks", "Launch gate", "No residual launch risks are listed in the current report.", "healthy", launch_report_href)
+                    ],
+                },
+                {
+                    "type": "links",
+                    "title": "Launch evidence",
+                    "items": readiness_panel["evidence_links"],
+                },
+            ],
+        },
+        {
+            **section_contracts["asset-coverage"],
+            "blocks": [
+                {
+                    "type": "cards",
+                    "title": "Governed asset counts",
                     "items": [
-                        *launch_records,
-                        *[
-                            _record(
-                                title="Residual risk",
-                                meta="remediation",
-                                detail=str(risk),
-                                status="warning",
-                            )
-                            for risk in launch_summary["residual_risks"]
-                        ],
+                        _card("Surfaces", str(len(surfaces)), "healthy", "Registered governed UI/runtime surfaces.", policy_href),
+                        _card("Tenants", str(len(tenants)), "healthy", "Tenant identities protected by role policy.", policy_href),
+                        _card("Roles", str(len(roles)), "healthy", "Roles mapped into governed surface access.", policy_href),
+                        _card("Retrieval sources", str(len(retrieval_sources)), "healthy", "Retrieval sources under tenant-scoped policy.", policy_href),
+                        _card("Tools", str(len(all_tools)), "healthy", "Governed tools across allow, deny, and confirmation-required modes.", policy_href),
+                        _card("MCP servers", str(len(mcp_servers)), "healthy" if mcp_servers else "warning", "MCP inventory visible in integration policy.", policy_href),
+                        _card("Governed runtimes", "1", "healthy", "Onyx is the governed runtime behind dashboard surfaces.", "#entry-points"),
+                    ],
+                },
+                {
+                    "type": "table",
+                    "title": "Protection inventory",
+                    "columns": [
+                        {"key": "asset_class", "label": "Asset class"},
+                        {"key": "count", "label": "Count"},
+                        {"key": "governed_by", "label": "Governed by"},
+                        {"key": "evidence", "label": "Evidence path"},
+                    ],
+                    "rows": asset_rows,
+                },
+                {
+                    "type": "links",
+                    "title": "Coverage references",
+                    "items": [
+                        _link("Asset inventory note", _raw("docs/asset-inventory.md"), "Repository note describing protected assets and control-plane ownership.", "neutral"),
+                        _link("Repo map", _raw("docs/repo-map.md"), "High-level repository layout that anchors the dashboard-first architecture.", "neutral"),
+                        _link("Runtime policy bundle", policy_href, "Source of truth for governed surfaces, roles, retrieval sources, and tools.", "healthy"),
                     ],
                 },
             ],
         },
         {
-            **section_meta("entry-points"),
+            **section_contracts["evidence-integrity"],
             "blocks": [
                 {
-                    "type": "links",
-                    "title": "Open tools",
+                    "type": "cards",
+                    "title": "Freshness and integrity summary",
                     "items": [
-                        {
-                            **runtime_link(
-                                label="Open Chat",
-                                href=_launch_handoff_url("/app"),
-                                fallback_href=_doc_link("docs/onyx-integration.md"),
-                                available=onyx_available,
-                                description="Open the Onyx chat workspace as the governed runtime module behind the control plane.",
-                                fallback_description="Onyx is not populated locally yet; open the integration guide instead.",
-                            )
-                        },
-                        {
-                            **runtime_link(
-                                label="Open Agents",
-                                href=_launch_handoff_url("/app/agents"),
-                                fallback_href=_doc_link("docs/onyx-integration.md"),
-                                available=onyx_available,
-                                description="Open the Onyx agents workspace behind the dashboard-first control plane.",
-                                fallback_description="Onyx is not populated locally yet; open the integration guide instead.",
-                            )
-                        },
-                        {
-                            **runtime_link(
-                                label="Search Knowledge",
-                                href=_launch_handoff_url("/app?chatMode=search"),
-                                fallback_href=_doc_link("docs/onyx-integration.md"),
-                                available=onyx_available,
-                                description="Open the Onyx search experience backed by the governed retrieval stack.",
-                                fallback_description="Onyx is not populated locally yet; open the integration guide instead.",
-                            )
-                        },
-                        {
-                            **runtime_link(
-                                label="Review Policies",
-                                href=policy_href,
-                                fallback_href=policy_href,
-                                available=policy_bundle.source == "overlay",
-                                description=f"Review the active runtime policy bundle and integration inventory. Source: {policy_source_detail}.",
-                                fallback_description="Open the local fallback policy bundle used when the overlay policy bundle is unavailable.",
-                            )
-                        },
-                        {
-                            **runtime_link(
-                                label="Review Evals",
-                                href=_public_service_url(3002),
-                                fallback_href=_doc_link("docs/langfuse-integration.md"),
-                                available=langfuse_available,
-                                description="Open Langfuse for trace and eval drill-down.",
-                                fallback_description="Langfuse is not populated locally yet; open the integration guide instead.",
-                            )
-                        },
-                        {
-                            **runtime_link(
-                                label="Review Evidence Pack",
-                                href=reviewer_href,
-                                fallback_href=reviewer_href,
-                                available=reviewer_bundle_relative_path(resolved_root).startswith("overlays/"),
-                                description="Open the reviewer evidence bundle exported by myStarterKit.",
-                                fallback_description="Open the local fallback reviewer evidence bundle used when the overlay evidence pack is unavailable.",
-                            )
-                        },
-                        {
-                            **runtime_link(
-                                label="Admin / Tenant Settings",
-                                href=_public_service_url(8080),
-                                fallback_href=_doc_link("docs/keycloak-integration.md"),
-                                available=keycloak_available,
-                                description="Identity and tenant administration entry point via Keycloak.",
-                                fallback_description="Keycloak is not populated locally yet; open the integration guide instead.",
-                            )
-                        },
+                        _card("Fresh artifacts", str(artifact_counts["fresh"]), "healthy", "Artifacts updated recently enough for evaluator trust.", "#evidence-integrity"),
+                        _card("Aging artifacts", str(artifact_counts["aging"]), "warning" if artifact_counts["aging"] else "healthy", "Artifacts that exist but are no longer same-day fresh.", "#evidence-integrity"),
+                        _card("Stale artifacts", str(artifact_counts["stale"]), "critical" if artifact_counts["stale"] else "healthy", "Artifacts present but old enough to warrant attention.", "#evidence-integrity"),
+                        _card("Missing artifacts", str(artifact_counts["missing"]), "critical" if artifact_counts["missing"] else "healthy", "Expected evidence that is missing from the checkout.", "#evidence-integrity"),
+                        _card("Verified artifacts", str(artifact_counts["verified"]), "healthy", "Artifacts whose structure or bundle references were checked.", "#evidence-integrity"),
                     ],
-                }
+                },
+                {
+                    "type": "table",
+                    "title": "Artifact inventory",
+                    "columns": [
+                        {"key": "artifact", "label": "Artifact"},
+                        {"key": "category", "label": "Category"},
+                        {"key": "freshness", "label": "Freshness"},
+                        {"key": "integrity", "label": "Integrity"},
+                        {"key": "updated", "label": "Last updated"},
+                    ],
+                    "rows": evidence_rows,
+                },
+                {
+                    "type": "records",
+                    "title": "Integrity warnings",
+                    "items": [
+                        _record(
+                            title=artifact["label"],
+                            meta=artifact["freshness"],
+                            detail=f"{artifact['integrity']}. {artifact['detail']} ({artifact['path']}).",
+                            status=artifact["status"],
+                            href=artifact["href"],
+                        )
+                        for artifact in artifact_inventory
+                        if artifact["status"] in {"warning", "critical"}
+                    ] or [
+                        _record("No integrity warnings", "Evidence integrity", "All tracked artifacts are present and structurally readable.", "healthy")
+                    ],
+                },
+            ],
+        },
+        {
+            **section_contracts["entry-points"],
+            "blocks": [
+                {
+                    "type": "cards",
+                    "title": "Governed runtime posture",
+                    "items": [
+                        _card("Onyx visibility", "Governed runtime", "healthy" if onyx_available else "warning", "Onyx remains behind governed dashboard handoffs.", _raw("docs/onyx-integration.md")),
+                        _card("Allowed handoff evidence", "Visible", "healthy", "Inspectable evidence bundle for an allowed runtime handoff is present.", _raw(INSPECTABLE_ALLOWED_FLOW)),
+                        _card("Denied handoff evidence", "Visible", "critical", "Inspectable evidence bundle for a denied runtime handoff is present.", _raw(INSPECTABLE_DENIED_FLOW)),
+                        _card("Recent handoff outcomes", str(len(onyx_handoffs)), "healthy", "Recent governed handoff outcomes are visible to reviewers.", "#entry-points"),
+                    ],
+                },
+                {
+                    "type": "records",
+                    "title": "Recent Onyx handoff outcomes",
+                    "items": onyx_handoffs,
+                },
+                {
+                    "type": "links",
+                    "title": "Governed entry points",
+                    "items": [
+                        _link("Open Chat", _launch_handoff_url("/app"), "Launch the governed Onyx chat surface through the dashboard handoff.", "healthy"),
+                        _link("Search Knowledge", _launch_handoff_url("/app?chatMode=search"), "Launch the governed search-oriented Onyx surface.", "healthy"),
+                        _link("Open Agents", _launch_handoff_url("/app/agents"), "Governed agents surface; non-admin roles should be denied.", "warning"),
+                        _link("Governed flow API", _dashboard_url("/api/control-plane/governed-flow"), "Trigger a governed flow run to generate fresh runtime artifacts.", "neutral"),
+                        _link("Onyx integration note", _raw("docs/onyx-integration.md"), "Architecture note for the governed Onyx runtime path.", "neutral"),
+                    ],
+                },
             ],
         },
     ]
 
+    sources = [
+        _link("Governed event feed", _raw(event_feed_path), "Event feed used by the dashboard overview and blocked-actions views.", "healthy"),
+        _link("Policy bundle", policy_href, "Runtime surface, retrieval, and tool governance policy.", "healthy" if policy_source == "overlay" else "warning"),
+        _link("Reviewer evidence bundle", reviewer_href, "Consolidated reviewer-facing evidence pack.", "healthy"),
+        _link("Launch report", launch_report_href, "Launch-gate findings and residual risk guidance.", "warning"),
+        _link("Dashboard ingestion feed", ingestion_href, "Dashboard export sample used for evidence drill-through and replay references.", "neutral"),
+    ]
+
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "title": str(contract.get("title", "Trust & Security Operations Dashboard")),
+        "title": str(contract.get("title", "AI Trust & Security Stack Control Plane")),
         "subtitle": str(contract.get("subtitle", "")),
         "hero_copy": str(contract.get("hero_copy", "")),
         "landing_steps": list(contract.get("landing_steps", [])),
-        "runtime_module": "Onyx runs behind this dashboard as the managed AI workspace.",
+        "generated_at": _iso_now(),
+        "runtime_module": "Onyx governed runtime",
+        "data_mode": {
+            "label": event_feed_label,
+            "status": "healthy" if has_live_governed_flow_artifacts(resolved_root) else "warning",
+            "detail": f"Primary event feed: {event_feed_path}",
+        },
+        "repo_description_suggestion": str(contract.get("repo_description_suggestion", "")),
+        "operator_briefing": quick_answers,
+        "kpis": kpis,
+        "readiness_panel": readiness_panel,
         "tabs": list(contract.get("tabs", [])),
         "sections": sections,
-        "sources": [
-            {
-                "label": "Policy bundle",
-                "href": _raw(policy_bundle.relative_path),
-                "description": f"Policy, retrieval, tool, and integration inventory. Active source: {policy_source_detail}.",
-            },
-            {
-                "label": "Telemetry sample",
-                "href": _raw("telemetry/exports/sample_events.jsonl"),
-                "description": "Normalized telemetry events feeding the dashboard summary.",
-            },
-            {
-                "label": "Launch gate report",
-                "href": _raw(launch_report_relative_path(resolved_root)),
-                "description": "Readiness findings consumed by the launch-gate section.",
-            },
-            {
-                "label": "Reviewer evidence bundle",
-                "href": _raw(reviewer_bundle_relative_path(resolved_root)),
-                "description": "Audit and evidence-pack source material.",
-            },
-            {
-                "label": "Dashboard ingestion sample",
-                "href": _raw(dashboard_ingestion_relative_path(resolved_root)),
-                "description": "Dashboard feed artifact used for fallback ingestion and replay views.",
-            },
-            {
-                "label": "Grafana operational dashboard spec",
-                "href": _raw("telemetry/dashboards/grafana/operational-dashboard-spec.json"),
-                "description": "Operational drill-down contract surfaced behind the control plane.",
-            },
-        ],
+        "sources": sources,
+        "activity_snapshot": activity_snapshot,
+        "evidence_exports": evidence_summary.get("exports", []),
     }

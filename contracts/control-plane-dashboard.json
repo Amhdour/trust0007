@@ -1,65 +1,82 @@
 {
-  "title": "Trust & Security Operations Dashboard for RAG and Autonomous Agents",
-  "subtitle": "Posture -> runtime -> retrieval -> tools -> evals -> audit -> launch gate",
-  "hero_copy": "This page gives operators a control-plane view of posture, governed runtime activity, retrieval security, evidence, and launch readiness.",
+  "title": "AI Trust & Security Stack Control Plane",
+  "subtitle": "Trust & Security Operations Dashboard for governed AI runtime enforcement, evidence quality, and launch readiness.",
+  "hero_copy": "This homepage is the visible Trust & Security Operations Dashboard: it shows what is protected, what governance blocked, why it was blocked, which evidence exists, and whether the governed runtime is launch-ready.",
   "landing_steps": [
-    "Security posture",
-    "Governed runtime",
-    "Evidence and evals",
-    "Launch readiness"
+    "Identity and session controls",
+    "Policy and retrieval enforcement",
+    "Tool governance and audit replay",
+    "Launch readiness and evidence review"
   ],
+  "repo_description_suggestion": "Dashboard-first AI Trust & Security Stack Control Plane for governed AI runtime launch readiness, policy enforcement, evidence integrity, and auditable Onyx handoffs.",
   "tabs": [
     { "id": "overview", "label": "Overview" },
-    { "id": "runtime", "label": "Runtime" },
-    { "id": "retrieval", "label": "Retrieval" },
-    { "id": "tools-mcp", "label": "Tools & MCP" },
-    { "id": "tools-mcp", "label": "Policies" },
-    { "id": "evals", "label": "Evals" },
+    { "id": "blocked-actions", "label": "Blocked Actions" },
+    { "id": "identity-session", "label": "Identity & Session" },
+    { "id": "policy-enforcement", "label": "Policy Enforcement" },
+    { "id": "retrieval-boundaries", "label": "Retrieval Boundaries" },
+    { "id": "tool-mcp-governance", "label": "Tool / MCP Governance" },
     { "id": "audit-replay", "label": "Audit & Replay" },
     { "id": "launch-gate", "label": "Launch Gate" },
-    { "id": "audit-replay", "label": "Evidence Pack" },
-    { "id": "entry-points", "label": "Chat / Agents" }
+    { "id": "asset-coverage", "label": "Asset Coverage" },
+    { "id": "evidence-integrity", "label": "Evidence Integrity" },
+    { "id": "entry-points", "label": "Onyx Runtime" }
   ],
   "sections": [
     {
       "id": "overview",
-      "title": "Global Security Posture",
-      "description": "A control-plane summary of platform health, security controls, and launch readiness."
+      "title": "Operations Snapshot",
+      "description": "A high-signal governance summary that answers what is protected, what was blocked, what evidence exists, and whether the platform is ready to launch."
     },
     {
-      "id": "runtime",
-      "title": "Live Runtime Activity",
-      "description": "Recent governed requests, decisions, alerts, and approvals flowing through the runtime plane."
+      "id": "blocked-actions",
+      "title": "Blocked / Governed Actions",
+      "description": "Recent denied retrievals, denied tool attempts, confirmation-required actions, and blocked Onyx handoffs with traceable reason codes."
     },
     {
-      "id": "retrieval",
-      "title": "Retrieval Security View",
-      "description": "How retrieval sources are segmented, approved, and used by governed AI workflows."
+      "id": "identity-session",
+      "title": "Identity & Session",
+      "description": "Tenant, role, surface, and session boundaries that establish who may reach each governed interface."
     },
     {
-      "id": "tools-mcp",
-      "title": "Tool and MCP Control View",
-      "description": "Which tools and MCP surfaces are allowed, blocked, or require approval before use."
+      "id": "policy-enforcement",
+      "title": "Policy Enforcement",
+      "description": "Decision volume, deny posture, policy sources, and the dominant reasons governance intercepted activity."
     },
     {
-      "id": "evals",
-      "title": "AI Traces and Evals",
-      "description": "Trace coverage, evaluation results, and safety checks across the governed runtime."
+      "id": "retrieval-boundaries",
+      "title": "Retrieval Boundaries",
+      "description": "Tenant-scoped retrieval source protection, blocked data access, and trust or provenance requirements."
+    },
+    {
+      "id": "tool-mcp-governance",
+      "title": "Tool / MCP Governance",
+      "description": "Allowed, denied, and confirmation-required tool actions plus MCP server exposure and sandbox requirements."
     },
     {
       "id": "audit-replay",
-      "title": "Audit and Replay",
-      "description": "Audit trails, replay support, and evidence exports for review and reporting."
+      "title": "Audit & Replay",
+      "description": "Audit coverage, replay bundles, governed flow traces, and reviewer-ready evidence entry points."
     },
     {
       "id": "launch-gate",
-      "title": "Launch Gate and Readiness",
-      "description": "Coverage, risks, failed tests, and go-live readiness for the control plane."
+      "title": "Launch Gate",
+      "description": "Current launch readiness state, failing controls, residual risks, and drill-down evidence for go or no-go decisions."
+    },
+    {
+      "id": "asset-coverage",
+      "title": "Asset / Protection Coverage",
+      "description": "The surfaces, tenants, roles, policy bundles, retrieval sources, tools, MCP servers, and runtimes under governance."
+    },
+    {
+      "id": "evidence-integrity",
+      "title": "Evidence Integrity & Freshness",
+      "description": "Artifact existence, freshness signals, integrity checks, and missing-evidence warnings for reviewer trust."
     },
     {
       "id": "entry-points",
-      "title": "Entry Points",
-      "description": "Direct links to the main runtime, policy, evidence, and admin surfaces behind this dashboard."
+      "title": "Onyx Governed Runtime",
+      "description": "Onyx remains a governed runtime behind the dashboard, with visible allow or deny outcomes and auditable handoffs."
     }
   ]
 }
