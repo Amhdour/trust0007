@@ -7,7 +7,7 @@ The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and
 ## Design intent
 
 - Lead with the dashboard, then identity/session, then governed AI runtime, then evidence/analytics.
-- Treat `upstream/*` as third-party source of truth.
+- Treat `upstream/*` as vendored third-party source snapshots.
 - Treat `overlays/myStarterKit` as the governance overlay baseline.
 - Keep local platform logic additive in:
   - `frontend/`
@@ -34,7 +34,7 @@ The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and
 - `infra/`: logical mapping for identity, policy, retrieval, telemetry, and evidence systems.
 - `evidence/`: dashboard-owned evidence export area.
 - `ai-trust-security-stack/`: managed compatibility submodule kept for migration/comparison workflows.
-- `upstream/`: pinned submodules for Keycloak, Envoy, Onyx, OPA, Vault, Qdrant, optional gVisor, Langfuse, Grafana, and Superset.
+- `upstream/`: vendored copies of Keycloak, Envoy, Onyx, OPA, Vault, Qdrant, optional gVisor, Langfuse, Grafana, and Superset sources.
 - `overlays/myStarterKit/`: governance-overlay submodule.
 - `overlays/governance-overlay/`: local, additive overlay contracts and integration wiring (this repo).
 - `adapters/`: Python adapters for policy/runtime/retrieval/secrets/sandbox/observability bridges.

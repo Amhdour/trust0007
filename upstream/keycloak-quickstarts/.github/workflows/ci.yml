@@ -1,0 +1,11 @@
+name: Keycloak Integration CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  call-ci-workflow:
+    uses: ./.github/workflows/workflow-ci.yml

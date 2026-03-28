@@ -1,0 +1,11 @@
+@use '../utils/size_variables';
+
+/**
+ * Copyright IBM Corp. 2016, 2025
+ * SPDX-License-Identifier: BUSL-1.1
+ */
+
+.overview-card {
+  padding: size_variables.$spacing-24;
+  line-height: initial;
+}

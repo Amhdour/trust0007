@@ -1,0 +1,212 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - copyloopvar
+    - errcheck
+    - gocritic
+    - govet
+    - ineffassign
+    - intrange
+    - mirror
+    - misspell
+    - perfsprint
+    - prealloc
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+    - usetesting
+  settings:
+    gocritic:
+      enabled-checks:
+        - filepathJoin
+        - dupImport
+        - redundantSprint
+        - stringConcatSimplify
+      disabled-checks:
+        - appendAssign
+        - singleCaseSwitch
+        - exitAfterDefer
+        - hugeParam
+        - preferFprint
+        - appendCombine
+      enabled-tags:
+        - performance
+      settings:
+        ifElseChain:
+          minThreshold: 10
+    govet:
+      enable:
+        - deepequalerrors
+        - nilness
+    lll:
+      line-length: 200
+    perfsprint:
+      err-error: true
+    revive:
+      rules:
+        - name: redefines-builtin-id
+          disabled: true
+        - name: unused-receiver
+          disabled: false
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - staticcheck
+        path: ast/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: bundle/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: capabilities/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: compile/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: config/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: cover/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: debug/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: dependencies/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: download/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: format/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: hooks/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: ir/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: keys/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: loader/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: logging/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: metrics/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: plugins/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: profiler/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: refactor/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: repl/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: rego/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: resolver/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: runtime/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: schemas/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: sdk/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: server/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: storage/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: tester/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: topdown/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: tracing/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: types/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: util/
+        text: SA1019
+      - linters:
+          - staticcheck
+        path: version/
+        text: SA1019
+    paths:
+      - internal/gojsonschema
+      - internal/jwx
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - internal/gojsonschema
+      - internal/jwx
+      - third_party$
+      - builtin$
+      - examples$

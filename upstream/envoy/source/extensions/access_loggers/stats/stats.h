@@ -1,0 +1,108 @@
+#pragma once
+
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/stats/v3/stats.pb.h"
+#include "envoy/stats/stats.h"
+#include "envoy/stats/tag.h"
+
+#include "source/common/matcher/matcher.h"
+#include "source/extensions/access_loggers/common/access_log_base.h"
+#include "source/extensions/matching/actions/transform_stat/transform_stat.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace AccessLoggers {
+namespace StatsAccessLog {
+
+class StatsAccessLog : public AccessLoggers::Common::ImplBase {
+public:
+  StatsAccessLog(const envoy::extensions::access_loggers::stats::v3::Config& config,
+                 Server::Configuration::GenericFactoryContext& context,
+                 AccessLog::FilterPtr&& filter,
+                 const std::vector<Formatter::CommandParserPtr>& command_parsers);
+
+private:
+  // AccessLoggers::Common::ImplBase
+  void emitLog(const Formatter::Context& context,
+               const StreamInfo::StreamInfo& stream_info) override;
+
+  // `emitLog` is called concurrently from different works. Move all the logic into a const function
+  // to ensure there are no data races in mutation of class members.
+  void emitLogConst(const Formatter::Context& context,
+                    const StreamInfo::StreamInfo& stream_info) const;
+
+  class DynamicTag {
+  public:
+    DynamicTag(const envoy::extensions::access_loggers::stats::v3::Config::Tag& tag_cfg,
+               Envoy::Stats::StatNamePool& pool,
+               const std::vector<Formatter::CommandParserPtr>& commands,
+               Server::Configuration::GenericFactoryContext& context);
+    DynamicTag(DynamicTag&&) = default;
+
+    const Envoy::Stats::StatName name_;
+    Formatter::FormatterPtr value_formatter_;
+    Matcher::MatchTreeSharedPtr<Envoy::Stats::StatTagMatchingData> rules_;
+  };
+
+  // The construction of NameAndTags can only be made at initialization time because it needs to
+  // intern tag names into StatNames via the StatNamePool in the main thread.
+  class NameAndTags {
+  public:
+    NameAndTags(const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
+                Envoy::Stats::StatNamePool& pool,
+                const std::vector<Formatter::CommandParserPtr>& commands,
+                Server::Configuration::GenericFactoryContext& context);
+
+    struct TagsResult {
+      Envoy::Stats::StatNameTagVector tags_;
+      std::vector<Envoy::Stats::StatNameDynamicStorage> dynamic_storage_;
+      bool dropped_;
+    };
+    TagsResult tags(const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info,
+                    Envoy::Stats::Scope& scope) const;
+
+    Envoy::Stats::StatName name_;
+    std::vector<DynamicTag> dynamic_tags_;
+  };
+
+  struct Histogram {
+    NameAndTags stat_;
+    Envoy::Stats::Histogram::Unit unit_;
+    Formatter::FormatterProviderPtr value_formatter_;
+  };
+
+  struct Counter {
+    NameAndTags stat_;
+    Formatter::FormatterProviderPtr value_formatter_;
+    uint64_t value_fixed_;
+  };
+
+  struct Gauge {
+    enum class OperationType {
+      SET,
+      PAIRED_ADD,
+      PAIRED_SUBTRACT,
+    };
+
+    NameAndTags stat_;
+    Formatter::FormatterProviderPtr value_formatter_;
+    uint64_t value_fixed_;
+    absl::InlinedVector<std::pair<envoy::data::accesslog::v3::AccessLogType, OperationType>, 2>
+        operations_;
+  };
+
+  void emitLogForGauge(const Gauge& gauge, const Formatter::Context& context,
+                       const StreamInfo::StreamInfo& stream_info) const;
+
+  const Stats::ScopeSharedPtr scope_;
+  Stats::StatNamePool stat_name_pool_;
+
+  const std::vector<Histogram> histograms_;
+  const std::vector<Counter> counters_;
+  const std::vector<Gauge> gauges_;
+};
+
+} // namespace StatsAccessLog
+} // namespace AccessLoggers
+} // namespace Extensions
+} // namespace Envoy

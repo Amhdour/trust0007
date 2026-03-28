@@ -1,0 +1,13 @@
+name: Keycloak Integration CI Nightly
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  call-ci-workflow:
+    uses: ./.github/workflows/workflow-ci.yml
+    with:
+      nightly-test: 'true'

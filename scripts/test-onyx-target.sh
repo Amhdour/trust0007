@@ -9,7 +9,7 @@ from pathlib import Path
 
 from backend.posture_service.service import build_control_plane_dashboard
 
-assert Path("upstream/onyx").exists(), "missing upstream/onyx submodule path"
+assert Path("upstream/onyx").exists(), "missing vendored upstream/onyx path"
 
 payload = build_control_plane_dashboard()
 runtime_module = payload["runtime_module"]

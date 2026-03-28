@@ -1,0 +1,24 @@
+{{!
+  Copyright IBM Corp. 2016, 2025
+  SPDX-License-Identifier: BUSL-1.1
+}}
+
+{{#if @model.groupIds}}
+  {{#each @model.directGroupIds as |gid|}}
+    <LinkTo @route="vault.cluster.access.identity.show" @models={{array "groups" gid "details"}} class="list-item-row">
+      <Icon @name="folder" class="has-text-grey-light" />{{gid}}
+    </LinkTo>
+  {{/each}}
+  {{#each @model.inheritedGroupIds as |gid|}}
+    <LinkedBlock @params={{array "vault.cluster.access.identity.show" "groups" gid "details"}} class="list-item-row">
+      <LinkTo @route="vault.cluster.access.identity.show" @models={{array "groups" gid "details"}} class="has-text-black">
+        <Icon @name="folder" class="has-text-grey-light" />{{gid}}
+      </LinkTo>
+      <Hds::Badge @text="inherited" />
+    </LinkedBlock>
+  {{/each}}
+{{else}}
+  <Hds::ApplicationState class="top-padding-32 is-marginless" as |A|>
+    <A.Header data-test-empty-state-title @title="{{@model.name}} is not a member of any groups." @titleTag="h2" />
+  </Hds::ApplicationState>
+{{/if}}

@@ -1,0 +1,8 @@
+/**
+ * Copyright IBM Corp. 2016, 2025
+ * SPDX-License-Identifier: BUSL-1.1
+ */
+
+import RoleSerializer from './role';
+
+export default RoleSerializer.extend();
