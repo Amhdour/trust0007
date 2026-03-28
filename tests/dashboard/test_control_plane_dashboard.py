@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
+import tempfile
 
-from backend.integration_adapter.repository import load_dashboard_contract
+from backend.integration_adapter.repository import load_dashboard_contract, load_runtime_policy_bundle
 from backend.launch_gate_service.service import build_launch_gate_summary
 from backend.posture_service.service import build_control_plane_dashboard
 
@@ -51,11 +52,11 @@ def test_launch_gate_summary_maps_existing_report() -> None:
     assert "risky_config_defaults_disabled" in summary["missing_controls"]
 
 
-def test_dashboard_links_fallback_to_local_artifacts_when_overlay_is_missing() -> None:
+def test_dashboard_prefers_overlay_policy_bundle_when_present() -> None:
     payload = build_control_plane_dashboard()
 
     source_hrefs = {source["label"]: source["href"] for source in payload["sources"]}
-    assert source_hrefs["Policy bundle"] == "/raw/policies/runtime-policy-fallback.json"
+    assert source_hrefs["Policy bundle"] == "/raw/overlays/myStarterKit/policies/bundles/default/policy.json"
     assert source_hrefs["Reviewer evidence bundle"] == "/raw/evidence/reviewer_evidence_bundle.json"
 
     entry_points = next(section for section in payload["sections"] if section["id"] == "entry-points")
@@ -65,10 +66,24 @@ def test_dashboard_links_fallback_to_local_artifacts_when_overlay_is_missing() -
             link_items.extend(block["items"])
 
     links = {item["label"]: item for item in link_items}
-    assert links["Review Policies"]["href"].endswith("/raw/policies/runtime-policy-fallback.json")
+    assert links["Review Policies"]["href"].endswith("/raw/overlays/myStarterKit/policies/bundles/default/policy.json")
     assert links["Review Evidence Pack"]["href"].endswith("/raw/evidence/reviewer_evidence_bundle.json")
     assert links["Review Evals"]["href"].endswith("/raw/docs/langfuse-integration.md")
     assert links["Admin / Tenant Settings"]["href"].endswith("/raw/docs/keycloak-integration.md")
+
+
+def test_runtime_policy_bundle_falls_back_when_overlay_is_missing() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        fallback_policy = root / "policies/runtime-policy-fallback.json"
+        fallback_policy.parent.mkdir(parents=True, exist_ok=True)
+        fallback_policy.write_text('{"tools":{"allowed_tools":["search"]}}', encoding="utf-8")
+
+        bundle = load_runtime_policy_bundle(root)
+
+        assert bundle.source == "fallback"
+        assert bundle.relative_path == "policies/runtime-policy-fallback.json"
+        assert bundle.document["tools"]["allowed_tools"] == ["search"]
 
 
 def test_contract_files_present() -> None:

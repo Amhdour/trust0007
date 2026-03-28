@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from html import escape
 import json
 import mimetypes
@@ -11,6 +12,7 @@ from urllib.error import URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import urlopen
 
+from backend.integration_adapter import load_runtime_policy_bundle
 from backend.posture_service.service import build_control_plane_dashboard, build_control_plane_live_log
 from backend.governance_flow_evaluator import GovernedFlowEvaluator
 from adapters.onyx_gateway_adapter.interfaces import PolicyChecker, RetrievalChecker, ToolDecisionChecker
@@ -31,10 +33,21 @@ ARTIFACT_DIR = Path(
     )
 ).resolve()
 
-# Load runtime policy
-POLICY_PATH = REPO_ROOT / "policies" / "runtime-policy-fallback.json"
-with open(POLICY_PATH) as f:
-    RUNTIME_POLICY = json.load(f)
+
+@dataclass(frozen=True)
+class RuntimePolicyContext:
+    document: dict
+    relative_path: str
+    source: str
+
+
+def _runtime_policy_context() -> RuntimePolicyContext:
+    bundle = load_runtime_policy_bundle(REPO_ROOT)
+    return RuntimePolicyContext(
+        document=bundle.document,
+        relative_path=bundle.relative_path,
+        source=bundle.source,
+    )
 
 
 def _public_service_url(port: int, path: str = "") -> str:
@@ -47,37 +60,117 @@ def _public_service_url(port: int, path: str = "") -> str:
     return f"{base}{path}"
 
 
-# Real governance implementations using runtime policy
+def _surface_rules(policy: dict) -> list[dict]:
+    rules = list(policy.get("surfaces", {}).get("path_policies", []))
+    return sorted(
+        rules,
+        key=lambda rule: (
+            -len(str(rule.get("path", ""))),
+            -len(rule.get("query", {}) or {}),
+        ),
+    )
+
+
+def _resolve_surface(policy: dict, requested_path: str) -> dict:
+    parsed = urlparse(requested_path)
+    path = parsed.path or "/app"
+    query = {key: values[-1] for key, values in parse_qs(parsed.query).items() if values}
+
+    for rule in _surface_rules(policy):
+        if rule.get("path") != path:
+            continue
+        expected_query = rule.get("query", {}) or {}
+        if any(query.get(key) != value for key, value in expected_query.items()):
+            continue
+        return {
+            "surface": str(rule.get("surface", "")),
+            "path": path,
+            "query": query,
+            "allowed_roles": list(rule.get("allowed_roles", [])),
+        }
+
+    return {
+        "surface": "",
+        "path": path,
+        "query": query,
+        "allowed_roles": [],
+    }
+
+
 class RuntimePolicyChecker(PolicyChecker):
+    def __init__(self, policy_context: RuntimePolicyContext) -> None:
+        self._context = policy_context
+        self._policy = policy_context.document
+
     def check_policy(self, request: NormalizedRequest) -> PolicyDecision:
-        # Allow if no forbidden content in prompt
-        forbidden_words = ["hack", "exploit", "bypass"]
-        if any(word in request.prompt.lower() for word in forbidden_words):
+        forbidden_terms = list(
+            self._policy.get("content_rules", {}).get("forbidden_terms", ["hack", "exploit", "bypass"])
+        )
+        lowered_prompt = request.prompt.lower()
+        if any(word.lower() in lowered_prompt for word in forbidden_terms):
             return PolicyDecision(allow=False, reasons=["policy.forbidden_content"])
-        return PolicyDecision(allow=True, reasons=["policy.allow"])
+
+        roles = list(request.metadata.get("identity_roles", []))
+        allowed_tenant_roles = set(self._policy.get("identity", {}).get("tenant_roles", {}).get(request.tenant_id, []))
+        if allowed_tenant_roles:
+            invalid_roles = [role for role in roles if role not in allowed_tenant_roles]
+            if invalid_roles:
+                return PolicyDecision(
+                    allow=False,
+                    reasons=[f"policy.identity_role_not_allowed:{role}" for role in invalid_roles],
+                )
+
+        requested_path = str(request.metadata.get("requested_path", ""))
+        if requested_path:
+            surface_info = _resolve_surface(self._policy, requested_path)
+            surface_name = surface_info.get("surface", "")
+            if not surface_name:
+                return PolicyDecision(allow=False, reasons=[f"policy.surface_not_registered:{surface_info['path']}"])
+
+            allowed_roles = set(surface_info.get("allowed_roles", []))
+            if allowed_roles and not any(role in allowed_roles for role in roles):
+                return PolicyDecision(
+                    allow=False,
+                    reasons=[f"policy.surface_role_denied:{surface_name}"],
+                )
+
+        return PolicyDecision(
+            allow=True,
+            reasons=["policy.allow"],
+        )
 
 
 class RuntimeRetrievalChecker(RetrievalChecker):
+    def __init__(self, policy_context: RuntimePolicyContext) -> None:
+        self._policy = policy_context.document
+
     def check_retrieval(self, request: NormalizedRequest) -> RetrievalDecision:
         if not request.retrieval_needed:
             return RetrievalDecision(allow=True, reasons=["retrieval.not_needed"])
-        
-        # Check tenant allowed sources
-        tenant_sources = RUNTIME_POLICY.get("retrieval", {}).get("tenant_allowed_sources", {}).get(request.tenant_id, [])
-        if not tenant_sources:
-            return RetrievalDecision(allow=False, reasons=["retrieval.tenant_not_allowed"])
-        
+
+        tenant_sources = self._policy.get("retrieval", {}).get("tenant_allowed_sources", {}).get(request.tenant_id, [])
+        if request.retrieval_source not in tenant_sources:
+            return RetrievalDecision(
+                allow=False,
+                reasons=[f"retrieval.source_not_allowed:{request.retrieval_source or 'unknown'}"],
+            )
+
         return RetrievalDecision(allow=True, reasons=["retrieval.allow"])
 
 
 class RuntimeToolChecker(ToolDecisionChecker):
+    def __init__(self, policy_context: RuntimePolicyContext) -> None:
+        self._policy = policy_context.document
+
     def check_tools(self, request: NormalizedRequest) -> ToolDecision:
-        allowed_tools = set(RUNTIME_POLICY.get("tools", {}).get("allowed_tools", []))
-        forbidden_tools = set(RUNTIME_POLICY.get("tools", {}).get("forbidden_tools", []))
-        
+        tool_policy = self._policy.get("tools", {})
+        allowed_tools = set(tool_policy.get("allowed_tools", []))
+        allowed_tools.update(tool_policy.get("confirmation_required_tools", []))
+        forbidden_tools = set(tool_policy.get("forbidden_tools", []))
+
         denied_tools = []
         reasons = []
-        
+
         for tool in request.requested_tools:
             if tool in forbidden_tools:
                 denied_tools.append(tool)
@@ -85,9 +178,9 @@ class RuntimeToolChecker(ToolDecisionChecker):
             elif tool not in allowed_tools:
                 denied_tools.append(tool)
                 reasons.append(f"tool.not_allowed:{tool}")
-        
+
         allowed_tools_list = [t for t in request.requested_tools if t not in denied_tools]
-        
+
         return ToolDecision(allowed_tools=allowed_tools_list, denied_tools=denied_tools, reasons=reasons)
 
 
@@ -107,9 +200,15 @@ class SeedRetrievalBackend(RetrievalBackend):
 
 
 class RuntimeRetrievalPolicy(RetrievalPolicyEvaluator):
+    def __init__(self, policy_context: RuntimePolicyContext) -> None:
+        self._policy = policy_context.document
+
     def evaluate(self, request: RetrievalRequest) -> dict:
-        allowed_integrations = set(RUNTIME_POLICY.get("integrations", {}).get("allowed_integrations", []))
-        allowed_sources = RUNTIME_POLICY.get("retrieval", {}).get("tenant_allowed_sources", {}).get(request.tenant_id, [])
+        allowed_integrations = set(self._policy.get("integrations", {}).get("allowed_integrations", []))
+        retrieval_policy = self._policy.get("retrieval", {})
+        allowed_sources = retrieval_policy.get("tenant_allowed_sources", {}).get(request.tenant_id, [])
+        required_trust_labels = retrieval_policy.get("source_trust_labels", {}).get(request.source, [])
+        required_provenance_fields = retrieval_policy.get("required_provenance_fields", [])
 
         if f"retrieval.{request.source}" not in allowed_integrations:
             return {
@@ -125,25 +224,42 @@ class RuntimeRetrievalPolicy(RetrievalPolicyEvaluator):
                 "reasons": [f"retrieval.tenant_not_allowed:{request.tenant_id}"],
             }
 
+        if request.source not in allowed_sources:
+            return {
+                "allow": False,
+                "mode": "deny",
+                "reasons": [f"retrieval.source_not_allowed:{request.source}"],
+            }
+
         return {
             "allow": True,
             "mode": "allow",
             "reasons": [
                 f"retrieval.integration_allowed:{request.source}",
                 f"retrieval.tenant_scoped:{request.tenant_id}",
-            ],
+            ]
+            + ([f"retrieval.trust_labels_required:{','.join(required_trust_labels)}"] if required_trust_labels else [])
+            + ([f"retrieval.provenance_required:{','.join(required_provenance_fields)}"] if required_provenance_fields else []),
+            "required_trust_labels": required_trust_labels,
+            "required_provenance_fields": required_provenance_fields,
+            "deny_on_empty_result": True,
         }
 
 
 class RuntimeToolExecutor(ToolExecutor):
+    def __init__(self, policy_context: RuntimePolicyContext) -> None:
+        self._policy = policy_context.document
+
     def execute(self, request: ToolActionRequest) -> dict:
-        allowed_tools = set(RUNTIME_POLICY.get("tools", {}).get("allowed_tools", []))
-        confirmation_required = set(RUNTIME_POLICY.get("tools", {}).get("confirmation_required_tools", []))
+        tool_policy = self._policy.get("tools", {})
+        allowed_tools = set(tool_policy.get("allowed_tools", []))
+        confirmation_required = set(tool_policy.get("confirmation_required_tools", []))
+        executable_tools = allowed_tools | confirmation_required
 
         if request.tool_name in confirmation_required and not request.confirmed:
             raise PermissionError(f"tool.confirmation_required:{request.tool_name}")
 
-        if request.tool_name not in allowed_tools:
+        if request.tool_name not in executable_tools:
             raise PermissionError(f"tool.execution_not_allowed:{request.tool_name}")
 
         return {
@@ -154,14 +270,31 @@ class RuntimeToolExecutor(ToolExecutor):
         }
 
 
-def _runtime_tool_policy_config() -> ToolPolicyConfig:
-    tool_policy = RUNTIME_POLICY.get("tools", {})
+def _runtime_tool_policy_config(policy_context: RuntimePolicyContext) -> ToolPolicyConfig:
+    tool_policy = policy_context.document.get("tools", {})
     confirmation_required = set(tool_policy.get("confirmation_required_tools", []))
+    argument_policies = tool_policy.get("argument_policies", {})
     return ToolPolicyConfig(
         tool_allowlist=set(tool_policy.get("allowed_tools", [])),
         confirmation_required_tools=confirmation_required,
         forbidden_tools=set(tool_policy.get("forbidden_tools", [])),
         forbidden_arguments={"password", "api_key", "token", "secret"},
+        allowed_arguments_by_tool={
+            tool_name: set(policy.get("allowed_arguments", []))
+            for tool_name, policy in argument_policies.items()
+            if policy.get("allowed_arguments") is not None
+        },
+        required_arguments_by_tool={
+            tool_name: set(policy.get("required_arguments", []))
+            for tool_name, policy in argument_policies.items()
+        },
+        forbidden_argument_value_substrings={
+            tool_name: {
+                arg_name: set(values)
+                for arg_name, values in policy.get("forbidden_value_substrings", {}).items()
+            }
+            for tool_name, policy in argument_policies.items()
+        },
         high_risk_tools=confirmation_required,
         rate_limit_hints={tool: "approval_required" for tool in confirmation_required},
     )
@@ -178,15 +311,15 @@ def _artifact_list_markup(artifacts: dict[str, str]) -> str:
     return "".join(items)
 
 
-def _build_governed_flow_evaluator() -> GovernedFlowEvaluator:
+def _build_governed_flow_evaluator(policy_context: RuntimePolicyContext) -> GovernedFlowEvaluator:
     return GovernedFlowEvaluator(
-        policy_checker=RuntimePolicyChecker(),
-        retrieval_checker=RuntimeRetrievalChecker(),
-        tool_checker=RuntimeToolChecker(),
+        policy_checker=RuntimePolicyChecker(policy_context),
+        retrieval_checker=RuntimeRetrievalChecker(policy_context),
+        tool_checker=RuntimeToolChecker(policy_context),
         retrieval_backend=SeedRetrievalBackend(),
-        retrieval_policy=RuntimeRetrievalPolicy(),
-        tool_executor=RuntimeToolExecutor(),
-        tool_policy_evaluator=StaticToolPolicyEvaluator(_runtime_tool_policy_config()),
+        retrieval_policy=RuntimeRetrievalPolicy(policy_context),
+        tool_executor=RuntimeToolExecutor(policy_context),
+        tool_policy_evaluator=StaticToolPolicyEvaluator(_runtime_tool_policy_config(policy_context)),
         artifact_dir=ARTIFACT_DIR,
     )
 
@@ -247,7 +380,8 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     def _handle_governed_flow(self) -> None:
         """Execute a governed flow with runtime policy enforcement and emit artifacts."""
         try:
-            evaluator = _build_governed_flow_evaluator()
+            policy_context = _runtime_policy_context()
+            evaluator = _build_governed_flow_evaluator(policy_context)
 
             result = evaluator.run(
                 user_id="api-user",
@@ -256,6 +390,14 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 requested_tools=["search", "summarize"],
                 retrieval_source="qdrant",
                 retrieval_needed=True,
+                roles=["tenant_user"],
+                request_metadata={"surface": "control-plane.governed-flow"},
+                tool_arguments={
+                    "search": {"query": "Demonstrate governed flow through control plane API"},
+                    "summarize": {"query": "Demonstrate governed flow through control plane API"},
+                },
+                policy_source=policy_context.source,
+                policy_path=policy_context.relative_path,
             )
 
             self._send_json(result.to_dict())
@@ -293,7 +435,9 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
         # Run governance check for Onyx handoff
         try:
-            evaluator = _build_governed_flow_evaluator()
+            policy_context = _runtime_policy_context()
+            surface_info = _resolve_surface(policy_context.document, safe_path)
+            evaluator = _build_governed_flow_evaluator(policy_context)
 
             flow_result = evaluator.run(
                 user_id="dashboard-user",
@@ -302,6 +446,21 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 requested_tools=["onyx"],
                 retrieval_source="qdrant",
                 retrieval_needed=False,
+                roles=["tenant_user"],
+                request_metadata={
+                    "requested_path": safe_path,
+                    "surface": surface_info.get("surface", ""),
+                    "surface_query": surface_info.get("query", {}),
+                },
+                tool_arguments={
+                    "onyx": {
+                        "surface": surface_info.get("surface", ""),
+                        "path": surface_info.get("path", safe_path),
+                        "chat_mode": surface_info.get("query", {}).get("chatMode", ""),
+                    }
+                },
+                policy_source=policy_context.source,
+                policy_path=policy_context.relative_path,
             )
         except Exception as e:
             error_reason = f"{type(e).__name__}: {e}"
@@ -378,6 +537,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         <strong>Handoff to Onyx was denied by control-plane policy.</strong>
         <div class="muted">Governance decision: {flow_result.launch_gate_decision if flow_result else 'error'}</div>
         <div class="muted">Trace ID: <code>{flow_result.trace_id if flow_result else 'unknown'}</code></div>
+        <div class="muted">Policy source: <code>{escape(flow_result.policy_source if flow_result else 'unknown')}</code> via <code>{escape(flow_result.policy_path if flow_result else 'unknown')}</code></div>
       </div>
       <p><strong>Reasons for denial:</strong></p>
       <ul>
@@ -510,6 +670,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         <strong>Governance Audit Trail:</strong><br>
         Trace: <code>{flow_result.trace_id if flow_result else 'unknown'}</code><br>
         Decision: <code>{flow_result.launch_gate_decision if flow_result else 'pass'}</code><br>
+        Policy Source: <code>{escape(flow_result.policy_source if flow_result else 'unknown')}</code> via <code>{escape(flow_result.policy_path if flow_result else 'unknown')}</code><br>
         Policy: {"Allow" if flow_result and flow_result.policy_allow else "Deny"} |
         Retrieval: {"Allow" if flow_result and flow_result.retrieval_allow else "Deny"} |
         Tools: {"Allow" if flow_result and not flow_result.denied_tools else "Deny"}<br>

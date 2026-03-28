@@ -1,0 +1,12 @@
+{
+  "label": "allowed_governed_runtime_flow",
+  "captured_at": "2026-03-28T10:18:52Z",
+  "result": "allow",
+  "summary": "Live governed-flow execution and governed Onyx handoff succeeded under the production-simulated control-plane service.",
+  "artifacts": [
+    "evidence/prod-sim/governed-flow-response.json",
+    "evidence/prod-sim/events.jsonl",
+    "evidence/prod-sim/launch-gate-result.json",
+    "evidence/prod-sim/launch-allow.html"
+  ]
+}

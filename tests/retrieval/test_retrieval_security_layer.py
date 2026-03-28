@@ -17,7 +17,14 @@ class StubBackend(RetrievalBackend):
 
 class StubPolicyAllow(RetrievalPolicyEvaluator):
     def evaluate(self, request: RetrievalRequest) -> dict:
-        return {"allow": True, "mode": "allow", "reasons": []}
+        return {
+            "allow": True,
+            "mode": "allow",
+            "reasons": [],
+            "required_trust_labels": ["trusted"],
+            "required_provenance_fields": ["uri"],
+            "deny_on_empty_result": True,
+        }
 
 
 class StubPolicyDeny(RetrievalPolicyEvaluator):
@@ -28,6 +35,18 @@ class StubPolicyDeny(RetrievalPolicyEvaluator):
 class StubPolicyDegrade(RetrievalPolicyEvaluator):
     def evaluate(self, request: RetrievalRequest) -> dict:
         return {"allow": True, "mode": "degrade", "reasons": ["trust labels missing"]}
+
+
+class StubPolicyStrict(RetrievalPolicyEvaluator):
+    def evaluate(self, request: RetrievalRequest) -> dict:
+        return {
+            "allow": True,
+            "mode": "allow",
+            "reasons": ["retrieval.strict"],
+            "required_trust_labels": ["trusted"],
+            "required_provenance_fields": ["uri"],
+            "deny_on_empty_result": True,
+        }
 
 
 def make_docs():
@@ -132,3 +151,39 @@ def test_retrieval_degrade_mode() -> None:
     assert result.mode == "degrade"
     assert len(result.filtered_documents) == 3
     assert "trust labels missing" in result.reasons
+
+
+def test_retrieval_denies_when_docs_fail_trust_or_provenance() -> None:
+    telemetry = InMemoryRetrievalTelemetry()
+    docs = [
+        RetrievalDocument(
+            doc_id="missing-provenance",
+            tenant_id="tenant-a",
+            source="qdrant",
+            content="doc missing provenance",
+            trust_label="trusted",
+            quarantined=False,
+            provenance={},
+        ),
+        RetrievalDocument(
+            doc_id="wrong-trust",
+            tenant_id="tenant-a",
+            source="qdrant",
+            content="doc wrong trust",
+            trust_label="untrusted",
+            quarantined=False,
+            provenance={"uri": "kb://wrong-trust"},
+        ),
+    ]
+    layer = RetrievalSecurityLayer(
+        backend=StubBackend(docs),
+        policy_evaluator=StubPolicyStrict(),
+        telemetry=telemetry,
+    )
+
+    result = layer.evaluate(make_request())
+
+    assert result.allow is False
+    assert result.mode == "deny"
+    assert "retrieval.provenance_missing" in result.reasons
+    assert "retrieval.trust_label_not_allowed" in result.reasons

@@ -17,12 +17,11 @@ from backend.integration_adapter.repository import (
     load_eval_summaries,
     load_latest_governed_flow_events,
     load_latest_governed_flow_launch_gate,
-    load_policy_bundle,
+    load_runtime_policy_bundle,
     load_reviewer_bundle,
     load_sample_events,
     load_service_inventory,
     path_has_files,
-    policy_bundle_relative_path,
     repo_root,
     reviewer_bundle_relative_path,
 )
@@ -144,7 +143,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         events = load_sample_events(resolved_root)
     
     counts = _count_events(events)
-    policy = load_policy_bundle(resolved_root)
+    policy_bundle = load_runtime_policy_bundle(resolved_root)
+    policy = policy_bundle.document
     reviewer = load_reviewer_bundle(resolved_root)
     evidence_summary = build_evidence_pack_summary(resolved_root)
     launch_summary = build_launch_gate_summary(resolved_root)
@@ -178,8 +178,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     onyx_available = path_has_files(resolved_root, "upstream/onyx")
     langfuse_available = path_has_files(resolved_root, "upstream/langfuse")
     keycloak_available = path_has_files(resolved_root, "upstream/keycloak")
-    policy_href = _dashboard_url(f"/raw/{policy_bundle_relative_path(resolved_root)}")
+    policy_href = _dashboard_url(f"/raw/{policy_bundle.relative_path}")
     reviewer_href = _dashboard_url(f"/raw/{reviewer_bundle_relative_path(resolved_root)}")
+    policy_source_label = "Overlay bundle" if policy_bundle.source == "overlay" else "Local fallback"
+    policy_source_detail = f"{policy_source_label} from {policy_bundle.relative_path}"
 
     def runtime_link(*, label: str, href: str, fallback_href: str, available: bool, description: str, fallback_description: str) -> dict[str, str]:
         return {
@@ -286,6 +288,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                             "Rules active" if "opa" in services else "Rules pending",
                             "healthy" if "opa" in services else "warning",
                             f"{len(allowed_integrations)} governed integrations in policy inventory.",
+                        ),
+                        _card(
+                            "Policy source",
+                            policy_source_label,
+                            "healthy" if policy_bundle.source == "overlay" else "warning",
+                            policy_source_detail,
                         ),
                         _card(
                             "User access",
@@ -605,8 +613,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                                 label="Review Policies",
                                 href=policy_href,
                                 fallback_href=policy_href,
-                                available=policy_bundle_relative_path(resolved_root).startswith("overlays/"),
-                                description="Review the active runtime policy bundle and integration inventory.",
+                                available=policy_bundle.source == "overlay",
+                                description=f"Review the active runtime policy bundle and integration inventory. Source: {policy_source_detail}.",
                                 fallback_description="Open the local fallback policy bundle used when the overlay policy bundle is unavailable.",
                             )
                         },
@@ -658,8 +666,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "sources": [
             {
                 "label": "Policy bundle",
-                "href": _raw(policy_bundle_relative_path(resolved_root)),
-                "description": "Policy, retrieval, tool, and integration inventory.",
+                "href": _raw(policy_bundle.relative_path),
+                "description": f"Policy, retrieval, tool, and integration inventory. Active source: {policy_source_detail}.",
             },
             {
                 "label": "Telemetry sample",

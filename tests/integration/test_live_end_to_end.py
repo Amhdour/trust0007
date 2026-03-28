@@ -109,6 +109,8 @@ def test_live_governed_flow_end_to_end():
         assert "trace_id" in flow_result
         assert "launch_gate" in flow_result
         assert "artifacts" in flow_result
+        assert flow_result["policy_bundle"]["source"] == "overlay"
+        assert flow_result["policy_bundle"]["path"] == "overlays/myStarterKit/policies/bundles/default/policy.json"
 
         events_file = repo_root / flow_result["artifacts"]["events_jsonl"]
         gate_file = repo_root / flow_result["artifacts"]["launch_gate_result"]
@@ -153,6 +155,36 @@ def test_live_onyx_handoff_enforcement():
         assert "Access Denied" in content
         assert "governance layer has blocked" in content
         assert "policy.forbidden_content" in content
+        assert "Policy source" in content
+    finally:
+        server.stop()
+
+
+def test_live_onyx_search_handoff_allowed() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    server = APIServer(repo_root)
+    server.start()
+
+    try:
+        response = http_get(server.url("/launch/onyx?path=/app?chatMode=search"), timeout=10)
+
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        assert "Governance Status:</strong> ✓ Approved" in response.text
+        assert "Policy Source" in response.text
+    finally:
+        server.stop()
+
+
+def test_live_onyx_agents_handoff_requires_admin_role() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    server = APIServer(repo_root)
+    server.start()
+
+    try:
+        response = http_get(server.url("/launch/onyx?path=/app/agents"), timeout=10)
+
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}"
+        assert "policy.surface_role_denied:onyx.agents" in response.text
     finally:
         server.stop()
 
@@ -188,5 +220,7 @@ if __name__ == "__main__":
     print("Running live end-to-end tests...")
     test_live_governed_flow_end_to_end()
     test_live_onyx_handoff_enforcement()
+    test_live_onyx_search_handoff_allowed()
+    test_live_onyx_agents_handoff_requires_admin_role()
     test_live_dashboard_consumes_artifacts()
     print("✅ All live end-to-end tests passed!")

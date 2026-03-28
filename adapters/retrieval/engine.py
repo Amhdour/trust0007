@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from typing import List
 
 from .interfaces import RetrievalBackend, RetrievalPolicyEvaluator, RetrievalTelemetry
@@ -24,6 +25,9 @@ class RetrievalSecurityLayer:
         allow = bool(policy.get("allow", False))
         mode = policy.get("mode", "deny")
         reasons = list(policy.get("reasons", []))
+        required_trust_labels = list(policy.get("required_trust_labels", request.trust_labels))
+        required_provenance_fields = list(policy.get("required_provenance_fields", []))
+        deny_on_empty = bool(policy.get("deny_on_empty_result", False))
 
         self._telemetry.emit(
             "retrieval.policy.decision",
@@ -34,6 +38,8 @@ class RetrievalSecurityLayer:
                 "allow": allow,
                 "mode": mode,
                 "reasons": reasons,
+                "required_trust_labels": required_trust_labels,
+                "required_provenance_fields": required_provenance_fields,
             },
         )
 
@@ -47,7 +53,23 @@ class RetrievalSecurityLayer:
             )
 
         docs = list(self._backend.search(request))
-        filtered = self._filter_documents(request, docs, degrade=(mode == "degrade"))
+        filtered, filter_failures = self._filter_documents(
+            request,
+            docs,
+            degrade=(mode == "degrade"),
+            required_trust_labels=required_trust_labels,
+            required_provenance_fields=required_provenance_fields,
+        )
+
+        if docs and not filtered and deny_on_empty and filter_failures:
+            failure_reasons = list(dict.fromkeys(reasons + sorted(filter_failures.elements())))
+            return RetrievalDecision(
+                allow=False,
+                mode="deny",
+                reasons=failure_reasons,
+                citations=[],
+                filtered_documents=[],
+            )
 
         citations = [self._citation_for(doc) for doc in filtered] if request.require_citations else []
 
@@ -76,24 +98,39 @@ class RetrievalSecurityLayer:
         request: RetrievalRequest,
         docs: List[RetrievalDocument],
         degrade: bool,
-    ) -> List[RetrievalDocument]:
+        required_trust_labels: List[str],
+        required_provenance_fields: List[str],
+    ) -> tuple[List[RetrievalDocument], Counter[str]]:
         filtered: List[RetrievalDocument] = []
+        failures: Counter[str] = Counter()
         for doc in docs:
             if doc.quarantined:
+                failures["retrieval.document_quarantined"] += 1
                 continue
             if doc.tenant_id != request.tenant_id:
+                failures["retrieval.cross_tenant_filtered"] += 1
                 continue
             if doc.source != request.source:
+                failures["retrieval.source_mismatch"] += 1
                 continue
-            if request.trust_labels and doc.trust_label not in request.trust_labels:
+            if required_trust_labels and doc.trust_label not in required_trust_labels:
+                failures["retrieval.trust_label_not_allowed"] += 1
+                continue
+            missing_provenance = [
+                field_name
+                for field_name in required_provenance_fields
+                if not doc.provenance.get(field_name)
+            ]
+            if missing_provenance:
+                failures["retrieval.provenance_missing"] += 1
                 continue
             filtered.append(doc)
 
         if degrade:
             # Degrade mode: stricter result shaping to reduce risk blast radius.
-            return filtered[: min(3, len(filtered))]
+            return filtered[: min(3, len(filtered))], failures
 
-        return filtered
+        return filtered, failures
 
     @staticmethod
     def _citation_for(doc: RetrievalDocument) -> dict:

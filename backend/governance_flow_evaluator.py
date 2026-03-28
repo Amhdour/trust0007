@@ -20,7 +20,7 @@ import sys
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from adapters.onyx_gateway_adapter.adapter import OnyxGatewayAdapter
 from adapters.onyx_gateway_adapter.interfaces import PolicyChecker, RetrievalChecker, ToolDecisionChecker
@@ -75,6 +75,8 @@ class GovernedFlowResult:
     launch_gate_max_score: int
     launch_gate_blockers: list[str]
     launch_gate_missing_evidence: list[str]
+    policy_source: str
+    policy_path: str
     artifacts: dict[str, str]  # artifact_name -> path (relative to repo root)
 
     def to_dict(self) -> dict:
@@ -96,6 +98,10 @@ class GovernedFlowResult:
                 "max_score": self.launch_gate_max_score,
                 "blockers": self.launch_gate_blockers,
                 "missing_evidence": self.launch_gate_missing_evidence,
+            },
+            "policy_bundle": {
+                "source": self.policy_source,
+                "path": self.policy_path,
             },
             "artifacts": self.artifacts,
         }
@@ -150,6 +156,11 @@ class GovernedFlowEvaluator:
         requested_tools: list[str],
         retrieval_source: str = "qdrant",
         retrieval_needed: bool = True,
+        roles: list[str] | None = None,
+        request_metadata: dict[str, Any] | None = None,
+        tool_arguments: dict[str, dict[str, Any]] | None = None,
+        policy_source: str = "",
+        policy_path: str = "",
     ) -> GovernedFlowResult:
         """Execute the full governed flow and return decision + artifacts.
 
@@ -199,7 +210,8 @@ class GovernedFlowEvaluator:
             )
 
         # 1) Identity established
-        identity = {"sub": user_id, "tenant_id": tenant_id, "roles": ["tenant_user"]}
+        identity_roles = roles or ["tenant_user"]
+        identity = {"sub": user_id, "tenant_id": tenant_id, "roles": identity_roles}
         emit("request.start", {"path": "/governed-flow", "user_id": user_id})
         emit("identity.established", identity)
 
@@ -219,7 +231,11 @@ class GovernedFlowEvaluator:
             requested_tools=requested_tools,
             retrieval_needed=retrieval_needed,
             retrieval_source=retrieval_source,
-            metadata={"trace_id": trace_id},
+            metadata={
+                "trace_id": trace_id,
+                "identity_roles": identity_roles,
+                **(request_metadata or {}),
+            },
         )
 
         gateway_decision = gateway.evaluate(normalized_request)
@@ -291,13 +307,16 @@ class GovernedFlowEvaluator:
             )
 
             for tool_name in requested_tools:
+                request_arguments = {"query": prompt}
+                if tool_arguments and tool_name in tool_arguments:
+                    request_arguments = dict(tool_arguments[tool_name])
                 result = tool_engine.evaluate(
                     ToolActionRequest(
                         request_id=request_id,
                         tenant_id=tenant_id,
                         user_id=user_id,
                         tool_name=tool_name,
-                        arguments={"query": prompt},
+                        arguments=request_arguments,
                     )
                 )
                 if result.status == "allow":
@@ -360,6 +379,8 @@ class GovernedFlowEvaluator:
             "flow_metadata": {
                 "trace_id": trace_id,
                 "request_id": request_id,
+                "policy_source": policy_source,
+                "policy_path": policy_path,
                 "artifacts": {"events_jsonl": _artifact_reference(events_path, self._artifact_dir.parent.parent)},
             },
         }
@@ -385,6 +406,8 @@ class GovernedFlowEvaluator:
             launch_gate_max_score=gate_result.max_score,
             launch_gate_blockers=gate_result.blockers,
             launch_gate_missing_evidence=gate_result.missing_evidence,
+            policy_source=policy_source,
+            policy_path=policy_path,
             artifacts={
                 "events_jsonl": relative_events,
                 "launch_gate_result": relative_gate,

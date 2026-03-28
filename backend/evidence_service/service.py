@@ -44,6 +44,11 @@ def build_evidence_pack_summary(root: Path | None = None) -> dict[str, Any]:
                 "description": "Export shape used for dashboard-level ingestion and replay views.",
             },
             {
+                "label": "Inspectable Runtime Evidence",
+                "href": _raw_link("evidence/reviewer/inspectable-live-runtime/README.md"),
+                "description": "Reviewer-facing entry point for one allowed and one denied live runtime flow.",
+            },
+            {
                 "label": "Grafana Operational Spec",
                 "href": _raw_link("telemetry/dashboards/grafana/operational-dashboard-spec.json"),
                 "description": "Operational observability drill-down contract.",

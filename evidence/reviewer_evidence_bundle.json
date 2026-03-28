@@ -24,5 +24,12 @@
         }
       }
     ]
+  },
+  "inspectable_evidence": {
+    "entry_point": "evidence/reviewer/inspectable-live-runtime/README.md",
+    "bundles": [
+      "evidence/reviewer/inspectable-live-runtime/allowed-flow.json",
+      "evidence/reviewer/inspectable-live-runtime/denied-flow.json"
+    ]
   }
 }

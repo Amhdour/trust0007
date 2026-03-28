@@ -8,3 +8,5 @@ Governed flow evidence:
 Handoff evidence:
 - `launch-allow.html`: allowed handoff page from `GET /launch/onyx?path=/app`.
 - `launch-deny.html`: denied handoff page from `GET /launch/onyx?path=/app/bypass`, showing real evaluator output with denial trace `flow-04bc78269869` and `policy.forbidden_content`.
+
+Reviewer-facing manifests for these artifacts live under `evidence/reviewer/inspectable-live-runtime/`.

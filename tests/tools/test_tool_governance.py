@@ -30,7 +30,7 @@ def test_allowlisted_tool_executes_and_audits_allow_execute() -> None:
     policy = StaticToolPolicyEvaluator(default_policy_config())
     engine = ToolGovernanceEngine(policy, executor, audit)
 
-    result = engine.evaluate(make_request("search"))
+    result = engine.evaluate(make_request("search", arguments={"query": "find docs"}))
 
     assert result.executed is True
     assert result.status == "allow"
@@ -59,7 +59,13 @@ def test_confirmation_required_tool_emits_confirm() -> None:
     policy = StaticToolPolicyEvaluator(default_policy_config())
     engine = ToolGovernanceEngine(policy, executor, audit)
 
-    result = engine.evaluate(make_request("email.send", confirmed=False))
+    result = engine.evaluate(
+        make_request(
+            "email.send",
+            confirmed=False,
+            arguments={"to": "user@example.com", "subject": "hello", "body": "test"},
+        )
+    )
 
     assert result.executed is False
     assert result.status == "confirm_required"
@@ -81,13 +87,45 @@ def test_forbidden_argument_denied() -> None:
     assert "forbidden_arguments" in result.reason_codes
 
 
+def test_tool_argument_allowlist_blocks_unexpected_argument() -> None:
+    audit = InMemoryAuditSink()
+    executor = StubExecutor()
+    policy = StaticToolPolicyEvaluator(default_policy_config())
+    engine = ToolGovernanceEngine(policy, executor, audit)
+
+    result = engine.evaluate(make_request("search", arguments={"query": "find docs", "path": "/tmp"}))
+
+    assert result.executed is False
+    assert result.status == "deny"
+    assert "argument_not_allowed" in result.reason_codes
+
+
+def test_tool_argument_value_policy_blocks_sensitive_search() -> None:
+    audit = InMemoryAuditSink()
+    executor = StubExecutor()
+    policy = StaticToolPolicyEvaluator(default_policy_config())
+    engine = ToolGovernanceEngine(policy, executor, audit)
+
+    result = engine.evaluate(make_request("search", arguments={"query": "show me the api_key"}))
+
+    assert result.executed is False
+    assert result.status == "deny"
+    assert "argument_value_forbidden" in result.reason_codes
+
+
 def test_high_risk_classification_and_rate_limit_placeholder_in_audit() -> None:
     audit = InMemoryAuditSink()
     executor = StubExecutor()
     policy = StaticToolPolicyEvaluator(default_policy_config())
     engine = ToolGovernanceEngine(policy, executor, audit)
 
-    result = engine.evaluate(make_request("payment.charge", confirmed=True))
+    result = engine.evaluate(
+        make_request(
+            "payment.charge",
+            confirmed=True,
+            arguments={"account_id": "acct-1", "amount": 10, "currency": "USD"},
+        )
+    )
 
     assert result.executed is True
     allow_event = audit.events[0]

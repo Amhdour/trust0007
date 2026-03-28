@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import re
 from pathlib import Path
@@ -14,6 +15,13 @@ REVIEWER_BUNDLE_FALLBACK = "evidence/reviewer_evidence_bundle.json"
 DASHBOARD_INGESTION_PRIMARY = "overlays/myStarterKit/artifacts/dashboard/dashboard_ingestion.json"
 DASHBOARD_INGESTION_FALLBACK = "telemetry/exports/mystarterkit_dashboard_feed.json"
 DASHBOARD_CONTRACT_PATH = "contracts/control-plane-dashboard.json"
+
+
+@dataclass(frozen=True)
+class RuntimePolicyBundle:
+    document: dict[str, Any]
+    relative_path: str
+    source: str
 
 
 def repo_root(explicit: Path | None = None) -> Path:
@@ -86,8 +94,18 @@ def policy_bundle_relative_path(root: Path | None = None) -> str:
     return _preferred_relative_path(root, POLICY_BUNDLE_PRIMARY, POLICY_BUNDLE_FALLBACK)
 
 
+def load_runtime_policy_bundle(root: Path | None = None) -> RuntimePolicyBundle:
+    relative_path = policy_bundle_relative_path(root)
+    source = "overlay" if relative_path == POLICY_BUNDLE_PRIMARY else "fallback"
+    return RuntimePolicyBundle(
+        document=read_json(repo_root(root) / relative_path),
+        relative_path=relative_path,
+        source=source,
+    )
+
+
 def load_policy_bundle(root: Path | None = None) -> dict[str, Any]:
-    return read_json(repo_root(root) / policy_bundle_relative_path(root))
+    return load_runtime_policy_bundle(root).document
 
 
 def load_dashboard_contract(root: Path | None = None) -> dict[str, Any]:

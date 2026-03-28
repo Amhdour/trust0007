@@ -1,8 +1,8 @@
 {
   "policy_metadata": {
-    "bundle_version": "fallback-local-dev",
+    "bundle_version": "overlay-governed-runtime-v1",
     "generated_at": "2026-03-28T00:00:00Z",
-    "source": "fallback"
+    "source": "overlay-generated"
   },
   "content_rules": {
     "forbidden_terms": [
@@ -162,6 +162,6 @@
           "format"
         ]
       }
-    ]
+    }
   }
 }
