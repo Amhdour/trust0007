@@ -28,8 +28,10 @@ The page now leads with:
    - Identity & Session
    - Policy Enforcement
    - Retrieval Boundaries
+   - Secret Access
    - Tool / MCP Governance
    - Audit & Replay
+   - Trace Correlation
    - Launch Gate
    - Asset / Protection Coverage
    - Evidence Integrity & Freshness
@@ -55,6 +57,13 @@ The page now leads with:
 - blocked actions and governance KPIs
   - live governed flow artifacts when present
   - otherwise `telemetry/exports/sample_events.jsonl`
+- identity / policy / retrieval / secret / trace sections
+  - `overlays/myStarterKit/artifacts/identity-evidence.json`
+  - `overlays/myStarterKit/artifacts/policy-evidence.json`
+  - `overlays/myStarterKit/artifacts/retrieval-evidence.json`
+  - `overlays/myStarterKit/artifacts/secret-evidence.json`
+  - `overlays/myStarterKit/artifacts/trace-correlation.json`
+  - `overlays/myStarterKit/artifacts/governed-flow-summary.json`
 - upstream posture
   - component inventory from `evidence/upstream_usage.inventory.json`
   - coverage audit from `backend/integration_adapter/repository.py`
@@ -76,6 +85,7 @@ The page now leads with:
   - reviewer bundle links
   - launch-report parsing
   - live governed-flow artifacts when generated
+  - live identity, policy, retrieval, secret, and trace evidence panels when those artifacts exist
   - live-log polling from Onyx and Langfuse when reachable
 - Demo-derived fallback:
   - `telemetry/exports/sample_events.jsonl`

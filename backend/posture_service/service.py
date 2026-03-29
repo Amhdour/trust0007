@@ -17,6 +17,12 @@ from backend.integration_adapter.repository import (
     load_dashboard_contract,
     load_eval_summaries,
     load_latest_governed_flow_events,
+    load_latest_governed_flow_summary,
+    load_latest_identity_evidence,
+    load_latest_policy_evidence,
+    load_latest_retrieval_evidence,
+    load_latest_secret_evidence,
+    load_latest_trace_correlation,
     load_runtime_policy_bundle,
     load_reviewer_bundle,
     load_sample_events,
@@ -276,9 +282,11 @@ def _artifact_integrity(path: Path, relative_path: str, root: Path) -> tuple[str
 
 def _event_feed(root: Path) -> tuple[list[dict[str, Any]], str, str]:
     if has_live_governed_flow_artifacts(root):
+        summary = load_latest_governed_flow_summary(root)
+        evidence_mode = str(summary.get("evidence_mode", "live")).lower()
         return (
             load_latest_governed_flow_events(root),
-            "Live governed flow artifacts",
+            "Live governed flow artifacts" if evidence_mode == "live" else "Governed flow artifacts",
             "overlays/myStarterKit/artifacts/events.jsonl",
         )
     return (
@@ -626,6 +634,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     ) or _upstream_components_by_classification(upstream_components)
     upstream_audit = dict(upstream_inventory.get("audit", {}))
     events, event_feed_label, event_feed_path = _event_feed(resolved_root)
+    governed_flow_summary = load_latest_governed_flow_summary(resolved_root)
+    identity_evidence = load_latest_identity_evidence(resolved_root)
+    policy_evidence = load_latest_policy_evidence(resolved_root)
+    retrieval_evidence = load_latest_retrieval_evidence(resolved_root)
+    secret_evidence = load_latest_secret_evidence(resolved_root)
+    trace_correlation = load_latest_trace_correlation(resolved_root)
     policy_bundle = load_runtime_policy_bundle(resolved_root)
     policy = policy_bundle.document
     reviewer = load_reviewer_bundle(resolved_root)
@@ -655,6 +669,15 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     request_starts = [event for event in events if event.get("event_type") == "request.start"]
     request_ends = [event for event in events if event.get("event_type") == "request.end"]
     trace_ids = sorted({str(event.get("trace_id", "")) for event in events if event.get("trace_id")})
+    live_evidence_mode = str(governed_flow_summary.get("evidence_mode", "")).lower() == "live"
+    latest_trace_id = str(governed_flow_summary.get("trace_id", "")) or str(trace_correlation.get("trace_id", ""))
+    latest_session_id = str(governed_flow_summary.get("session_id", "")) or str(trace_correlation.get("session_id", ""))
+    identity_live = bool(identity_evidence.get("live"))
+    policy_engine = str(policy_evidence.get("engine", policy_source))
+    retrieval_live_backend = bool(retrieval_evidence.get("live_backend"))
+    secret_required = bool(secret_evidence.get("required"))
+    secret_fetched = bool(secret_evidence.get("fetched"))
+    trace_complete = bool(trace_correlation.get("complete"))
     audit_events = reviewer.get("sample_audit_events", {}).get("events", [])
     blocked_attacks = reviewer.get("blocked_attack_summary", {}).get("blocked_attacks", [])
 
@@ -1091,6 +1114,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Roles under governance", str(len(roles)), "healthy", "Roles allowed to reach governed surfaces.", policy_href),
                         _card("Identity assertions observed", str(len(identity_events)), "healthy" if identity_events else "warning", "Identity establishment events visible in current telemetry.", _raw(event_feed_path)),
                         _card("Governed surfaces", str(len(surfaces)), "healthy", "Registered runtime surfaces protected by policy path rules.", "#entry-points"),
+                        _card("Identity source", str(identity_evidence.get("source", "demo_fallback")), "healthy" if identity_live else "warning", "Latest governed flow identity source. Live mode should show Keycloak-backed validation.", _raw("overlays/myStarterKit/artifacts/identity-evidence.json")),
+                        _card("Session correlation", latest_session_id or "missing", "healthy" if latest_session_id else "critical", "Latest governed flow session identifier used for trace correlation.", "#trace-correlation"),
                     ],
                 },
                 {
@@ -1111,6 +1136,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _link("Policy bundle", policy_href, "Tenant roles and surface access rules used by runtime governance.", "healthy"),
                         _link("Keycloak integration note", _raw("docs/keycloak-integration.md"), "Identity/session wiring and integration notes for the dashboard-first stack.", "neutral"),
                         _link("Governed telemetry feed", _raw(event_feed_path), "Identity-established events with tenant and actor context.", "healthy"),
+                        _link("Identity evidence artifact", _raw("overlays/myStarterKit/artifacts/identity-evidence.json"), "Latest governed-flow identity proof showing live vs demo identity derivation.", "healthy" if identity_evidence else "warning"),
                     ],
                 },
             ],
@@ -1126,6 +1152,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Explicit denies", str(denied_policy_decisions), "critical" if denied_policy_decisions else "healthy", "Policy decisions that directly denied access or handoff.", "#blocked-actions"),
                         _card("Top deny reason", _top_reason(policy_reason_counts), "warning" if policy_reason_counts else "neutral", "Dominant governance rationale across denies and blocked runtime handoffs.", "#blocked-actions"),
                         _card("Policy source", policy_source.upper(), "healthy" if policy_source == "overlay" else "warning", f"Current runtime policy bundle path: {policy_path}.", policy_href),
+                        _card("Decision engine", policy_engine.upper(), "healthy" if policy_engine == "opa" else "warning", "Latest governed-flow policy engine. Live mode should show OPA as the active decision path.", _raw("overlays/myStarterKit/artifacts/policy-evidence.json")),
                     ],
                 },
                 {
@@ -1157,6 +1184,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _link("Runtime policy bundle", policy_href, "Raw runtime policy bundle governing surfaces, retrieval, and tools.", "healthy"),
                         _link("Policy rego", _raw("policies/rego/policy.rego"), "Underlying policy rule definitions used for the local stack.", "neutral"),
                         _link("Tool governance note", _raw("docs/tool-governance.md"), "Documentation for tool policy posture and runtime enforcement.", "neutral"),
+                        _link("Policy evidence artifact", _raw("overlays/myStarterKit/artifacts/policy-evidence.json"), "Latest governed-flow policy decision artifact with engine, package path, and reasons.", "healthy" if policy_evidence else "warning"),
                     ],
                 },
             ],
@@ -1172,6 +1200,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Blocked retrievals", str(blocked_retrievals), "critical" if blocked_retrievals else "healthy", "Denied retrievals by source or tenant boundary.", "#blocked-actions"),
                         _card("Allowed sources", str(len(retrieval_sources)), "healthy", "Sources explicitly modeled in policy.", policy_href),
                         _card("Tenant/source pairs", str(len(retrieval_rows)), "healthy", "Tenant-scoped retrieval boundaries declared in policy.", policy_href),
+                        _card("Latest backend", str(retrieval_evidence.get("backend", "demo")), "healthy" if retrieval_live_backend else "warning", "Latest governed-flow retrieval backend. Live mode should show a real backend path such as Qdrant.", _raw("overlays/myStarterKit/artifacts/retrieval-evidence.json")),
                     ],
                 },
                 {
@@ -1205,6 +1234,49 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                             href=_raw(event_feed_path),
                         )
                         for event in retrieval_events[:6]
+                    ],
+                },
+                {
+                    "type": "links",
+                    "title": "Retrieval evidence",
+                    "items": [
+                        _link("Retrieval evidence artifact", _raw("overlays/myStarterKit/artifacts/retrieval-evidence.json"), "Latest governed-flow retrieval evidence with backend, filters, and result count.", "healthy" if retrieval_evidence else "warning"),
+                        _link("Retrieval security note", _raw("docs/retrieval-security.md"), "Tenant-scoped retrieval governance and trust requirements.", "neutral"),
+                    ],
+                },
+            ],
+        },
+        {
+            **section_contracts["secret-access"],
+            "blocks": [
+                {
+                    "type": "cards",
+                    "title": "Secret access posture",
+                    "items": [
+                        _card("Secret required", "yes" if secret_required else "no", "warning" if secret_required else "neutral", "Whether the latest governed flow required a live secret lookup.", _raw("overlays/myStarterKit/artifacts/secret-evidence.json")),
+                        _card("Secret fetched", "yes" if secret_fetched else "no", "healthy" if secret_fetched or not secret_required else "critical", "Required secret access must succeed in live mode or the governed operation fails closed.", _raw("overlays/myStarterKit/artifacts/secret-evidence.json")),
+                        _card("Secret backend", str(secret_evidence.get("backend", "unconfigured")), "healthy" if secret_evidence.get("backend") == "vault" else "warning", "Latest governed-flow secret backend.", _raw("overlays/myStarterKit/artifacts/secret-evidence.json")),
+                    ],
+                },
+                {
+                    "type": "records",
+                    "title": "Latest secret access evidence",
+                    "items": [
+                        _record(
+                            title="Latest governed secret lookup",
+                            meta=" | ".join(value for value in (str(secret_evidence.get("purpose", "")), latest_trace_id, latest_session_id) if value),
+                            detail=f"Required={secret_required} fetched={secret_fetched} reason={secret_evidence.get('reason', 'unknown')}",
+                            status="healthy" if secret_fetched or not secret_required else "critical",
+                            href=_raw("overlays/myStarterKit/artifacts/secret-evidence.json"),
+                        )
+                    ],
+                },
+                {
+                    "type": "links",
+                    "title": "Secret evidence",
+                    "items": [
+                        _link("Secret evidence artifact", _raw("overlays/myStarterKit/artifacts/secret-evidence.json"), "Latest governed-flow secret access artifact with masked status only.", "healthy" if secret_evidence else "warning"),
+                        _link("Vault integration note", _raw("docs/vault-integration.md"), "Safe secret-handling expectations and fail-safe behavior.", "neutral"),
                     ],
                 },
             ],
@@ -1280,6 +1352,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "items": [
                         _card("Audit coverage", f"{audit_coverage}%", "healthy" if audit_coverage >= 60 else "warning", "Observed traces tied to explicit audit events in the reviewer bundle.", reviewer_href),
                         _card("Trace coverage", f"{trace_coverage}%", "healthy" if trace_coverage >= 80 else "warning", "Requests with visible completion telemetry in the current feed.", _raw(event_feed_path)),
+                        _card("Trace continuity", "complete" if trace_complete else "incomplete", "healthy" if trace_complete else "critical", "Latest governed flow trace continuity across identity, policy, retrieval, secret, tool, and handoff steps.", _raw("overlays/myStarterKit/artifacts/trace-correlation.json")),
                         _card("Replay bundles", "2", "healthy", "Inspectable allowed and denied runtime bundles are available for evaluator review.", _raw(INSPECTABLE_ALLOWED_FLOW)),
                         _card("Blocked attacks", str(evidence_summary.get("blocked_count", 0)), "healthy", "Reviewer evidence bundle records blocked hostile scenarios.", reviewer_href),
                         _card("Eval pass / total", f"{eval_passed} / {eval_total}", "healthy" if eval_total == 0 or eval_passed == eval_total else "warning", "Latest available evaluation summary for the governed stack.", ingestion_href),
@@ -1338,6 +1411,41 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
+            **section_contracts["trace-correlation"],
+            "blocks": [
+                {
+                    "type": "cards",
+                    "title": "Trace correlation posture",
+                    "items": [
+                        _card("Latest trace", latest_trace_id or "missing", "healthy" if latest_trace_id else "critical", "Latest governed-flow trace identifier.", _raw("overlays/myStarterKit/artifacts/trace-correlation.json")),
+                        _card("Latest session", latest_session_id or "missing", "healthy" if latest_session_id else "warning", "Latest governed-flow session identifier tied to the trace.", _raw("overlays/myStarterKit/artifacts/trace-correlation.json")),
+                        _card("Trace complete", "yes" if trace_complete else "no", "healthy" if trace_complete else "critical", "Whether the latest governed flow recorded the required end-to-end control steps under one correlated trace.", _raw("overlays/myStarterKit/artifacts/trace-correlation.json")),
+                    ],
+                },
+                {
+                    "type": "records",
+                    "title": "Latest trace evidence",
+                    "items": [
+                        _record(
+                            title="Correlated governed request",
+                            meta=" | ".join(value for value in (latest_trace_id, latest_session_id, str(governed_flow_summary.get("evidence_mode", event_feed_label))) if value),
+                            detail=f"Missing steps: {', '.join(trace_correlation.get('missing_steps', [])) or 'none'}",
+                            status="healthy" if trace_complete else "critical",
+                            href=_raw("overlays/myStarterKit/artifacts/trace-correlation.json"),
+                        )
+                    ],
+                },
+                {
+                    "type": "links",
+                    "title": "Trace evidence",
+                    "items": [
+                        _link("Trace correlation artifact", _raw("overlays/myStarterKit/artifacts/trace-correlation.json"), "Cross-step trace evidence for the latest governed flow.", "healthy" if trace_correlation else "warning"),
+                        _link("Governed event feed", _raw(event_feed_path), "Underlying correlated events for the latest governed path.", "healthy"),
+                    ],
+                },
+            ],
+        },
+        {
             **section_contracts["launch-gate"],
             "blocks": [
                 {
@@ -1349,6 +1457,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Control coverage", str(launch_summary["control_coverage"]), "healthy", "Passing controls over total launch findings.", launch_report_href),
                         _card("Failing controls", str(len(failing_controls)), "critical" if failing_controls else "healthy", "Controls that are not in a full pass state.", launch_report_href),
                         _card("Residual risks", str(len(residual_risks)), "warning" if residual_risks else "healthy", "Remaining launch caveats or hardening tasks.", launch_report_href),
+                        _card("Evidence mode", str(launch_summary.get("evidence_mode", "demo")).upper(), "healthy" if str(launch_summary.get("evidence_mode", "")) == "live" else "warning", "Live mode should compute readiness from governed-flow evidence artifacts instead of sample/demo telemetry.", launch_report_href),
                     ],
                 },
                 {
@@ -1491,6 +1600,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     sources = [
         _link("Governed event feed", _raw(event_feed_path), "Event feed used by the dashboard overview and blocked-actions views.", "healthy"),
         _link("Policy bundle", policy_href, "Runtime surface, retrieval, and tool governance policy.", "healthy" if policy_source == "overlay" else "warning"),
+        _link("Governed flow summary", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), "Latest governed-flow summary including identity, policy, retrieval, secret, trace, and launch-gate evidence.", "healthy" if governed_flow_summary else "warning"),
         _link("Upstream usage inventory", _raw("evidence/upstream_usage.inventory.json"), "Classification of active, partial, optional, and reference-only upstream components.", "healthy"),
         _link("Reviewer evidence bundle", reviewer_href, "Consolidated reviewer-facing evidence pack.", "healthy"),
         _link("Launch report", launch_report_href, "Launch-gate findings and residual risk guidance.", "warning"),
@@ -1505,8 +1615,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "generated_at": _iso_now(),
         "runtime_module": "Onyx governed runtime",
         "data_mode": {
-            "label": event_feed_label,
-            "status": "healthy" if has_live_governed_flow_artifacts(resolved_root) else "warning",
+            "label": "Live governed flow artifacts" if live_evidence_mode else event_feed_label,
+            "status": "healthy" if live_evidence_mode else ("healthy" if has_live_governed_flow_artifacts(resolved_root) else "warning"),
             "detail": f"Primary event feed: {event_feed_path}",
         },
         "repo_description_suggestion": str(contract.get("repo_description_suggestion", "")),

@@ -120,8 +120,9 @@ Not every vendored upstream under `upstream/` is an equally active part of the c
 - Active now:
   - Onyx is the governed runtime target behind `/launch/onyx`.
   - Langfuse is the evidence-plane activity source the dashboard can consume live.
+  - Keycloak, OPA, Qdrant, and Vault are now active in the strict live governed path, where live identity, live policy, live retrieval, and conditional live secret access are mandatory dependencies.
 - Partially used:
-  - Keycloak, Envoy, OPA, Vault, Qdrant, and Grafana are kept because they strengthen real trust boundaries or control outcomes, but several are not yet proven mandatory request-path dependencies.
+  - Envoy and Grafana are kept because they strengthen real trust boundaries or control outcomes, but they are not yet mandatory request-path dependencies.
 - Optional future:
   - Superset and gVisor remain in scope only as future analytics or isolation depth.
 - Reference only:
@@ -137,6 +138,19 @@ Every component that remains in scope is expected to answer:
 - what control gap appears if it is removed
 
 See `docs/upstream-usage-matrix.md` for the reviewer-facing explanation and `evidence/upstream_usage.inventory.json` for the machine-readable inventory surfaced by the dashboard.
+
+## Mandatory Now
+
+When `CONTROL_PLANE_GOVERNANCE_MODE=live` or the request explicitly asks for `mode=live`, a governed handoff to `/launch/onyx` now fails closed unless these steps complete successfully:
+
+1. Keycloak-backed identity is resolved from bearer token or session cookie.
+2. OPA returns a live policy decision for the request.
+3. Retrieval executes against the configured live backend and passes boundary checks.
+4. Required runtime secret access succeeds through Vault-backed secret retrieval.
+5. Trace correlation stays intact across identity, policy, retrieval, secret, tool, handoff, and launch-gate steps.
+6. Launch-gate evaluates the live evidence set and does not return `no_go`.
+
+Demo mode still exists, but it is now explicitly labeled as demo/fallback rather than being treated as equivalent to the live governed path.
 
 ## Runtime Testing Model
 

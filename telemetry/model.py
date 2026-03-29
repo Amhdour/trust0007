@@ -32,6 +32,7 @@ class EventModel:
         trace_id: str,
         request_id: str,
         payload: Dict,
+        session_id: str = "",
         tenant_id: str = "",
         severity: str = "info",
     ) -> TelemetryEvent:
@@ -46,6 +47,7 @@ class EventModel:
             event_type=event_type,
             trace_id=trace_id,
             request_id=request_id,
+            session_id=session_id,
             tenant_id=tenant_id,
             severity=severity,
             payload=_sanitize_payload(payload),

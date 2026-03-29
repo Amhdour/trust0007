@@ -1,0 +1,18 @@
+{
+  "label": "denied_live_retrieval_flow",
+  "mode": "live",
+  "result": "deny",
+  "reason_codes": [
+    "retrieval.backend_unavailable"
+  ],
+  "summary": "The governed handoff fails closed when the live retrieval backend cannot satisfy the tenant-scoped governed retrieval request.",
+  "dashboard_sections": [
+    "Retrieval Boundaries",
+    "Launch Gate"
+  ],
+  "proof_sources": [
+    "tests/integration/test_live_governed_runtime_dependencies.py::test_live_handoff_denies_when_retrieval_backend_unavailable",
+    "adapters/retrieval/qdrant.py",
+    "backend/governance_flow_evaluator.py"
+  ]
+}

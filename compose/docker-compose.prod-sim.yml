@@ -8,6 +8,18 @@ services:
       CONTROL_PLANE_ARTIFACT_DIR: /workspace/overlays/myStarterKit/artifacts
       CONTROL_PLANE_HOST: 0.0.0.0
       CONTROL_PLANE_PORT: 3000
+      CONTROL_PLANE_GOVERNANCE_MODE: ${CONTROL_PLANE_GOVERNANCE_MODE:-live}
+      CONTROL_PLANE_ENVIRONMENT_MODE: ${CONTROL_PLANE_ENVIRONMENT_MODE:-prod-sim}
+      CONTROL_PLANE_KEYCLOAK_BASE_URL: ${CONTROL_PLANE_KEYCLOAK_BASE_URL:-http://keycloak:8080}
+      CONTROL_PLANE_KEYCLOAK_REALM: ${CONTROL_PLANE_KEYCLOAK_REALM:-umbrella-dev}
+      CONTROL_PLANE_OPA_URL: ${CONTROL_PLANE_OPA_URL:-http://opa:8181}
+      CONTROL_PLANE_OPA_PACKAGE: ${CONTROL_PLANE_OPA_PACKAGE:-umbrella/policy/decision}
+      CONTROL_PLANE_QDRANT_URL: ${CONTROL_PLANE_QDRANT_URL:-http://qdrant:6333}
+      CONTROL_PLANE_QDRANT_COLLECTION: ${CONTROL_PLANE_QDRANT_COLLECTION:-governed_docs}
+      CONTROL_PLANE_VAULT_ADDR: ${CONTROL_PLANE_VAULT_ADDR:-http://vault:8200}
+      CONTROL_PLANE_VAULT_TOKEN: ${CONTROL_PLANE_VAULT_TOKEN:-}
+      CONTROL_PLANE_ONYX_SECRET_PATH: ${CONTROL_PLANE_ONYX_SECRET_PATH:-secret/data/dev/tenant-dashboard/runtime}
+      CONTROL_PLANE_ONYX_SECRET_KEY: ${CONTROL_PLANE_ONYX_SECRET_KEY:-api_token}
       CODESPACE_NAME: ${CODESPACE_NAME:-}
       GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: ${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}
     ports:
@@ -205,9 +217,10 @@ services:
 
   opa:
     image: openpolicyagent/opa:0.70.0
-    command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies/policy.rego"]
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies/runtime.rego", "/policies/retrieval.rego"]
     volumes:
-      - ./opa/policy.rego:/policies/policy.rego:ro
+      - ../policies/rego/policy.rego:/policies/runtime.rego:ro
+      - ../policies/retrieval/policy.rego:/policies/retrieval.rego:ro
     ports:
       - "127.0.0.1:8181:8181"
     networks:

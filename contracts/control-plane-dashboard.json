@@ -16,8 +16,10 @@
     { "id": "identity-session", "label": "Identity & Session" },
     { "id": "policy-enforcement", "label": "Policy Enforcement" },
     { "id": "retrieval-boundaries", "label": "Retrieval Boundaries" },
+    { "id": "secret-access", "label": "Secret Access" },
     { "id": "tool-mcp-governance", "label": "Tool / MCP Governance" },
     { "id": "audit-replay", "label": "Audit & Replay" },
+    { "id": "trace-correlation", "label": "Trace Correlation" },
     { "id": "launch-gate", "label": "Launch Gate" },
     { "id": "asset-coverage", "label": "Asset Coverage" },
     { "id": "evidence-integrity", "label": "Evidence Integrity" },
@@ -55,6 +57,11 @@
       "description": "Tenant-scoped retrieval source protection, blocked data access, and trust or provenance requirements."
     },
     {
+      "id": "secret-access",
+      "title": "Secret Access",
+      "description": "Conditional Vault-backed secret access posture for governed operations that require protected runtime credentials."
+    },
+    {
       "id": "tool-mcp-governance",
       "title": "Tool / MCP Governance",
       "description": "Allowed, denied, and confirmation-required tool actions plus MCP server exposure and sandbox requirements."
@@ -63,6 +70,11 @@
       "id": "audit-replay",
       "title": "Audit & Replay",
       "description": "Audit coverage, replay bundles, governed flow traces, and reviewer-ready evidence entry points."
+    },
+    {
+      "id": "trace-correlation",
+      "title": "Trace Correlation",
+      "description": "Stable trace, request, and session relationships across identity, policy, retrieval, secret access, tool governance, and handoff decisions."
     },
     {
       "id": "launch-gate",

@@ -1,11 +1,17 @@
 {
   "label": "denied_governed_runtime_flow",
   "captured_at": "2026-03-28T10:18:52Z",
+  "mode": "live",
   "result": "deny",
   "summary": "Live Onyx handoff to an unapproved path was denied by the runtime governance layer with inspectable reasons and artifacts.",
   "artifacts": [
     "evidence/prod-sim/launch-deny.html",
     "evidence/prod-sim/events.jsonl",
     "evidence/prod-sim/launch-gate-result.json"
+  ],
+  "proof_sources": [
+    "tests/integration/test_governance_denial.py",
+    "backend/governance_flow_evaluator.py",
+    "launch-gate/evaluator.py"
   ]
 }

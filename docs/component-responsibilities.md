@@ -13,9 +13,9 @@ This document describes the intended responsibility of each major component plus
 - Why it stays active: it adds runtime trace visibility that the dashboard can consume directly.
 
 ## Keycloak
-- Status: `partially_used`
-- Role: intended identity and session authority.
-- Current gap: live JWT or session enforcement is not yet wired into the dashboard request path.
+- Status: `used_now`
+- Role: live identity and session authority for strict governed handoffs.
+- Current gap: current live mode resolves Keycloak-backed identity via HTTP session or bearer-token introspection patterns, but Envoy-side JWT enforcement is still future depth.
 
 ## Envoy
 - Status: `partially_used`
@@ -28,19 +28,19 @@ This document describes the intended responsibility of each major component plus
 - Why it stays central: it is where this repo adds differentiated governance value rather than relying on upstream presence alone.
 
 ## OPA
-- Status: `partially_used`
-- Role: policy-language anchor and optional sidecar decision engine.
-- Current gap: live handoff decisions are still made in the repo-owned control-plane server.
+- Status: `used_now`
+- Role: mandatory live policy decision engine for strict governed handoffs.
+- Current gap: OPA is now on the request path, but Envoy ext_authz integration is still future depth.
 
 ## Vault
-- Status: `partially_used`
-- Role: conditional secret backend.
-- Current gap: no dashboard-visible secret-access telemetry or reviewer evidence depends on it yet.
+- Status: `used_now`
+- Role: conditional live secret backend for governed operations that require protected runtime secrets.
+- Current gap: Vault is mandatory only for secret-requiring paths, not every governed request.
 
 ## Qdrant
-- Status: `partially_used`
-- Role: intended governed retrieval backend.
-- Current gap: current retrieval flows still use seeded demo data rather than a proven live Qdrant bridge.
+- Status: `used_now`
+- Role: mandatory live retrieval backend for strict governed handoffs.
+- Current gap: the current bridge is a real backend path, but still a narrower filter-backed retrieval flow than a full vector-search integration.
 
 ## Grafana
 - Status: `partially_used`

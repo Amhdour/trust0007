@@ -29,14 +29,14 @@ If a component cannot answer those questions with repo-backed wiring or evidence
 
 | Component | Classification | Path status | Where it sits now | Why it stays in scope | Current gap | Recommended action |
 | --- | --- | --- | --- | --- | --- | --- |
-| Onyx | `used_now` | `mandatory` | Governed runtime behind `/launch/onyx` and the Onyx-lite start script | Only upstream runtime the repo proves through handoff flows, tests, and reviewer evidence | Not part of the default control-plane compose stack | Keep as active runtime dependency |
-| Langfuse | `used_now` | `mandatory` | Evidence plane and live activity feed | Gives the dashboard a real runtime observability source | Not every governed-flow artifact is exported into Langfuse yet | Keep as active runtime dependency |
-| Keycloak | `partially_used` | `supporting` | Compose service, realm template, and helper scripts | Intended identity and session authority for tenant-aware access | Live JWT validation and session handoff are not in the current request path | Keep as platform dependency, mark snapshot as reference |
-| Envoy | `partially_used` | `supporting` | Compose service and local ingress config | Intended ingress chokepoint and future authz bridge | Current `/launch/onyx` flow does not traverse Envoy | Keep as platform dependency, mark snapshot as reference |
-| OPA | `partially_used` | `supporting` | Rego policies, tests, optional container, and Envoy example policy | Keeps policy portable and reviewable | Live launch decisions are still local Python decisions | Keep as platform dependency, mark snapshot as reference |
-| Vault | `partially_used` | `supporting` | Compose service plus secrets adapter | Keeps a real secret boundary in scope for governed connectors | No live secret fetch or dashboard-visible Vault telemetry yet | Keep as platform dependency, mark snapshot as reference |
-| Qdrant | `partially_used` | `supporting` | Compose service and retrieval policy semantics | Retrieval governance is central to the control-plane story | Governed retrieval still uses seeded demo data instead of a live Qdrant client | Keep as platform dependency, mark snapshot as reference |
-| Grafana | `partially_used` | `supporting` | Compose service with provisioned dashboards | Useful operational drill-down that complements the homepage | No alert loop or launch dependency is enforced from Grafana today | Keep as platform dependency, mark snapshot as reference |
+| Onyx | `used_now` | `mandatory` | Governed runtime behind `/launch/onyx` and the Onyx-lite start script | It is the runtime target the control plane is built to govern | Not part of the default control-plane compose stack | Keep as active runtime dependency |
+| Keycloak | `used_now` | `mandatory` | Live identity adapter, compose service, realm template, and governed-flow evaluator | Live mode now fails closed unless identity is resolved from Keycloak-backed bearer token or session state | Current implementation uses Keycloak userinfo/session resolution, not a full ingress JWT-validation path yet | Keep as active runtime dependency |
+| OPA | `used_now` | `mandatory` | Rego policies, live OPA HTTP client, compose service, and governed-flow evaluator | Live mode now fails closed unless OPA returns a decision for the request | Envoy ext_authz is still future depth rather than the current mandatory path | Keep as active runtime dependency |
+| Qdrant | `used_now` | `mandatory` | Live retrieval adapter, compose service, and governed-flow evaluator | Live mode now fails closed unless governed retrieval executes against the configured backend | The current live bridge is filter-backed scroll retrieval rather than a richer vector-search path | Keep as active runtime dependency |
+| Vault | `used_now` | `mandatory` | Conditional live secret adapter, compose service, and governed-flow evaluator | Secret-requiring governed operations now fail closed unless Vault-backed secret access succeeds | Conditional dependency only; non-secret flows do not need Vault | Keep as active runtime dependency |
+| Langfuse | `used_now` | `supporting` | Evidence plane and live activity feed | It gives the dashboard a real observability destination beyond local files | Not every governed-flow artifact is exported into Langfuse yet, and live mode does not fail closed on Langfuse reachability | Keep as active evidence-plane dependency |
+| Envoy | `partially_used` | `supporting` | Compose service and local ingress config | It remains the intended ingress chokepoint for future route-level governance | Current `/launch/onyx` flow does not traverse Envoy | Keep as platform dependency, mark snapshot as reference |
+| Grafana | `partially_used` | `supporting` | Compose service with provisioned dashboards | It provides an operator drill-down that complements the homepage | No alert loop or launch dependency is enforced from Grafana today | Keep as platform dependency, mark snapshot as reference |
 | Superset | `optional_future` | `optional` | Compose service and analytics scaffolding | Could become useful for historical trust and evidence analytics | No current reviewer workflow depends on it | Mark optional |
 | gVisor | `optional_future` | `optional` | Design-only sandbox boundary via repo-owned sandbox logic | Would strengthen isolation for risky execution | No gVisor-backed runtime path or evidence exists | Mark optional |
 | Keycloak Quickstarts | `reference_only` | `reference` | Vendored example snapshot only | Helpful reference material for future identity work | No repo-owned runtime logic consumes it | Remove from active claims |
@@ -45,12 +45,17 @@ If a component cannot answer those questions with repo-backed wiring or evidence
 
 ## What the repo proves today
 
-- Clearly active:
+- Clearly active and mandatory in the strict live governed path:
   - Onyx as the governed runtime target.
-  - Langfuse as the live evidence-plane activity source.
+  - Keycloak for live identity establishment.
+  - OPA for live policy decisions.
+  - Qdrant for live retrieval execution.
+  - Vault for secret-requiring governed operations.
+- Clearly active and supporting:
+  - Langfuse as a live evidence-plane destination and activity source.
 - Clearly partial:
-  - Keycloak, Envoy, OPA, Vault, Qdrant, and Grafana.
-  - These are in scope because they improve trust boundaries, policy portability, secrets posture, retrieval governance, or observability, but they are not all mandatory request-path dependencies yet.
+  - Envoy and Grafana.
+  - Both matter to the platform story, but neither is currently a fail-closed request-path dependency.
 - Clearly optional:
   - Superset and gVisor.
   - Both remain future depth until they produce reviewer-visible outcomes.
@@ -60,7 +65,7 @@ If a component cannot answer those questions with repo-backed wiring or evidence
 
 ## Practical reading
 
-- The runtime the repo proves today is dashboard-first governance plus governed handoff into Onyx.
-- The evidence path the repo proves today is repo-owned artifacts plus Langfuse-linked runtime visibility when traces are available.
+- The runtime the repo now proves in `live` mode is dashboard-first governance plus governed handoff into Onyx through live identity, live OPA, live retrieval, conditional live secret access, trace correlation, and launch-gate approval.
+- The evidence path the repo proves today is repo-owned artifacts first, with Langfuse-linked runtime visibility as a supporting observability surface rather than the only source of truth.
 - Supporting services are kept only where they strengthen a real trust boundary, a real control family, or a credible next integration step.
 - The repo should never imply that all vendored upstreams are equally integrated just because they exist under `upstream/`.

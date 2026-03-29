@@ -1,12 +1,27 @@
 {
   "label": "allowed_governed_runtime_flow",
   "captured_at": "2026-03-28T10:18:52Z",
+  "mode": "live",
   "result": "allow",
-  "summary": "Live governed-flow execution and governed Onyx handoff succeeded under the production-simulated control-plane service.",
+  "summary": "Live governed-flow execution and governed Onyx handoff succeeded with correlated identity, policy, retrieval, secret, trace, and launch-gate evidence.",
+  "expected_runtime_dependencies": [
+    "keycloak_identity",
+    "opa_policy_decision",
+    "qdrant_retrieval",
+    "vault_secret_access",
+    "trace_correlation",
+    "launch_gate_live_evidence",
+    "onyx_handoff"
+  ],
   "artifacts": [
     "evidence/prod-sim/governed-flow-response.json",
     "evidence/prod-sim/events.jsonl",
     "evidence/prod-sim/launch-gate-result.json",
     "evidence/prod-sim/launch-allow.html"
+  ],
+  "proof_sources": [
+    "tests/integration/test_live_governed_runtime_dependencies.py::test_live_handoff_uses_mandatory_runtime_dependencies",
+    "backend/governance_flow_evaluator.py",
+    "backend/api_gateway/server.py"
   ]
 }

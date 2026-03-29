@@ -9,6 +9,7 @@ class TelemetryEvent:
     trace_id: str
     request_id: str
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    session_id: str = ""
     tenant_id: str = ""
     severity: str = "info"
     payload: Dict[str, Any] = field(default_factory=dict)

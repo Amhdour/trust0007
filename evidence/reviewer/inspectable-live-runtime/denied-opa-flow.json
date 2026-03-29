@@ -1,0 +1,18 @@
+{
+  "label": "denied_live_opa_flow",
+  "mode": "live",
+  "result": "deny",
+  "reason_codes": [
+    "policy.opa_unavailable"
+  ],
+  "summary": "The governed handoff fails closed when the live OPA path is unreachable or cannot return a decision.",
+  "dashboard_sections": [
+    "Policy Enforcement",
+    "Launch Gate"
+  ],
+  "proof_sources": [
+    "tests/integration/test_live_governed_runtime_dependencies.py::test_live_handoff_denies_when_opa_unavailable",
+    "adapters/policy/opa.py",
+    "backend/governance_flow_evaluator.py"
+  ]
+}

@@ -6,20 +6,26 @@ import json
 import mimetypes
 import os
 from http import HTTPStatus
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import urlopen
 
+from adapters.identity.keycloak import KeycloakIdentityProvider
 from backend.integration_adapter import load_runtime_policy_bundle
 from backend.integration_adapter.repository import load_upstream_usage_inventory
 from backend.posture_service.service import build_control_plane_dashboard, build_control_plane_live_log
 from backend.governance_flow_evaluator import GovernedFlowEvaluator
 from adapters.onyx_gateway_adapter.interfaces import PolicyChecker, RetrievalChecker, ToolDecisionChecker
 from adapters.onyx_gateway_adapter.schemas import PolicyDecision, RetrievalDecision, ToolDecision, NormalizedRequest
+from adapters.policy.opa import OPAClient, OPAPolicyChecker
 from adapters.retrieval.interfaces import RetrievalBackend, RetrievalPolicyEvaluator
+from adapters.retrieval.qdrant import QdrantRetrievalBackend
 from adapters.retrieval.schemas import RetrievalDocument, RetrievalRequest
+from adapters.secrets.provider import VaultSecretsProvider
+from adapters.secrets.vault import VaultHTTPClient
 from adapters.tools.interfaces import ToolExecutor
 from adapters.tools.policy_model import StaticToolPolicyEvaluator, ToolPolicyConfig
 from adapters.tools.schemas import ToolActionRequest
@@ -59,6 +65,29 @@ def _public_service_url(port: int, path: str = "") -> str:
     else:
         base = f"http://localhost:{port}"
     return f"{base}{path}"
+
+
+def _governance_mode(explicit: str = "") -> str:
+    return (explicit or os.environ.get("CONTROL_PLANE_GOVERNANCE_MODE", "demo")).strip().lower() or "demo"
+
+
+def _control_plane_environment_mode() -> str:
+    return os.environ.get("CONTROL_PLANE_ENVIRONMENT_MODE", "dev").strip().lower() or "dev"
+
+
+def _keycloak_userinfo_url() -> str:
+    explicit = os.environ.get("CONTROL_PLANE_KEYCLOAK_USERINFO_URL", "").strip()
+    if explicit:
+        return explicit
+    base_url = os.environ.get("CONTROL_PLANE_KEYCLOAK_BASE_URL", "http://keycloak:8080").strip().rstrip("/")
+    realm = os.environ.get("CONTROL_PLANE_KEYCLOAK_REALM", "umbrella-dev").strip()
+    return f"{base_url}/realms/{realm}/protocol/openid-connect/userinfo"
+
+
+def _cookie_map(raw_cookie: str) -> dict[str, str]:
+    cookie = SimpleCookie()
+    cookie.load(raw_cookie or "")
+    return {name: morsel.value for name, morsel in cookie.items()}
 
 
 def _surface_rules(policy: dict) -> list[dict]:
@@ -312,16 +341,47 @@ def _artifact_list_markup(artifacts: dict[str, str]) -> str:
     return "".join(items)
 
 
-def _build_governed_flow_evaluator(policy_context: RuntimePolicyContext) -> GovernedFlowEvaluator:
+def _build_secret_provider() -> VaultSecretsProvider | None:
+    vault_addr = os.environ.get("CONTROL_PLANE_VAULT_ADDR", "http://vault:8200").strip()
+    vault_token = os.environ.get("CONTROL_PLANE_VAULT_TOKEN", "").strip()
+    if not vault_addr or not vault_token:
+        return None
+    return VaultSecretsProvider(VaultHTTPClient(base_url=vault_addr, token=vault_token))
+
+
+def _build_governed_flow_evaluator(policy_context: RuntimePolicyContext, *, flow_mode: str) -> GovernedFlowEvaluator:
+    if flow_mode == "live":
+        policy_checker: PolicyChecker = OPAPolicyChecker(
+            client=OPAClient(os.environ.get("CONTROL_PLANE_OPA_URL", "http://opa:8181")),
+            package_path=os.environ.get("CONTROL_PLANE_OPA_PACKAGE", "umbrella/policy/decision"),
+            runtime_policy=policy_context.document,
+            environment_mode=_control_plane_environment_mode(),
+        )
+        retrieval_backend: RetrievalBackend = QdrantRetrievalBackend(
+            base_url=os.environ.get("CONTROL_PLANE_QDRANT_URL", "http://qdrant:6333"),
+            collection=os.environ.get("CONTROL_PLANE_QDRANT_COLLECTION", "governed_docs"),
+        )
+        identity_provider = KeycloakIdentityProvider(_keycloak_userinfo_url())
+        secret_provider = _build_secret_provider()
+    else:
+        policy_checker = RuntimePolicyChecker(policy_context)
+        retrieval_backend = SeedRetrievalBackend()
+        identity_provider = None
+        secret_provider = None
+
     return GovernedFlowEvaluator(
-        policy_checker=RuntimePolicyChecker(policy_context),
+        policy_checker=policy_checker,
         retrieval_checker=RuntimeRetrievalChecker(policy_context),
         tool_checker=RuntimeToolChecker(policy_context),
-        retrieval_backend=SeedRetrievalBackend(),
+        retrieval_backend=retrieval_backend,
         retrieval_policy=RuntimeRetrievalPolicy(policy_context),
         tool_executor=RuntimeToolExecutor(policy_context),
         tool_policy_evaluator=StaticToolPolicyEvaluator(_runtime_tool_policy_config(policy_context)),
         artifact_dir=ARTIFACT_DIR,
+        identity_provider=identity_provider,
+        secret_provider=secret_provider,
+        flow_mode=flow_mode,
+        environment_mode=_control_plane_environment_mode(),
     )
 
 
@@ -329,7 +389,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     server_version = "control-plane/0.1"
 
     def do_GET(self) -> None:  # noqa: N802
-        parsed = urlparse(self.path)
+        parsed = urlparse(getattr(self, "path", "/"))
         path = parsed.path
 
         if path in {"/api/health", "/healthz"}:
@@ -382,11 +442,22 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             return default
         return max(minimum, min(maximum, parsed))
 
+    def _query_value(self, query: dict[str, list[str]], key: str, default: str = "") -> str:
+        values = query.get(key, [])
+        return values[-1] if values else default
+
+    def _request_cookies(self) -> dict[str, str]:
+        return _cookie_map(self.headers.get("Cookie", ""))
+
     def _handle_governed_flow(self) -> None:
         """Execute a governed flow with runtime policy enforcement and emit artifacts."""
         try:
+            parsed = urlparse(self.path)
+            query = parse_qs(parsed.query)
+            flow_mode = _governance_mode(self._query_value(query, "mode", ""))
+            secret_required = self._query_value(query, "secret_required", "").lower() in {"1", "true", "yes"}
             policy_context = _runtime_policy_context()
-            evaluator = _build_governed_flow_evaluator(policy_context)
+            evaluator = _build_governed_flow_evaluator(policy_context, flow_mode=flow_mode)
 
             result = evaluator.run(
                 user_id="api-user",
@@ -403,6 +474,17 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 },
                 policy_source=policy_context.source,
                 policy_path=policy_context.relative_path,
+                authorization_header=self.headers.get("Authorization", ""),
+                cookies=self._request_cookies(),
+                evidence_mode=flow_mode,
+                secret_request={
+                    "needed": secret_required,
+                    "secret_path": os.environ.get("CONTROL_PLANE_REQUIRED_SECRET_PATH", "secret/data/dev/tenant-a/runtime"),
+                    "secret_key": os.environ.get("CONTROL_PLANE_REQUIRED_SECRET_KEY", "api_token"),
+                    "purpose": "governed_flow_runtime_secret",
+                }
+                if secret_required
+                else None,
             )
 
             self._send_json(result.to_dict())
@@ -437,12 +519,16 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         safe_path_html = escape(safe_path)
         flow_result = None
         error_reason = None
+        parsed = urlparse(getattr(self, "path", f"/launch/onyx?path={quote(safe_path, safe='/?=&')}"))
+        query = parse_qs(parsed.query)
+        flow_mode = _governance_mode(query.get("mode", [""])[-1] if query.get("mode") else "")
+        live_mode = flow_mode == "live"
 
         # Run governance check for Onyx handoff
         try:
             policy_context = _runtime_policy_context()
             surface_info = _resolve_surface(policy_context.document, safe_path)
-            evaluator = _build_governed_flow_evaluator(policy_context)
+            evaluator = _build_governed_flow_evaluator(policy_context, flow_mode=flow_mode)
 
             flow_result = evaluator.run(
                 user_id="dashboard-user",
@@ -450,7 +536,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 prompt=f"Navigate to Onyx path: {safe_path}",
                 requested_tools=["onyx"],
                 retrieval_source="qdrant",
-                retrieval_needed=False,
+                retrieval_needed=live_mode,
                 roles=["tenant_user"],
                 request_metadata={
                     "requested_path": safe_path,
@@ -466,6 +552,17 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 },
                 policy_source=policy_context.source,
                 policy_path=policy_context.relative_path,
+                authorization_header=self.headers.get("Authorization", ""),
+                cookies=_cookie_map(self.headers.get("Cookie", "")),
+                evidence_mode=flow_mode,
+                secret_request={
+                    "needed": live_mode,
+                    "secret_path": os.environ.get("CONTROL_PLANE_ONYX_SECRET_PATH", "secret/data/dev/tenant-dashboard/runtime"),
+                    "secret_key": os.environ.get("CONTROL_PLANE_ONYX_SECRET_KEY", "api_token"),
+                    "purpose": "onyx_runtime_handoff",
+                }
+                if live_mode
+                else None,
             )
         except Exception as e:
             error_reason = f"{type(e).__name__}: {e}"

@@ -16,6 +16,12 @@ DASHBOARD_INGESTION_PRIMARY = "overlays/myStarterKit/artifacts/dashboard/dashboa
 DASHBOARD_INGESTION_FALLBACK = "telemetry/exports/mystarterkit_dashboard_feed.json"
 DASHBOARD_CONTRACT_PATH = "contracts/control-plane-dashboard.json"
 UPSTREAM_USAGE_INVENTORY_PATH = "evidence/upstream_usage.inventory.json"
+GOVERNED_FLOW_SUMMARY_PATH = "overlays/myStarterKit/artifacts/governed-flow-summary.json"
+IDENTITY_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/identity-evidence.json"
+POLICY_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/policy-evidence.json"
+RETRIEVAL_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/retrieval-evidence.json"
+SECRET_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/secret-evidence.json"
+TRACE_CORRELATION_PATH = "overlays/myStarterKit/artifacts/trace-correlation.json"
 UPSTREAM_INVENTORY_CLASSIFICATIONS = {
     "used_now",
     "partially_used",
@@ -261,6 +267,31 @@ def load_latest_governed_flow_launch_gate(root: Path | None = None) -> dict[str,
     return read_json(gate_path)
 
 
+def load_latest_governed_flow_summary(root: Path | None = None) -> dict[str, Any]:
+    resolved_root = repo_root(root)
+    return read_json(resolved_root / GOVERNED_FLOW_SUMMARY_PATH)
+
+
+def load_latest_identity_evidence(root: Path | None = None) -> dict[str, Any]:
+    return read_json(repo_root(root) / IDENTITY_EVIDENCE_PATH)
+
+
+def load_latest_policy_evidence(root: Path | None = None) -> dict[str, Any]:
+    return read_json(repo_root(root) / POLICY_EVIDENCE_PATH)
+
+
+def load_latest_retrieval_evidence(root: Path | None = None) -> dict[str, Any]:
+    return read_json(repo_root(root) / RETRIEVAL_EVIDENCE_PATH)
+
+
+def load_latest_secret_evidence(root: Path | None = None) -> dict[str, Any]:
+    return read_json(repo_root(root) / SECRET_EVIDENCE_PATH)
+
+
+def load_latest_trace_correlation(root: Path | None = None) -> dict[str, Any]:
+    return read_json(repo_root(root) / TRACE_CORRELATION_PATH)
+
+
 def has_live_governed_flow_artifacts(root: Path | None = None) -> bool:
     """Check if live governed flow artifacts are available in the overlay directory."""
     resolved_root = repo_root(root)
@@ -269,4 +300,5 @@ def has_live_governed_flow_artifacts(root: Path | None = None) -> bool:
         artifacts_dir.exists()
         and (artifacts_dir / "events.jsonl").exists()
         and (artifacts_dir / "launch-gate-result.json").exists()
+        and (artifacts_dir / "governed-flow-summary.json").exists()
     )

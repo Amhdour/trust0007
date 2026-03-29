@@ -84,7 +84,7 @@ def test_dashboard_includes_upstream_integration_posture_section() -> None:
 def test_upstream_usage_inventory_is_machine_readable() -> None:
     inventory = load_upstream_usage_inventory()
 
-    assert inventory["inventory_version"] == 2
+    assert inventory["inventory_version"] == 3
     assert inventory["components"]
     assert inventory["audit"]["inventory_covers_all_upstreams"] is True
     assert set(inventory["upstream_paths"]) == set(list_upstream_component_paths())
@@ -166,3 +166,12 @@ def test_upstream_usage_matrix_doc_exists() -> None:
     assert "Upstream Usage Matrix" in matrix
     assert "Onyx" in matrix
     assert "reference_only" in matrix
+
+
+def test_live_mode_docs_exist() -> None:
+    live_demo = Path("docs/live-vs-demo-matrix.md").read_text(encoding="utf-8")
+    evidence_model = Path("docs/evidence-model.md").read_text(encoding="utf-8")
+
+    assert "live" in live_demo
+    assert "demo" in live_demo
+    assert "trace_id" in evidence_model

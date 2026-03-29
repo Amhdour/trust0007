@@ -16,7 +16,7 @@ This stack is **development-focused** and intentionally minimal. It is not produ
 
 Compose file: `compose/docker-compose.yml`
 
-These services are not all equally active in the current request path. The dashboard and governed Onyx handoff are the primary proof path; several supporting services remain platform scaffolding or optional drill-down destinations. See `docs/upstream-usage-matrix.md`.
+These services are not all equally active in the current request path. The dashboard and governed Onyx handoff are the primary proof path. In `demo` mode, the repo can still run with local fallback behavior. In `live` mode, Keycloak, OPA, Qdrant, and conditional Vault access become fail-closed dependencies in the governed handoff path. See `docs/upstream-usage-matrix.md` and `docs/live-vs-demo-matrix.md`.
 
 ## 1) Configure environment
 
@@ -25,6 +25,18 @@ cp compose/.env.example compose/.env
 ```
 
 Update placeholder values in `compose/.env` before starting.
+
+Important live-mode variables:
+- `CONTROL_PLANE_GOVERNANCE_MODE`
+- `CONTROL_PLANE_KEYCLOAK_BASE_URL`
+- `CONTROL_PLANE_KEYCLOAK_REALM`
+- `CONTROL_PLANE_OPA_URL`
+- `CONTROL_PLANE_QDRANT_URL`
+- `CONTROL_PLANE_QDRANT_COLLECTION`
+- `CONTROL_PLANE_VAULT_ADDR`
+- `CONTROL_PLANE_VAULT_TOKEN`
+- `CONTROL_PLANE_ONYX_SECRET_PATH`
+- `CONTROL_PLANE_ONYX_SECRET_KEY`
 
 ## 2) Start the stack
 
@@ -64,6 +76,7 @@ docker compose --env-file compose/.env -f compose/docker-compose.yml down -v
 ## Notes
 - The dashboard is the main landing page and aggregates posture from repo-owned artifacts plus supporting services.
 - Onyx is the governed runtime target, but it is started separately from the default compose stack.
+- Use `mode=live` on governed endpoints only after Keycloak, OPA, Qdrant, and Vault are configured; live mode is fail-closed by design.
 - In another Codespace, replace `orange-space-journey-7vrrp4wqq4r6h7p9` with that Codespace name and keep the same port suffix.
 - Secrets are provided via environment variables and placeholders only.
 - `vault` is configured in `-dev` mode for local development.

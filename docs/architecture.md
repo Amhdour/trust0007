@@ -8,12 +8,9 @@ The repo should be read in tiers instead of as one flat chain:
   - Dashboard homepage and repo-owned control-plane services
   - Governed handoff into Onyx
   - Langfuse-backed runtime visibility when traces are available
+  - Strict live governed path through Keycloak, OPA, Qdrant, and conditional Vault access
 - **Platform dependencies with partial wiring**
-  - Keycloak
   - Envoy
-  - OPA
-  - Vault
-  - Qdrant
   - Grafana
 - **Optional / future depth**
   - Superset
@@ -35,11 +32,16 @@ See `docs/upstream-usage-matrix.md` and `evidence/upstream_usage.inventory.json`
 ## 3) Runtime path the repo proves today
 
 - User lands on the repo-owned dashboard first.
-- The control plane evaluates governance locally from the runtime policy bundle.
-- Approved requests hand off to Onyx through `/launch/onyx`.
+- In demo mode, the control plane can still run with repo-local fallback governance.
+- In live mode, governed handoff to `/launch/onyx` requires:
+  - Keycloak-backed identity
+  - live OPA policy evaluation
+  - live Qdrant-backed retrieval execution
+  - conditional Vault-backed secret access
+  - trace-correlated evidence and launch-gate approval
 - Evidence is captured in repo-owned artifacts and augmented with Langfuse activity when available.
 
-Keycloak, Envoy, OPA, Vault, Qdrant, Grafana, Superset, and gVisor remain important to the platform story, but they should only be described as active runtime dependencies where the repo proves that depth.
+Envoy, Grafana, Superset, and gVisor remain important to the broader platform story, but they should only be described as active runtime dependencies where the repo proves that depth.
 
 ## 4) Trust boundaries
 
@@ -78,12 +80,12 @@ Keycloak, Envoy, OPA, Vault, Qdrant, Grafana, Superset, and gVisor remain import
 ## 5) Core control points
 
 - **CP1 Dashboard control tower**: custom homepage summarizes posture, alerts, traces, and readiness.
-- **CP2 Identity/session establishment**: Keycloak is the intended identity authority, but live dashboard enforcement is still partly stubbed.
+- **CP2 Identity/session establishment**: Keycloak-backed bearer token or session resolution is mandatory in live governed mode.
 - **CP3 Ingress enforcement**: Envoy is the intended ingress chokepoint, but current governed handoffs do not require it.
 - **CP4 Runtime governance**: myStarterKit enforces trust/security controls before/through reasoning.
-- **CP5 Policy decision**: current decisions are local to the repo-owned control plane; OPA remains the policy-language and sidecar bridge.
-- **CP6 Secret retrieval gate**: Vault is available as a conditional secret backend when wiring is completed.
-- **CP7 Retrieval gate**: Qdrant is the intended governed retrieval backend, but current demo retrieval is still seeded.
+- **CP5 Policy decision**: OPA is the mandatory decision engine in live governed mode.
+- **CP6 Secret retrieval gate**: Vault-backed secret access is a conditional mandatory dependency for secret-requiring governed operations.
+- **CP7 Retrieval gate**: Qdrant-backed retrieval is a mandatory live dependency for the strict governed handoff path.
 - **CP8 Risky execution sandboxing**: gVisor remains future isolation depth, not a proven current path.
 - **CP9 Continuous evidence emission**: Langfuse telemetry throughout request lifecycle.
 - **CP10 Post-request assurance**: Grafana/Superset views consumed by launch-gate and evidence workflows.
@@ -91,25 +93,23 @@ Keycloak, Envoy, OPA, Vault, Qdrant, Grafana, Superset, and gVisor remain import
 ## 6) Data flow summary
 
 - User lands on the dashboard first.
-- Identity and ingress integrations may be layered in, but the current repo-owned handoff path is centered on the dashboard server.
-- Onyx runtime receives request and context.
-- Onyx/myStarterKit conditionally accesses:
-  - Vault (secrets), only when that integration is enabled.
-  - Qdrant (retrieval), only when that integration is enabled.
-  - gVisor (sandbox), only in a future isolated execution path.
-- Response and runtime metadata return through ingress path and are summarized back into the dashboard.
-- Telemetry, policy decisions, and evaluations are emitted to Langfuse continuously.
+- In live mode, the dashboard server resolves live identity from Keycloak-compatible session or bearer token state.
+- The control plane sends a live policy input to OPA and fails closed if OPA is unreachable or denies.
+- The governed flow executes retrieval against Qdrant and fails closed if retrieval evidence is missing or invalid.
+- Secret-requiring operations call Vault-backed secret access and fail closed on missing secret evidence.
+- Launch-gate evaluates the live evidence set before the handoff is approved.
+- Response and runtime metadata return through the dashboard-owned control plane.
+- Telemetry, policy decisions, and evaluations are emitted to file-backed artifacts and can be exported onward to Langfuse.
 
 ## 7) Policy flow summary
 
-- Policy context assembled from request, identity/session claims, action intent, and runtime state.
-- myStarterKit applies local governance policies first (where configured).
-- OPA currently provides policy-language portability and optional sidecar depth more than mandatory live decisioning.
+- Policy context assembled from request, identity/session claims, action intent, tool metadata, and runtime state.
+- In live mode, OPA is the mandatory policy decision point for the governed path.
 - Final decision governs whether Onyx can continue, call tools, read secrets, retrieve data, or execute in sandbox.
-- Policy decision outcomes are logged as evidence signals.
+- Policy decision outcomes are logged as evidence signals with trace and session correlation.
 
 ## 8) Evidence flow summary
 
-- During request: traces, policy decisions, retrieval/tool events, and security-relevant state emitted to Langfuse.
-- Post request: Langfuse outputs feed operational and evidence drill-down views in Grafana/Superset.
-- Launch-gate consumes these evidence views/signals and the dashboard summarizes readiness back into one homepage.
+- During request: identity, policy, retrieval, secret, tool, handoff, and launch-gate events are emitted to repo-owned artifacts under `overlays/myStarterKit/artifacts/`.
+- Post request: those artifacts are summarized into dashboard sections and can be exported onward to Langfuse/Grafana drill-downs.
+- In live mode, launch-gate consumes the live governed-flow evidence set and does not silently substitute demo artifacts.

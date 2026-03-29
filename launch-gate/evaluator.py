@@ -147,6 +147,67 @@ def default_controls() -> List[ControlRequirement]:
     ]
 
 
+def live_controls(*, secret_required: bool = False) -> List[ControlRequirement]:
+    controls = [
+        ControlRequirement(
+            control_id="live_identity",
+            description="Live identity evidence present.",
+            required_evidence=["identity.live"],
+            mandatory=True,
+            weight=3,
+        ),
+        ControlRequirement(
+            control_id="live_policy",
+            description="Live OPA policy evidence present.",
+            required_evidence=["policy.live_opa"],
+            mandatory=True,
+            weight=3,
+        ),
+        ControlRequirement(
+            control_id="live_retrieval",
+            description="Live retrieval enforcement evidence present.",
+            required_evidence=["retrieval.live_backend"],
+            mandatory=True,
+            weight=2,
+        ),
+        ControlRequirement(
+            control_id="trace_correlation",
+            description="Cross-step trace correlation evidence present.",
+            required_evidence=["trace.correlation"],
+            mandatory=True,
+            weight=2,
+        ),
+        ControlRequirement(
+            control_id="handoff_governance",
+            description="Governed handoff evidence present.",
+            required_evidence=["handoff.decision"],
+            mandatory=True,
+            weight=2,
+        ),
+    ]
+    if secret_required:
+        controls.append(
+            ControlRequirement(
+                control_id="live_secret_access",
+                description="Required secret access evidence present.",
+                required_evidence=["secret.access"],
+                mandatory=True,
+                weight=2,
+            )
+        )
+    else:
+        controls.append(
+            ControlRequirement(
+                control_id="optional_secret_access",
+                description="Secret access evidence available when a governed operation requires it.",
+                required_evidence=["secret.access"],
+                mandatory=False,
+                weight=1,
+            )
+        )
+    return controls
+
+
 def cli_run(evidence_json: str, kill_switch: bool = False) -> str:
     evidence = json.loads(evidence_json)
     result = evaluate_launch_gate(evidence=evidence, controls=default_controls(), kill_switch=kill_switch)

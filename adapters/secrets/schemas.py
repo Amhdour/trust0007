@@ -9,6 +9,7 @@ class SecretFetchRequest:
     needed: bool
     secret_path: str
     secret_key: str
+    purpose: str = ""
 
 
 @dataclass(frozen=True)
