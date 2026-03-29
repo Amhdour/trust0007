@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Passing Strict Live Flow Dashboard Preview</title>
+  <desc id="desc">Simplified dashboard preview showing a passing strict live governed flow with live evidence mode, allow results, and go launch status.</desc>
+  <rect width="1200" height="760" fill="#f5f1e8"/>
+  <rect x="28" y="28" width="1144" height="704" rx="24" fill="#fffdf9" stroke="#d8cfc2"/>
+  <text x="56" y="76" fill="#1e2330" font-size="28" font-family="Georgia, serif">Trust &amp; Security Operations Dashboard</text>
+  <text x="56" y="108" fill="#5c6472" font-size="16" font-family="Georgia, serif">Passing strict live governed flow preview</text>
+
+  <rect x="56" y="136" width="220" height="88" rx="16" fill="#eef8ef" stroke="#9cc7a3"/>
+  <text x="74" y="168" fill="#5c6472" font-size="14" font-family="Arial, sans-serif">Evidence mode</text>
+  <text x="74" y="203" fill="#1d6b3c" font-size="30" font-family="Arial, sans-serif" font-weight="700">LIVE</text>
+
+  <rect x="294" y="136" width="220" height="88" rx="16" fill="#eef8ef" stroke="#9cc7a3"/>
+  <text x="312" y="168" fill="#5c6472" font-size="14" font-family="Arial, sans-serif">Readiness status</text>
+  <text x="312" y="203" fill="#1d6b3c" font-size="30" font-family="Arial, sans-serif" font-weight="700">GO</text>
+
+  <rect x="532" y="136" width="220" height="88" rx="16" fill="#eef8ef" stroke="#9cc7a3"/>
+  <text x="550" y="168" fill="#5c6472" font-size="14" font-family="Arial, sans-serif">Latest handoff</text>
+  <text x="550" y="203" fill="#1d6b3c" font-size="30" font-family="Arial, sans-serif" font-weight="700">ALLOW</text>
+
+  <rect x="770" y="136" width="346" height="88" rx="16" fill="#eef8ef" stroke="#9cc7a3"/>
+  <text x="788" y="168" fill="#5c6472" font-size="14" font-family="Arial, sans-serif">What this preview shows</text>
+  <text x="788" y="198" fill="#1e2330" font-size="16" font-family="Arial, sans-serif">live identity, live OPA, live retrieval, live secret,</text>
+  <text x="788" y="220" fill="#1e2330" font-size="16" font-family="Arial, sans-serif">complete trace, launch-gate pass, governed handoff allow</text>
+
+  <g font-family="Arial, sans-serif">
+    <rect x="56" y="260" width="246" height="130" rx="18" fill="#f7fcf7" stroke="#9cc7a3"/>
+    <text x="76" y="292" fill="#5c6472" font-size="14">Identity result</text>
+    <text x="76" y="332" fill="#1d6b3c" font-size="34" font-weight="700">ALLOW</text>
+    <text x="76" y="360" fill="#1e2330" font-size="16">source=keycloak_userinfo</text>
+
+    <rect x="320" y="260" width="246" height="130" rx="18" fill="#f7fcf7" stroke="#9cc7a3"/>
+    <text x="340" y="292" fill="#5c6472" font-size="14">Decision engine</text>
+    <text x="340" y="332" fill="#1d6b3c" font-size="34" font-weight="700">OPA</text>
+    <text x="340" y="360" fill="#1e2330" font-size="16">Latest policy result=ALLOW</text>
+
+    <rect x="584" y="260" width="246" height="130" rx="18" fill="#f7fcf7" stroke="#9cc7a3"/>
+    <text x="604" y="292" fill="#5c6472" font-size="14">Latest retrieval result</text>
+    <text x="604" y="332" fill="#1d6b3c" font-size="34" font-weight="700">ALLOW</text>
+    <text x="604" y="360" fill="#1e2330" font-size="16">backend=qdrant</text>
+
+    <rect x="848" y="260" width="268" height="130" rx="18" fill="#f7fcf7" stroke="#9cc7a3"/>
+    <text x="868" y="292" fill="#5c6472" font-size="14">Secret fetched</text>
+    <text x="868" y="332" fill="#1d6b3c" font-size="34" font-weight="700">YES</text>
+    <text x="868" y="360" fill="#1e2330" font-size="16">backend=vault</text>
+
+    <rect x="56" y="414" width="246" height="130" rx="18" fill="#f7fcf7" stroke="#9cc7a3"/>
+    <text x="76" y="446" fill="#5c6472" font-size="14">Trace complete</text>
+    <text x="76" y="486" fill="#1d6b3c" font-size="34" font-weight="700">YES</text>
+    <text x="76" y="514" fill="#1e2330" font-size="16">session correlated</text>
+
+    <rect x="320" y="414" width="796" height="130" rx="18" fill="#fff7ea" stroke="#d8cfc2"/>
+    <text x="340" y="446" fill="#5c6472" font-size="14">Reviewer cue</text>
+    <text x="340" y="480" fill="#1e2330" font-size="22" font-weight="700">All mandatory live path cards show healthy or allow states.</text>
+    <text x="340" y="512" fill="#1e2330" font-size="18">Use this visual alongside allowed-flow.json and governed-flow-summary.json.</text>
+  </g>
+</svg>

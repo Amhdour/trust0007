@@ -1,11 +1,118 @@
 # AI Trust & Security Stack Control Plane
 
-This repository is now shaped as a **dashboard-first control plane** for an AI Trust & Security platform built around upstream projects and `myStarterKit`.
+This repository is a **dashboard-first AI Trust & Security control plane**. It proves a governed runtime handoff into Onyx, a strict live governed path, dependency-specific fail-closed behavior, and evidence-backed launch readiness without treating every vendored upstream as equally active.
 
-The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and Autonomous Agents**. Onyx is treated as a governed runtime module behind that dashboard instead of the primary visible entry.
+The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and Autonomous Agents**. Onyx is a governed runtime module behind that dashboard, not the primary visible product entry.
 
 Suggested short repository description:
 `Dashboard-first AI Trust & Security Stack Control Plane for governed AI runtime launch readiness, policy enforcement, evidence integrity, and auditable Onyx handoffs.`
+
+## What This Repo Proves
+
+- A strict live governed path can allow a runtime handoff only after live identity, live policy, live retrieval, conditional live secret access, trace correlation, and launch-gate evidence all succeed.
+- The same governed path fails closed when Keycloak-compatible identity, OPA, Qdrant, Vault, or trace/evidence requirements fail.
+- The dashboard and artifact set explain why the handoff passed, denied, or downgraded.
+- The repo distinguishes mandatory path elements from supporting, optional, and reference-only components instead of inflating the architecture.
+
+## Reviewer Fast Path
+
+If you only have a minute, start here:
+
+1. Proof matrix: [docs/strict-live-proof-matrix.md](/workspaces/beta011/docs/strict-live-proof-matrix.md)
+2. Main strict-live integration proof: [tests/integration/test_strict_live_http_end_to_end.py](/workspaces/beta011/tests/integration/test_strict_live_http_end_to_end.py)
+3. Reviewer landing page: [docs/reviewer-fast-path.md](/workspaces/beta011/docs/reviewer-fast-path.md)
+4. Passing live flow artifact: [allowed-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
+5. Denied identity artifact: [denied-identity-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
+6. Denied OPA artifact: [denied-opa-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
+7. Denied retrieval artifact: [denied-retrieval-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
+8. Denied secret artifact: [denied-secret-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
+9. Launch-gate no-go artifact: [live-launch-gate-downgrade.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
+10. Visual dashboard proof guide: [docs/dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md)
+
+## Passing Strict Live Flow
+
+The strongest “see a pass” path is:
+
+- test: [tests/integration/test_strict_live_http_end_to_end.py](/workspaces/beta011/tests/integration/test_strict_live_http_end_to_end.py)
+  - `test_strict_live_handoff_passes_through_http_dependency_chain`
+- proof summary: [docs/strict-live-proof-matrix.md](/workspaces/beta011/docs/strict-live-proof-matrix.md)
+- reviewer artifact: [allowed-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
+- dashboard visual callout: [docs/dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md)
+
+That path proves:
+
+- Keycloak-compatible identity participation
+- OPA decision participation
+- Qdrant retrieval participation
+- Vault-backed secret participation when required
+- complete trace correlation
+- launch-gate pass from live evidence
+- governed Onyx handoff approval
+
+## Failing Strict Live Flow Examples
+
+The strongest “see a deny” and “see a no-go” paths are:
+
+- identity denial: [denied-identity-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
+- OPA denial/unavailable: [denied-opa-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
+- retrieval denial: [denied-retrieval-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
+- secret denial: [denied-secret-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
+- launch-gate no-go from missing live evidence: [live-launch-gate-downgrade.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
+
+The main fail-closed test coverage is in [tests/integration/test_strict_live_http_end_to_end.py](/workspaces/beta011/tests/integration/test_strict_live_http_end_to_end.py) and [tests/integration/test_live_governed_runtime_dependencies.py](/workspaces/beta011/tests/integration/test_live_governed_runtime_dependencies.py).
+
+## Evidence Artifacts To Inspect
+
+Primary governed-flow artifacts:
+
+- [governed-flow-summary.json](/workspaces/beta011/overlays/myStarterKit/artifacts/governed-flow-summary.json)
+- [identity-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/identity-evidence.json)
+- [policy-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/policy-evidence.json)
+- [retrieval-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/retrieval-evidence.json)
+- [secret-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/secret-evidence.json)
+- [trace-correlation.json](/workspaces/beta011/overlays/myStarterKit/artifacts/trace-correlation.json)
+- [launch-gate-result.json](/workspaces/beta011/overlays/myStarterKit/artifacts/launch-gate-result.json)
+- [reviewer evidence bundle](/workspaces/beta011/evidence/reviewer_evidence_bundle.json)
+
+## What Is Mandatory Now
+
+When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a governed handoff to `/launch/onyx` fails closed unless all of these complete successfully:
+
+1. Keycloak-backed identity from bearer token or session cookie
+2. OPA decision for the request
+3. Retrieval against the configured live backend
+4. Required Vault-backed secret access
+5. Complete trace correlation across the governed flow
+6. Launch-gate approval from live evidence
+
+## What Is Proven Now
+
+- Proven mandatory path elements:
+  - Onyx handoff behind the dashboard
+  - Keycloak-compatible identity
+  - OPA policy decision
+  - Qdrant retrieval
+  - Vault secret access when required
+  - trace correlation
+  - live-evidence launch gate
+- Active supporting elements:
+  - Langfuse
+  - Envoy
+  - Grafana
+- Optional future elements:
+  - Superset
+  - gVisor
+- Reference-only elements:
+  - Keycloak Quickstarts
+  - OPA Envoy Plugin
+  - Langfuse Python SDK
+
+## What Remains Supporting Or Future
+
+- Envoy strengthens the ingress story, but the current proved request path does not require it.
+- Grafana is a useful drill-down surface, but not a fail-closed dependency.
+- Langfuse is active for observability, but live handoff proof does not depend on Langfuse reachability.
+- Superset and gVisor remain future or optional depth.
 
 ## Design intent
 
@@ -49,18 +156,6 @@ Suggested short repository description:
 ## Phase status
 
 Execution plan tracking and phase notes are stored under `docs/phases/`.
-
-## Homepage Information Architecture
-
-The homepage is now optimized to answer the reviewer questions in under 10 seconds:
-
-- What is protected: asset and protection coverage across surfaces, tenants, roles, retrieval sources, tools, MCP servers, and the governed Onyx runtime.
-- What was blocked: denied retrievals, denied tool attempts, confirmation-required actions, and blocked `/launch/onyx` handoffs.
-- Why it was blocked: surfaced reason codes, policy source, policy path, trace IDs, tenants, actors, and surfaces.
-- What evidence exists: reviewer bundles, governed flow traces, launch-gate outputs, telemetry exports, and replay-ready artifacts.
-- Is the system launch-ready: dominant launch gate panel with readiness status, control-family summaries, top failing controls, and residual risks.
-
-See `docs/control-plane-dashboard-homepage.md` for the homepage structure, data sources, and real-versus-demo notes.
 
 ## Quickstart
 
@@ -140,22 +235,16 @@ Every component that remains in scope is expected to answer:
 See `docs/upstream-usage-matrix.md` for the reviewer-facing explanation and `evidence/upstream_usage.inventory.json` for the machine-readable inventory surfaced by the dashboard.
 See `docs/strict-live-proof-matrix.md` for the acceptance criteria and pass/fail proof matrix for the strict live governed path.
 
-## Mandatory Now
-
-When `CONTROL_PLANE_GOVERNANCE_MODE=live` or the request explicitly asks for `mode=live`, a governed handoff to `/launch/onyx` now fails closed unless these steps complete successfully:
-
-1. Keycloak-backed identity is resolved from bearer token or session cookie.
-2. OPA returns a live policy decision for the request.
-3. Retrieval executes against the configured live backend and passes boundary checks.
-4. Required runtime secret access succeeds through Vault-backed secret retrieval.
-5. Trace correlation stays intact across identity, policy, retrieval, secret, tool, handoff, and launch-gate steps.
-6. Launch-gate evaluates the live evidence set and does not return `no_go`.
-
-Demo mode still exists, but it is now explicitly labeled as demo/fallback rather than being treated as equivalent to the live governed path.
-
 ## Runtime Testing Model
 
 - `Onyx` is the primary sample runtime platform for real integration testing in this repo.
 - The in-repo demo is the fast fallback path when the upstream Onyx stack is not running.
 - The dashboard remains the product entrypoint, and Onyx is the governed runtime reached behind it.
 - **Governance enforcement** is now live: `/launch/onyx` blocks denied requests with audit trails.
+
+## Proof And Dashboard Docs
+
+- [docs/reviewer-fast-path.md](/workspaces/beta011/docs/reviewer-fast-path.md): shortest path to see a pass, a deny, and a no-go
+- [docs/strict-live-proof-matrix.md](/workspaces/beta011/docs/strict-live-proof-matrix.md): acceptance criteria and dependency-by-dependency proof matrix
+- [docs/dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md): what to look for in the dashboard for pass and deny cases
+- [docs/control-plane-dashboard-homepage.md](/workspaces/beta011/docs/control-plane-dashboard-homepage.md): dashboard structure and data sourcing

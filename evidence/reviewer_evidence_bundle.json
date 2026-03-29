@@ -45,6 +45,8 @@
   },
   "inspectable_evidence": {
     "entry_point": "evidence/reviewer/inspectable-live-runtime/README.md",
+    "reviewer_fast_path": "docs/reviewer-fast-path.md",
+    "visual_proof_guide": "docs/dashboard-visual-proof.md",
     "proof_matrix": "docs/strict-live-proof-matrix.md",
     "bundles": [
       "evidence/reviewer/inspectable-live-runtime/allowed-flow.json",

@@ -34,3 +34,13 @@ def test_inspectable_live_runtime_examples_include_artifact_snapshots() -> None:
         summary = payload["artifact_snapshots"].get("governed_flow_summary", {})
         assert summary.get("evidence_mode") == "live"
         assert "handoff_allowed" in summary
+
+
+def test_reviewer_fast_path_docs_are_linked_from_bundle() -> None:
+    bundle = json.loads(Path("evidence/reviewer_evidence_bundle.json").read_text(encoding="utf-8"))
+    inspectable = bundle["inspectable_evidence"]
+
+    assert inspectable["reviewer_fast_path"] == "docs/reviewer-fast-path.md"
+    assert inspectable["visual_proof_guide"] == "docs/dashboard-visual-proof.md"
+    assert Path(inspectable["reviewer_fast_path"]).is_file()
+    assert Path(inspectable["visual_proof_guide"]).is_file()

@@ -189,9 +189,18 @@ def test_live_mode_docs_exist() -> None:
     live_demo = Path("docs/live-vs-demo-matrix.md").read_text(encoding="utf-8")
     evidence_model = Path("docs/evidence-model.md").read_text(encoding="utf-8")
     proof_matrix = Path("docs/strict-live-proof-matrix.md").read_text(encoding="utf-8")
+    reviewer_fast_path = Path("docs/reviewer-fast-path.md").read_text(encoding="utf-8")
+    visual_proof = Path("docs/dashboard-visual-proof.md").read_text(encoding="utf-8")
 
     assert "live" in live_demo
     assert "demo" in live_demo
     assert "trace_id" in evidence_model
     assert "Acceptance criteria" in proof_matrix
     assert "strict live governed path" in proof_matrix.lower()
+    assert "See A Pass" in reviewer_fast_path
+    assert "Visual Previews" in visual_proof
+
+
+def test_visual_proof_assets_exist() -> None:
+    assert Path("docs/images/dashboard-live-pass.svg").is_file()
+    assert Path("docs/images/dashboard-live-deny.svg").is_file()

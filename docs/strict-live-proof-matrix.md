@@ -2,6 +2,12 @@
 
 This document defines when the repo is allowed to claim that the strict live governed path is proven.
 
+Fast supporting links:
+
+- reviewer landing page: [reviewer-fast-path.md](/workspaces/beta011/docs/reviewer-fast-path.md)
+- visual proof guide: [dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md)
+- reviewer evidence bundle: [reviewer_evidence_bundle.json](/workspaces/beta011/evidence/reviewer_evidence_bundle.json)
+
 ## Acceptance criteria
 
 A live-mode governed handoff is considered proven only if:
