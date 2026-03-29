@@ -6,3 +6,4 @@ phased implementation plan, and first-file bootstrap sequence.
 Additional homepage-focused notes:
 
 - `control-plane-dashboard-homepage.md`: current homepage information architecture, data sourcing, and demo-versus-live guidance.
+- `upstream-usage-matrix.md`: strict classification of active, partial, optional, and reference-only upstream integrations.

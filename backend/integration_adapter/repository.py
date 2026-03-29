@@ -15,6 +15,7 @@ REVIEWER_BUNDLE_FALLBACK = "evidence/reviewer_evidence_bundle.json"
 DASHBOARD_INGESTION_PRIMARY = "overlays/myStarterKit/artifacts/dashboard/dashboard_ingestion.json"
 DASHBOARD_INGESTION_FALLBACK = "telemetry/exports/mystarterkit_dashboard_feed.json"
 DASHBOARD_CONTRACT_PATH = "contracts/control-plane-dashboard.json"
+UPSTREAM_USAGE_INVENTORY_PATH = "evidence/upstream_usage.inventory.json"
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,10 @@ def load_policy_bundle(root: Path | None = None) -> dict[str, Any]:
 
 def load_dashboard_contract(root: Path | None = None) -> dict[str, Any]:
     return read_json(repo_root(root) / DASHBOARD_CONTRACT_PATH)
+
+
+def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
+    return read_json(repo_root(root) / UPSTREAM_USAGE_INVENTORY_PATH)
 
 
 def launch_report_relative_path(root: Path | None = None) -> str:

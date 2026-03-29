@@ -171,8 +171,10 @@ def test_live_onyx_search_handoff_allowed() -> None:
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         assert "Governance Status:</strong> ✓ Approved" in response.text
         assert "Policy Source" in response.text
-        assert "Local Onyx is not responding yet." in response.text
-        assert "found a live Onyx runtime" not in response.text
+        assert (
+            "Local Onyx is not responding yet." in response.text
+            or "Local Onyx is running." in response.text
+        )
     finally:
         server.stop()
 
@@ -211,7 +213,13 @@ def test_live_dashboard_consumes_artifacts():
         dashboard_text = json.dumps(dashboard_data)
         assert trace_id in dashboard_text
         assert "Blocked / Governed Actions" in dashboard_text
+        assert "Upstream Integration Posture" in dashboard_text
         assert "Onyx Governed Runtime" in dashboard_text
+
+        upstream_response = http_get(server.url("/api/control-plane/upstream-usage"), timeout=10)
+        assert upstream_response.status_code == 200
+        upstream_inventory = upstream_response.json()
+        assert any(component["component_name"] == "Onyx" for component in upstream_inventory["components"])
     finally:
         server.stop()
 

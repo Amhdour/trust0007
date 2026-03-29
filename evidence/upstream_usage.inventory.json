@@ -1,0 +1,350 @@
+{
+  "inventory_version": 1,
+  "generated_at": "2026-03-28T00:00:00Z",
+  "scope_note": "Classification is based on repository wiring, local compose definitions, adapters, tests, and dashboard-visible signals in this checkout.",
+  "components": [
+    {
+      "component_name": "Onyx",
+      "upstream_path": "upstream/onyx",
+      "classification": "used_now",
+      "recommended_action": "keep as active runtime dependency",
+      "runtime_role": "Primary governed AI runtime target reached behind dashboard-controlled handoffs.",
+      "runtime_location": "Runtime plane behind `/launch/onyx`, `scripts/start-onyx-lite.sh`, and `tests/integration/test_onyx_runtime_target.py`.",
+      "integration_points": [
+        "backend/api_gateway/server.py",
+        "backend/activity_service/service.py",
+        "adapters/onyx_gateway_adapter/adapter.py",
+        "scripts/start-onyx-lite.sh",
+        "docs/onyx-integration.md"
+      ],
+      "governance_signals": [
+        "Governed `/launch/onyx` allow or deny outcomes",
+        "Recent Onyx handoff outcomes on the homepage",
+        "Onyx activity entries in the live activity feed"
+      ],
+      "evidence_artifacts": [
+        "evidence/reviewer/inspectable-live-runtime/allowed-flow.json",
+        "evidence/reviewer/inspectable-live-runtime/denied-flow.json",
+        "overlays/myStarterKit/artifacts/events.jsonl"
+      ],
+      "enabled_in_dev": true,
+      "enabled_in_prod_sim": false,
+      "source_snapshot_required": true,
+      "removal_impact": "Removes the only real upstream runtime target, breaks governed handoff flows, and invalidates the repo's Onyx-focused integration tests.",
+      "status_notes": "Onyx is intentionally not the homepage; it remains the governed runtime module behind the dashboard entry flow."
+    },
+    {
+      "component_name": "Langfuse",
+      "upstream_path": "upstream/langfuse",
+      "classification": "used_now",
+      "recommended_action": "keep as active runtime dependency",
+      "runtime_role": "Evidence-plane trace store and live observability destination when traces are available.",
+      "runtime_location": "Evidence plane via `compose/docker-compose.yml`, `backend/activity_service/service.py`, and `adapters/observability/langfuse/`.",
+      "integration_points": [
+        "compose/docker-compose.yml",
+        "compose/docker-compose.prod-sim.yml",
+        "backend/activity_service/service.py",
+        "adapters/observability/langfuse/exporter.py",
+        "tests/observability/test_langfuse_exporter.py"
+      ],
+      "governance_signals": [
+        "Langfuse trace and session activity in the live activity feed",
+        "Trace-derived operational visibility for governed runtime behavior"
+      ],
+      "evidence_artifacts": [
+        "compose/grafana/dashboards/mystarterkit-operational.json",
+        "telemetry/exports/mystarterkit_dashboard_feed.json"
+      ],
+      "enabled_in_dev": true,
+      "enabled_in_prod_sim": true,
+      "source_snapshot_required": false,
+      "removal_impact": "Removes live trace/session visibility from the dashboard and weakens evidence-plane drill-downs tied to runtime activity.",
+      "status_notes": "The repo has a real Langfuse bridge and dashboard polling, but not every governed-flow artifact is pushed into Langfuse automatically yet."
+    },
+    {
+      "component_name": "Keycloak",
+      "upstream_path": "upstream/keycloak",
+      "classification": "partially_used",
+      "recommended_action": "keep as platform dependency but mark source snapshot as reference",
+      "runtime_role": "Planned identity provider and session authority for tenant-aware runtime access.",
+      "runtime_location": "Compose service plus repo-owned templates and scripts; the current dashboard server does not validate live Keycloak tokens yet.",
+      "integration_points": [
+        "compose/docker-compose.yml",
+        "compose/docker-compose.prod-sim.yml",
+        "adapters/identity/realm-dev-template.json",
+        "scripts/keycloak/dev-import-realm.sh",
+        "docs/keycloak-integration.md"
+      ],
+      "governance_signals": [
+        "Role and tenant policy are modeled on the dashboard, but those signals are currently sourced from the runtime policy bundle rather than live Keycloak sessions."
+      ],
+      "evidence_artifacts": [
+        "adapters/identity/realm-dev-template.json",
+        "docs/keycloak-integration.md"
+      ],
+      "enabled_in_dev": true,
+      "enabled_in_prod_sim": true,
+      "source_snapshot_required": false,
+      "removal_impact": "Would remove the repo's identity integration anchor and local realm workflow, but the current demo path would still run because identity is still locally stubbed.",
+      "status_notes": "Do not claim live IAM enforcement until JWT validation or session handoff is wired into the control plane or ingress."
+    },
+    {
+      "component_name": "Envoy",
+      "upstream_path": "upstream/envoy",
+      "classification": "partially_used",
+      "recommended_action": "keep as platform dependency but mark source snapshot as reference",
+      "runtime_role": "Ingress and edge policy bridge stub for future governed routing into runtime services.",
+      "runtime_location": "Compose service and local config under `compose/envoy/`; the current `/launch/onyx` flow does not traverse Envoy.",
+      "integration_points": [
+        "compose/docker-compose.yml",
+        "compose/docker-compose.prod-sim.yml",
+        "compose/envoy/envoy.local.yaml",
+        "docs/envoy-opa-integration.md"
+      ],
+      "governance_signals": [
+        "No dedicated dashboard signal yet; Envoy is present as an ingress control anchor rather than a proven runtime chokepoint."
+      ],
+      "evidence_artifacts": [
+        "compose/envoy/envoy.local.yaml",
+        "docs/envoy-opa-integration.md"
+      ],
+      "enabled_in_dev": true,
+      "enabled_in_prod_sim": true,
+      "source_snapshot_required": false,
+      "removal_impact": "Would remove the repo's ingress-policy bridge and make future JWT and ext_authz enforcement harder, but current dashboard-to-Onyx governance would still operate.",
+      "status_notes": "Keep the config and container wiring, but avoid describing Envoy as mandatory in the current runtime path."
+    },
+    {
+      "component_name": "OPA",
+      "upstream_path": "upstream/opa",
+      "classification": "partially_used",
+      "recommended_action": "keep as platform dependency but mark source snapshot as reference",
+      "runtime_role": "Policy authoring and optional sidecar decision engine for future ingress or central-policy delegation.",
+      "runtime_location": "Local Rego policies, tests, and an optional OPA container exist, but current launch and handoff decisions are evaluated inside the repo-owned Python control plane.",
+      "integration_points": [
+        "policies/rego/policy.rego",
+        "policies/tests/policy_test.rego",
+        "compose/docker-compose.yml",
+        "compose/opa/policy.rego",
+        "docs/policy-model.md"
+      ],
+      "governance_signals": [
+        "Policy source visibility on the dashboard",
+        "Rego-tested policy coverage, even though live handoff decisions do not call the OPA server yet"
+      ],
+      "evidence_artifacts": [
+        "policies/runtime-policy-fallback.json",
+        "overlays/myStarterKit/policies/bundles/default/policy.json",
+        "policies/tests/policy_test.rego"
+      ],
+      "enabled_in_dev": true,
+      "enabled_in_prod_sim": true,
+      "source_snapshot_required": false,
+      "removal_impact": "Would weaken the repo's policy-language anchor and Envoy-authz bridge, but current server-side policy evaluation would still function from the runtime bundle.",
+      "status_notes": "OPA is materially present for policy authoring and future delegation, but it is not yet the live authority for the governed dashboard handoff path."
+    },
+    {
+      "component_name": "Vault",
+      "upstream_path": "upstream/vault",
+      "classification": "partially_used",
+      "recommended_action": "keep as platform dependency but mark source snapshot as reference",
+      "runtime_role": "Conditional secrets backend for operations that require protected credentials.",
+      "runtime_location": "Compose service plus `adapters/secrets/`; current governed-flow execution does not call Vault during dashboard or Onyx handoff flows.",
+      "integration_points": [
+        "compose/docker-compose.yml",
+        "compose/docker-compose.prod-sim.yml",
+        "adapters/secrets/provider.py",
+        "tests/secrets/test_vault_secrets_provider.py",
+        "docs/vault-integration.md"
+      ],
+      "governance_signals": [
+        "No reviewer-facing Vault signal yet; current signals stop at fail-safe adapter behavior such as `vault_unavailable` and `secret_key_missing`."
+      ],
+      "evidence_artifacts": [
+        "compose/vault/paths.example.env",
+        "docs/vault-integration.md",
+        "tests/secrets/test_vault_secrets_provider.py"
+      ],
+      "enabled_in_dev": true,
+      "enabled_in_prod_sim": true,
+      "source_snapshot_required": false,
+      "removal_impact": "Would remove the secrets-governance integration point and leave no clear path for governed secret retrieval when runtime connectors need it.",
+      "status_notes": "Keep Vault in scope as a platform dependency, but do not claim active secret-governance evidence until secret access is surfaced in telemetry and reviewer artifacts."
+    },
+    {
+      "component_name": "Qdrant",
+      "upstream_path": "upstream/qdrant",
+      "classification": "partially_used",
+      "recommended_action": "keep as platform dependency but mark source snapshot as reference",
+      "runtime_role": "Intended vector retrieval backend for governed RAG access.",
+      "runtime_location": "Compose service and retrieval policy semantics; the current governed-flow evaluator still uses a seed retrieval backend instead of a live Qdrant client.",
+      "integration_points": [
+        "compose/docker-compose.yml",
+        "compose/docker-compose.prod-sim.yml",
+        "backend/api_gateway/server.py",
+        "policies/rego/policy.rego",
+        "tests/retrieval/test_retrieval_security_layer.py"
+      ],
+      "governance_signals": [
+        "Retrieval boundary decisions labeled with source `qdrant` on the dashboard",
+        "Tenant/source retrieval controls in the policy and dashboard coverage tables"
+      ],
+      "evidence_artifacts": [
+        "telemetry/exports/sample_events.jsonl",
+        "overlays/myStarterKit/artifacts/events.jsonl",
+        "policies/runtime-policy-fallback.json"
+      ],
+      "enabled_in_dev": true,
+      "enabled_in_prod_sim": true,
+      "source_snapshot_required": false,
+      "removal_impact": "Would remove the repo's intended retrieval backend and make current retrieval-boundary claims purely synthetic, even though the demo evaluator could still return seeded documents.",
+      "status_notes": "Keep Qdrant claims narrow: retrieval governance is real, but live Qdrant-backed retrieval is not yet proven in the current governed-flow path."
+    },
+    {
+      "component_name": "Grafana",
+      "upstream_path": "upstream/grafana",
+      "classification": "partially_used",
+      "recommended_action": "keep as platform dependency but mark source snapshot as reference",
+      "runtime_role": "Operational observability drill-down destination fed by local telemetry and Langfuse-backed data sources.",
+      "runtime_location": "Compose service with provisioning and dashboard specs; the main reviewer experience remains the repo-owned homepage.",
+      "integration_points": [
+        "compose/docker-compose.yml",
+        "compose/docker-compose.prod-sim.yml",
+        "compose/grafana/provisioning/dashboards/mystarterkit.yml",
+        "compose/grafana/dashboards/mystarterkit-operational.json",
+        "tests/telemetry/test_dashboard_artifacts.py"
+      ],
+      "governance_signals": [
+        "Operational dashboard specification for Onyx traces and governed request volume",
+        "Evidence-service export link for the Grafana operational spec"
+      ],
+      "evidence_artifacts": [
+        "compose/grafana/dashboards/mystarterkit-operational.json",
+        "telemetry/dashboards/grafana/operational-dashboard-spec.json"
+      ],
+      "enabled_in_dev": true,
+      "enabled_in_prod_sim": true,
+      "source_snapshot_required": false,
+      "removal_impact": "Would remove a useful operational drill-down surface for traces and request trends, but the homepage dashboard and reviewer evidence pack would still function.",
+      "status_notes": "Grafana is a supporting drill-down, not the product homepage and not a prerequisite for core governance enforcement."
+    },
+    {
+      "component_name": "Superset",
+      "upstream_path": "upstream/superset",
+      "classification": "optional_future",
+      "recommended_action": "mark optional",
+      "runtime_role": "Future analytical reporting surface for trust and evidence datasets.",
+      "runtime_location": "Compose service and local config only; no current dashboard signal or evidence workflow depends on Superset.",
+      "integration_points": [
+        "compose/docker-compose.yml",
+        "compose/docker-compose.prod-sim.yml",
+        "compose/superset/superset_config.py",
+        "docs/grafana-superset.md"
+      ],
+      "governance_signals": [
+        "No dedicated dashboard signal yet."
+      ],
+      "evidence_artifacts": [
+        "telemetry/dashboards/superset/evidence-views.yaml",
+        "compose/superset/superset_config.py"
+      ],
+      "enabled_in_dev": true,
+      "enabled_in_prod_sim": true,
+      "source_snapshot_required": false,
+      "removal_impact": "Would remove a future analytics destination, but no current control-plane decision, dashboard section, or reviewer artifact would break.",
+      "status_notes": "Keep Superset documented as optional analytics scaffolding until real datasets or dashboard drill-throughs depend on it."
+    },
+    {
+      "component_name": "gVisor",
+      "upstream_path": "upstream/gvisor",
+      "classification": "optional_future",
+      "recommended_action": "mark optional",
+      "runtime_role": "Future isolation boundary for risky execution paths selected by sandbox policy.",
+      "runtime_location": "Logical design only via `adapters/sandbox/` and `docs/sandboxing.md`; there is no gVisor runtime deployment in the current stack.",
+      "integration_points": [
+        "adapters/sandbox/engine.py",
+        "adapters/sandbox/policy_model.py",
+        "tests/sandbox/test_sandboxing_engine.py",
+        "docs/sandboxing.md"
+      ],
+      "governance_signals": [
+        "Sandbox decision events exist in local logic, but no live gVisor-backed isolation signal is surfaced on the dashboard."
+      ],
+      "evidence_artifacts": [
+        "tests/sandbox/test_sandboxing_engine.py",
+        "docs/sandboxing.md"
+      ],
+      "enabled_in_dev": false,
+      "enabled_in_prod_sim": false,
+      "source_snapshot_required": false,
+      "removal_impact": "Would reduce the repo's future isolation story, but it would not change any currently exercised runtime, dashboard, or evidence path.",
+      "status_notes": "Only promote gVisor to active status once a real isolated execution path is implemented and evidenced."
+    },
+    {
+      "component_name": "Keycloak Quickstarts",
+      "upstream_path": "upstream/keycloak-quickstarts",
+      "classification": "reference_only",
+      "recommended_action": "remove from active claims",
+      "runtime_role": "Example and compatibility reference material for future Keycloak integration work.",
+      "runtime_location": "Vendored source snapshot only.",
+      "integration_points": [
+        "upstream/keycloak-quickstarts"
+      ],
+      "governance_signals": [
+        "No runtime or dashboard signal."
+      ],
+      "evidence_artifacts": [
+        "upstream/keycloak-quickstarts"
+      ],
+      "enabled_in_dev": false,
+      "enabled_in_prod_sim": false,
+      "source_snapshot_required": false,
+      "removal_impact": "Would only remove local example material for future identity work.",
+      "status_notes": "Do not describe this snapshot as part of the active platform runtime."
+    },
+    {
+      "component_name": "OPA Envoy Plugin",
+      "upstream_path": "upstream/opa-envoy-plugin",
+      "classification": "reference_only",
+      "recommended_action": "remove from active claims",
+      "runtime_role": "Reference implementation for future Envoy and OPA integration depth.",
+      "runtime_location": "Vendored source snapshot only.",
+      "integration_points": [
+        "upstream/opa-envoy-plugin"
+      ],
+      "governance_signals": [
+        "No runtime or dashboard signal."
+      ],
+      "evidence_artifacts": [
+        "upstream/opa-envoy-plugin"
+      ],
+      "enabled_in_dev": false,
+      "enabled_in_prod_sim": false,
+      "source_snapshot_required": false,
+      "removal_impact": "Would only remove local reference material for a deeper Envoy-authz path.",
+      "status_notes": "Keep as reference source only unless the stack adopts the plugin in an evidenced request path."
+    },
+    {
+      "component_name": "Langfuse Python SDK",
+      "upstream_path": "upstream/langfuse-python",
+      "classification": "reference_only",
+      "recommended_action": "remove from active claims",
+      "runtime_role": "SDK reference snapshot for future direct client integrations.",
+      "runtime_location": "Vendored source snapshot only; current repo-owned Langfuse adapters do not import it.",
+      "integration_points": [
+        "upstream/langfuse-python"
+      ],
+      "governance_signals": [
+        "No runtime or dashboard signal."
+      ],
+      "evidence_artifacts": [
+        "upstream/langfuse-python"
+      ],
+      "enabled_in_dev": false,
+      "enabled_in_prod_sim": false,
+      "source_snapshot_required": false,
+      "removal_impact": "Would only remove local SDK reference material for future direct Langfuse instrumentation work.",
+      "status_notes": "Do not imply the vendored SDK is part of the current evidence path."
+    }
+  ]
+}

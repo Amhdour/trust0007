@@ -2,7 +2,11 @@ import json
 from pathlib import Path
 import tempfile
 
-from backend.integration_adapter.repository import load_dashboard_contract, load_runtime_policy_bundle
+from backend.integration_adapter.repository import (
+    load_dashboard_contract,
+    load_runtime_policy_bundle,
+    load_upstream_usage_inventory,
+)
 from backend.launch_gate_service.service import build_launch_gate_summary
 from backend.posture_service.service import build_control_plane_dashboard
 
@@ -57,6 +61,29 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     assert payload["readiness_panel"]["status_label"] in {"GO", "CONDITIONAL", "NO-GO"}
     assert payload["readiness_panel"]["control_families"]
     assert payload["data_mode"]["label"]
+
+
+def test_dashboard_includes_upstream_integration_posture_section() -> None:
+    payload = build_control_plane_dashboard()
+
+    upstream_section = next(section for section in payload["sections"] if section["id"] == "upstream-posture")
+    cards_block = next(block for block in upstream_section["blocks"] if block["type"] == "cards")
+    table_block = next(block for block in upstream_section["blocks"] if block["type"] == "table")
+    links_block = next(block for block in upstream_section["blocks"] if block["type"] == "links")
+
+    labels = {item["label"] for item in cards_block["items"]}
+    assert {"Used now", "Partially used", "Optional / future", "Reference only"} <= labels
+    assert any(row["component"] == "Onyx" and row["classification"] == "used_now" for row in table_block["rows"])
+    assert any(item["label"] == "Upstream usage API" for item in links_block["items"])
+
+
+def test_upstream_usage_inventory_is_machine_readable() -> None:
+    inventory = load_upstream_usage_inventory()
+
+    assert inventory["inventory_version"] == 1
+    assert inventory["components"]
+    assert any(component["component_name"] == "Onyx" for component in inventory["components"])
+    assert any(component["classification"] == "reference_only" for component in inventory["components"])
 
 
 def test_launch_gate_summary_maps_existing_report() -> None:
@@ -124,3 +151,11 @@ def test_contract_files_present() -> None:
     ):
         payload = json.loads(Path(contract_path).read_text(encoding="utf-8"))
         assert payload["type"] == "object"
+
+
+def test_upstream_usage_matrix_doc_exists() -> None:
+    matrix = Path("docs/upstream-usage-matrix.md").read_text(encoding="utf-8")
+
+    assert "Upstream Usage Matrix" in matrix
+    assert "Onyx" in matrix
+    assert "reference_only" in matrix

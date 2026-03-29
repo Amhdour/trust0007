@@ -113,6 +113,17 @@ docker-compose -f compose/docker-compose.prod-sim.yml up
 - Proper initialization requirements
 - External certificate/trust store support
 
+## Upstream integration model
+
+Not every vendored upstream under `upstream/` is an equally active part of the current architecture.
+
+- Active now: Onyx and Langfuse materially contribute to the current governed runtime or evidence path.
+- Partially used: Keycloak, Envoy, OPA, Vault, Qdrant, and Grafana are present through containers, policy, adapters, or bridge configs, but some are not yet mandatory request-path dependencies.
+- Optional future: Superset and gVisor stay in scope only as future analytics or isolation depth.
+- Reference only: supporting snapshots such as Keycloak Quickstarts, the OPA Envoy Plugin, and the Langfuse Python SDK are retained for implementation reference, not for active architecture claims.
+
+See `docs/upstream-usage-matrix.md` for the reviewer-facing explanation and `evidence/upstream_usage.inventory.json` for the machine-readable inventory surfaced by the dashboard.
+
 ## Runtime Testing Model
 
 - `Onyx` is the primary sample runtime platform for real integration testing in this repo.

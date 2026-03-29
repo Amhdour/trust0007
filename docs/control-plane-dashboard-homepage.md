@@ -24,6 +24,7 @@ The page now leads with:
 5. Drill-down sections:
    - Operations Snapshot
    - Blocked / Governed Actions
+   - Upstream Integration Posture
    - Identity & Session
    - Policy Enforcement
    - Retrieval Boundaries
@@ -40,6 +41,9 @@ The page now leads with:
 - `/api/control-plane/overview`
   - built in `backend/posture_service/service.py`
   - contract labels from `contracts/control-plane-dashboard.json`
+- `/api/control-plane/upstream-usage`
+  - built from `evidence/upstream_usage.inventory.json`
+  - used to keep the dashboard's upstream posture section machine-readable and reviewer-auditable
 - launch readiness
   - `backend/launch_gate_service/service.py`
   - `launch-gate/starter_launch_readiness_report.json`

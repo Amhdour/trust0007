@@ -1,5 +1,7 @@
 # Request Flow & Governance Enforcement
 
+This document describes the current governed flow plus adjacent integration intent. Some surrounding components, such as Keycloak, Envoy, Vault, Qdrant, and gVisor, are only partially wired today. See `docs/upstream-usage-matrix.md` for the strict activation model.
+
 ## High-level flow
 1. **Client request enters** via dashboard or API gateway.
 2. **Identity context established** (token/session validation).
@@ -49,7 +51,7 @@ trace_id logged for audit
 ```
 
 ## Cross-cutting controls
-- **Authentication and authorization** via Keycloak integration.
+- **Authentication and authorization** via repo-owned governance today, with Keycloak remaining the intended live identity source.
 - **Policy decision logging** to events.jsonl with trace_id.
 - **Error handling and security event emission** for all deny cases.
 - **Startup and readiness checks** in launch-gate with evidence requirements.

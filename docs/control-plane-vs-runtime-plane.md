@@ -1,14 +1,16 @@
 # Control Plane vs Runtime Plane
 
+This document describes logical placement, not equal activation depth. For current repo-backed status, see `docs/upstream-usage-matrix.md`.
+
 ## Control plane
 
 The control plane governs **what is allowed** and **under which conditions**.
 
 ### Components in control plane
-- Keycloak (identity assertions and session context)
-- Envoy (ingress enforcement and routing policy)
+- Keycloak (identity assertions and session context when live identity wiring is enabled)
+- Envoy (ingress enforcement and routing policy when the ingress bridge is enabled)
 - myStarterKit governance layer (runtime governance intent)
-- OPA (policy decision authority)
+- OPA (policy-language authority and optional sidecar decision engine)
 - myStarterKit launch gate (evidence-driven readiness/launch decisions)
 
 ### Control-plane outputs
@@ -22,9 +24,9 @@ The runtime plane executes the request path and tool/data interactions.
 
 ### Components in runtime plane
 - Onyx runtime (reasoning/orchestration)
-- Vault access path (when secrets are needed)
-- Qdrant retrieval path (when retrieval is needed)
-- gVisor sandbox path (when risky execution is identified)
+- Vault access path (when secret integration is enabled)
+- Qdrant retrieval path (when live retrieval integration is enabled)
+- gVisor sandbox path (when risky execution isolation is implemented)
 
 ### Runtime-plane outputs
 - Response artifacts
@@ -37,7 +39,7 @@ The runtime plane executes the request path and tool/data interactions.
 Evidence flows across both planes.
 
 - Langfuse collects traces, evaluations, and policy/control events.
-- Grafana/Superset expose evidence views.
+- Grafana and optional Superset views expose evidence drill-downs.
 - Launch gate consumes evidence to influence future control-plane decisions.
 
 ## Policy flow across planes

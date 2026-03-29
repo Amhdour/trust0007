@@ -12,6 +12,7 @@
   "tabs": [
     { "id": "overview", "label": "Overview" },
     { "id": "blocked-actions", "label": "Blocked Actions" },
+    { "id": "upstream-posture", "label": "Upstream Posture" },
     { "id": "identity-session", "label": "Identity & Session" },
     { "id": "policy-enforcement", "label": "Policy Enforcement" },
     { "id": "retrieval-boundaries", "label": "Retrieval Boundaries" },
@@ -32,6 +33,11 @@
       "id": "blocked-actions",
       "title": "Blocked / Governed Actions",
       "description": "Recent denied retrievals, denied tool attempts, confirmation-required actions, and blocked Onyx handoffs with traceable reason codes."
+    },
+    {
+      "id": "upstream-posture",
+      "title": "Upstream Integration Posture",
+      "description": "A strict inventory of which vendored upstreams are active now, partially wired, optional for future work, or reference-only."
     },
     {
       "id": "identity-session",

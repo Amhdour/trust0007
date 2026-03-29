@@ -53,5 +53,10 @@ def build_evidence_pack_summary(root: Path | None = None) -> dict[str, Any]:
                 "href": _raw_link("telemetry/dashboards/grafana/operational-dashboard-spec.json"),
                 "description": "Operational observability drill-down contract.",
             },
+            {
+                "label": "Upstream Usage Inventory",
+                "href": _raw_link("evidence/upstream_usage.inventory.json"),
+                "description": "Machine-readable classification of active, partial, optional, and reference-only upstream components.",
+            },
         ],
     }

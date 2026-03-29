@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import urlopen
 
 from backend.integration_adapter import load_runtime_policy_bundle
+from backend.integration_adapter.repository import load_upstream_usage_inventory
 from backend.posture_service.service import build_control_plane_dashboard, build_control_plane_live_log
 from backend.governance_flow_evaluator import GovernedFlowEvaluator
 from adapters.onyx_gateway_adapter.interfaces import PolicyChecker, RetrievalChecker, ToolDecisionChecker
@@ -337,6 +338,10 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
         if path in {"/api/control-plane", "/api/control-plane/overview"}:
             self._send_json(build_control_plane_dashboard(REPO_ROOT))
+            return
+
+        if path == "/api/control-plane/upstream-usage":
+            self._send_json(load_upstream_usage_inventory(REPO_ROOT))
             return
 
         if path == "/api/control-plane/live-log":

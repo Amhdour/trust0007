@@ -16,6 +16,8 @@ This stack is **development-focused** and intentionally minimal. It is not produ
 
 Compose file: `compose/docker-compose.yml`
 
+These services are not all equally active in the current request path. The dashboard and governed Onyx handoff are the primary proof path; several supporting services remain platform scaffolding or optional drill-down destinations. See `docs/upstream-usage-matrix.md`.
+
 ## 1) Configure environment
 
 ```bash
@@ -61,6 +63,7 @@ docker compose --env-file compose/.env -f compose/docker-compose.yml down -v
 
 ## Notes
 - The dashboard is the main landing page and aggregates posture from repo-owned artifacts plus supporting services.
+- Onyx is the governed runtime target, but it is started separately from the default compose stack.
 - In another Codespace, replace `orange-space-journey-7vrrp4wqq4r6h7p9` with that Codespace name and keep the same port suffix.
 - Secrets are provided via environment variables and placeholders only.
 - `vault` is configured in `-dev` mode for local development.

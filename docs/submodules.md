@@ -46,4 +46,5 @@ Behavior:
 
 ## Notes
 - `upstream/*` is treated as third-party code.
+- Not every vendored upstream is an active runtime dependency; use `docs/upstream-usage-matrix.md` before making architecture claims.
 - Avoid direct modifications in upstream repositories unless strictly necessary.

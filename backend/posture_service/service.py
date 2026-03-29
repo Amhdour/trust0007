@@ -21,6 +21,7 @@ from backend.integration_adapter.repository import (
     load_reviewer_bundle,
     load_sample_events,
     load_service_inventory,
+    load_upstream_usage_inventory,
     path_has_files,
     read_json,
     read_jsonl,
@@ -344,6 +345,62 @@ def _section_meta(contract: dict[str, Any]) -> dict[str, dict[str, str]]:
     }
 
 
+def _upstream_components_by_classification(components: list[dict[str, Any]]) -> Counter[str]:
+    return Counter(str(component.get("classification", "reference_only")) for component in components)
+
+
+def _bool_label(value: bool) -> str:
+    return "yes" if value else "no"
+
+
+def _upstream_table_rows(components: list[dict[str, Any]]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for component in components:
+        signals = _string_list(component.get("governance_signals"))
+        evidence = _string_list(component.get("evidence_artifacts"))
+        rows.append(
+            {
+                "component": str(component.get("component_name", "Component")),
+                "classification": str(component.get("classification", "reference_only")),
+                "role": str(component.get("runtime_role", "Role not documented.")),
+                "signal": signals[0] if signals else "No dedicated governance signal yet.",
+                "evidence": evidence[0] if evidence else "No evidence artifact listed.",
+                "dev": _bool_label(bool(component.get("enabled_in_dev"))),
+                "prod_sim": _bool_label(bool(component.get("enabled_in_prod_sim"))),
+            }
+        )
+    return rows
+
+
+def _upstream_record_items(components: list[dict[str, Any]]) -> list[dict[str, str]]:
+    return [
+        _record(
+            title=str(component.get("component_name", "Component")),
+            meta=" | ".join(
+                (
+                    str(component.get("classification", "reference_only")),
+                    str(component.get("recommended_action", "review classification")),
+                )
+            ),
+            detail=" ".join(
+                part
+                for part in (
+                    str(component.get("runtime_role", "")).strip(),
+                    f"Removal impact: {str(component.get('removal_impact', '')).strip()}",
+                )
+                if part
+            ),
+            status={
+                "used_now": "healthy",
+                "partially_used": "warning",
+                "optional_future": "neutral",
+                "reference_only": "neutral",
+            }.get(str(component.get("classification", "")), "neutral"),
+        )
+        for component in components
+    ]
+
+
 def _build_artifact_inventory(root: Path) -> tuple[list[dict[str, str]], Counter[str]]:
     reviewer_path = reviewer_bundle_relative_path(root)
     launch_path = launch_report_relative_path(root)
@@ -534,6 +591,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     contract = load_dashboard_contract(resolved_root)
     section_contracts = _section_meta(contract)
     services = load_service_inventory(resolved_root)
+    upstream_inventory = load_upstream_usage_inventory(resolved_root)
+    upstream_components = list(upstream_inventory.get("components", []))
+    upstream_counts = _upstream_components_by_classification(upstream_components)
     events, event_feed_label, event_feed_path = _event_feed(resolved_root)
     policy_bundle = load_runtime_policy_bundle(resolved_root)
     policy = policy_bundle.document
@@ -731,6 +791,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 _card("Dashboard mode", "Governance-first", "healthy", "This homepage leads with governance outcomes and readiness, not raw runtime usage.", "#overview"),
                 _card("Data source", event_feed_label, "healthy" if has_live_governed_flow_artifacts(resolved_root) else "warning", f"Primary feed: {event_feed_path}.", _raw(event_feed_path)),
                 _card("Runtime position", "Onyx behind governed handoffs", "healthy", "Onyx remains visible as a governed runtime reached through dashboard-controlled surfaces.", "#entry-points"),
+                _card("Upstream discipline", f"{upstream_counts['used_now']} active / {len(upstream_components)} inventoried", "healthy", "Vendored upstreams are classified by real runtime use, not by mere presence under `upstream/`.", "#upstream-posture"),
                 _card("Portfolio framing", "Layer Retrofit + Launch Gate", "healthy", "The homepage is tuned for evaluator review of enforcement, evidence, and launch readiness.", _raw("docs/control-plane-dashboard-homepage.md")),
             ],
         },
@@ -912,6 +973,49 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _link("Governed telemetry feed", _raw(event_feed_path), "Raw reason codes, trace IDs, and timestamps for current governed actions.", "healthy"),
                         _link("Inspectable denied runtime flow", _raw(INSPECTABLE_DENIED_FLOW), "Denied /launch/onyx handoff bundle with linked artifacts.", "critical"),
                         _link("Reviewer evidence bundle", reviewer_href, "Reviewer-facing evidence pack containing blocked attack summary and audit signals.", "healthy"),
+                    ],
+                },
+            ],
+        },
+        {
+            **section_contracts["upstream-posture"],
+            "blocks": [
+                {
+                    "type": "cards",
+                    "title": "Upstream usage classification",
+                    "items": [
+                        _card("Used now", str(upstream_counts["used_now"]), "healthy", "Components that currently strengthen the repo's real runtime or evidence path.", "#upstream-posture"),
+                        _card("Partially used", str(upstream_counts["partially_used"]), "warning", "Components present through containers, policy, adapters, or bridge configs without full mandatory-path proof.", "#upstream-posture"),
+                        _card("Optional / future", str(upstream_counts["optional_future"]), "neutral", "Components intentionally kept out of active architecture claims until they produce reviewer-visible outcomes.", "#upstream-posture"),
+                        _card("Reference only", str(upstream_counts["reference_only"]), "neutral", "Vendored snapshots retained for compatibility or implementation reference only.", "#upstream-posture"),
+                    ],
+                },
+                {
+                    "type": "table",
+                    "title": "Component-by-component posture",
+                    "columns": [
+                        {"key": "component", "label": "Component"},
+                        {"key": "classification", "label": "Classification"},
+                        {"key": "role", "label": "Runtime role"},
+                        {"key": "signal", "label": "Governance signal"},
+                        {"key": "evidence", "label": "Evidence artifact"},
+                        {"key": "dev", "label": "Dev"},
+                        {"key": "prod_sim", "label": "Prod-sim"},
+                    ],
+                    "rows": _upstream_table_rows(upstream_components),
+                },
+                {
+                    "type": "records",
+                    "title": "Why each component stays or shrinks",
+                    "items": _upstream_record_items(upstream_components),
+                },
+                {
+                    "type": "links",
+                    "title": "Upstream inventory evidence",
+                    "items": [
+                        _link("Upstream usage API", _dashboard_url("/api/control-plane/upstream-usage"), "Machine-readable upstream inventory exposed by the control plane.", "healthy"),
+                        _link("Upstream usage inventory", _raw("evidence/upstream_usage.inventory.json"), "Repo-owned component inventory with classification, signals, evidence, and removal impact.", "healthy"),
+                        _link("Upstream usage matrix", _raw("docs/upstream-usage-matrix.md"), "Reviewer-facing explanation of what is active, partial, optional, or reference-only.", "neutral"),
                     ],
                 },
             ],
@@ -1327,6 +1431,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     sources = [
         _link("Governed event feed", _raw(event_feed_path), "Event feed used by the dashboard overview and blocked-actions views.", "healthy"),
         _link("Policy bundle", policy_href, "Runtime surface, retrieval, and tool governance policy.", "healthy" if policy_source == "overlay" else "warning"),
+        _link("Upstream usage inventory", _raw("evidence/upstream_usage.inventory.json"), "Classification of active, partial, optional, and reference-only upstream components.", "healthy"),
         _link("Reviewer evidence bundle", reviewer_href, "Consolidated reviewer-facing evidence pack.", "healthy"),
         _link("Launch report", launch_report_href, "Launch-gate findings and residual risk guidance.", "warning"),
         _link("Dashboard ingestion feed", ingestion_href, "Dashboard export sample used for evidence drill-through and replay references.", "neutral"),
