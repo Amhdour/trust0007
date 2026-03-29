@@ -17,6 +17,7 @@ DASHBOARD_INGESTION_FALLBACK = "telemetry/exports/mystarterkit_dashboard_feed.js
 DASHBOARD_CONTRACT_PATH = "contracts/control-plane-dashboard.json"
 UPSTREAM_USAGE_INVENTORY_PATH = "evidence/upstream_usage.inventory.json"
 GOVERNED_FLOW_SUMMARY_PATH = "overlays/myStarterKit/artifacts/governed-flow-summary.json"
+GOVERNED_REQUEST_FEED_PATH = "overlays/myStarterKit/artifacts/governed-request-feed.json"
 IDENTITY_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/identity-evidence.json"
 POLICY_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/policy-evidence.json"
 RETRIEVAL_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/retrieval-evidence.json"
@@ -50,6 +51,15 @@ def read_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_json_array(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict)]
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -271,6 +281,18 @@ def load_latest_governed_flow_launch_gate(root: Path | None = None) -> dict[str,
 def load_latest_governed_flow_summary(root: Path | None = None) -> dict[str, Any]:
     resolved_root = repo_root(root)
     return read_json(resolved_root / GOVERNED_FLOW_SUMMARY_PATH)
+
+
+def governed_request_feed_relative_path(root: Path | None = None) -> str:
+    resolved_root = repo_root(root)
+    if (resolved_root / GOVERNED_REQUEST_FEED_PATH).exists():
+        return GOVERNED_REQUEST_FEED_PATH
+    return GOVERNED_REQUEST_FEED_PATH
+
+
+def load_latest_governed_request_feed(root: Path | None = None) -> list[dict[str, Any]]:
+    resolved_root = repo_root(root)
+    return read_json_array(resolved_root / GOVERNED_REQUEST_FEED_PATH)
 
 
 def load_latest_identity_evidence(root: Path | None = None) -> dict[str, Any]:

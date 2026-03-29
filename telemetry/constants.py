@@ -2,6 +2,9 @@
 
 REQUIRED_EVENT_TYPES = [
     "request.start",
+    "request.question_received",
+    "request.question_sanitized",
+    "request.question_classified",
     "identity.established",
     "identity.session",
     "policy.decision",

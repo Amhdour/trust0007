@@ -12,6 +12,7 @@ The page now leads with:
 - a dominant Security Readiness / Launch Gate panel
 - explicit live-vs-demo and latest handoff pass/fail cues
 - blocked and governed actions
+- recent governed requests as sanitized previews
 - six primary trust/security domains
 - asset and protection coverage
 - evidence integrity and freshness
@@ -26,6 +27,7 @@ The page now leads with:
 4. Security Readiness / Launch Gate: readiness state, control-family summaries, top failing controls, residual risks, and evidence links.
 5. Drill-down sections:
    - Operations Snapshot
+   - Recent Governed Requests
    - Blocked / Governed Actions
    - Upstream Integration Posture
    - Identity & Session
@@ -60,6 +62,10 @@ The page now leads with:
 - blocked actions and governance KPIs
   - live governed flow artifacts when present
   - otherwise `telemetry/exports/sample_events.jsonl`
+- recent governed requests
+  - `overlays/myStarterKit/artifacts/governed-request-feed.json`
+  - per-trace snapshot artifacts under `overlays/myStarterKit/artifacts/governed-request-history/`
+  - dashboard-visible question text comes from sanitized previews only
 - identity / policy / retrieval / secret / trace sections
   - `overlays/myStarterKit/artifacts/identity-evidence.json`
   - `overlays/myStarterKit/artifacts/policy-evidence.json`
@@ -93,9 +99,15 @@ The page now leads with:
   - live governed-flow artifacts when generated
   - runtime-generated audit records when a governed flow has run
   - live identity, policy, retrieval, secret, and trace evidence panels when those artifacts exist
-  - live-log polling from Onyx and Langfuse when reachable
+- live-log polling from Onyx and Langfuse when reachable
 - Demo-derived fallback:
   - `telemetry/exports/sample_events.jsonl`
   - any KPI or blocked-action summary built from that sample file when live governed-flow artifacts are absent
 
 The dashboard should always make this visible through the data-mode badge in the hero area.
+
+## Governed request visibility
+
+- The homepage request feed is reviewer-safe operational evidence, not raw chat replay.
+- Each row shows a sanitized question preview, governance outcome, evidence mode, and trace-linked artifact references.
+- If a prompt contains likely secrets or sensitive tokens, the preview is redacted before it becomes dashboard-visible.

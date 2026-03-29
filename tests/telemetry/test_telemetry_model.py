@@ -54,6 +54,7 @@ def test_consistent_schema_and_jsonl_output(tmp_path: Path) -> None:
         "event_type",
         "trace_id",
         "request_id",
+        "session_id",
         "timestamp",
         "tenant_id",
         "severity",

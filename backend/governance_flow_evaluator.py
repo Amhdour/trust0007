@@ -26,6 +26,11 @@ from adapters.tools.engine import ToolGovernanceEngine
 from adapters.tools.interfaces import InMemoryAuditSink, ToolExecutor, ToolPolicyEvaluator
 from adapters.tools.policy_model import StaticToolPolicyEvaluator, default_policy_config
 from adapters.tools.schemas import ToolActionRequest
+from backend.governed_request_telemetry import (
+    append_governed_request_feed,
+    sanitize_question,
+    write_history_artifacts,
+)
 from telemetry.model import EventModel
 from telemetry.sinks import JsonlEventSink
 
@@ -113,6 +118,7 @@ class GovernedFlowResult:
     policy_path: str
     evidence_mode: str
     artifacts: dict[str, str]
+    governed_request: dict[str, Any] = field(default_factory=dict)
     dependency_status: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -140,6 +146,7 @@ class GovernedFlowResult:
                 "path": self.policy_path,
             },
             "evidence_mode": self.evidence_mode,
+            "governed_request": self.governed_request,
             "dependencies": self.dependency_status,
             "artifacts": self.artifacts,
         }
@@ -238,6 +245,8 @@ class GovernedFlowEvaluator:
         for path in artifact_paths.values():
             if path.exists():
                 path.unlink()
+        governed_request_feed_path = self._artifact_dir / "governed-request-feed.json"
+        governed_request_history_root = self._artifact_dir / "governed-request-history"
 
         model = EventModel()
         sink = JsonlEventSink(str(artifact_paths["events_jsonl"]))
@@ -246,6 +255,21 @@ class GovernedFlowEvaluator:
         surface_id = _surface_identifier(base_metadata, requested_path)
         audit_stage_sequence: list[str] = []
         audit_record_count = 0
+        question_telemetry = sanitize_question(prompt)
+        request_telemetry_common = {
+            "runtime_target": "onyx",
+            "surface": surface_id,
+            "requested_path": requested_path,
+            "evidence_mode": mode,
+            "environment_mode": self._environment_mode,
+            "question_hash": question_telemetry["question_hash"],
+            "question_preview": question_telemetry["question_preview"],
+            "question_redacted": question_telemetry["question_redacted"],
+            "question_truncated": question_telemetry["question_truncated"],
+            "contains_sensitive_patterns": question_telemetry["contains_sensitive_patterns"],
+            "sensitive_pattern_labels": list(question_telemetry["sensitive_pattern_labels"]),
+            "question_length": question_telemetry["question_length"],
+        }
 
         def emit(event_type: str, payload: dict[str, Any], severity: str = "info") -> None:
             sink.emit(
@@ -314,6 +338,23 @@ class GovernedFlowEvaluator:
                 "evidence_mode": mode,
                 "environment_mode": self._environment_mode,
             },
+        )
+        emit(
+            "request.question_received",
+            {
+                **request_telemetry_common,
+                "actor_id": user_id,
+                "tenant_id": tenant_id,
+            },
+        )
+        emit(
+            "request.question_sanitized",
+            {
+                **request_telemetry_common,
+                "actor_id": user_id,
+                "tenant_id": tenant_id,
+            },
+            severity="warning" if question_telemetry["question_redacted"] else "info",
         )
 
         identity_request = IdentityResolutionRequest(
@@ -1013,6 +1054,51 @@ class GovernedFlowEvaluator:
                 "runtime_target": "onyx",
             },
         )
+        repo_root = Path(__file__).resolve().parent.parent
+        current_artifact_refs = {
+            name: _artifact_reference(path, repo_root) for name, path in artifact_paths.items()
+        }
+        governed_request_record = {
+            "timestamp": _now_iso(),
+            "trace_id": trace_id,
+            "request_id": request_id,
+            "session_id": session_id,
+            "tenant_id": effective_tenant_id,
+            "actor_id": effective_user_id,
+            "user_id": effective_user_id,
+            "surface": surface_id,
+            "requested_path": requested_path,
+            "runtime_target": "onyx",
+            "evidence_mode": mode,
+            "environment_mode": self._environment_mode,
+            "identity_authenticated": identity_result.authenticated,
+            "identity_live": identity_result.live,
+            "policy_allow": policy_allow,
+            "retrieval_allow": retrieval_allow,
+            "secret_required": secret_required,
+            "secret_satisfied": secret_satisfied,
+            "handoff_allowed": final_decision,
+            "reason_codes": list(final_reasons),
+            "artifact_refs": dict(current_artifact_refs),
+            **question_telemetry,
+        }
+        emit(
+            "request.question_classified",
+            {
+                **request_telemetry_common,
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
+                "identity_authenticated": identity_result.authenticated,
+                "identity_live": identity_result.live,
+                "policy_allow": policy_allow,
+                "retrieval_allow": retrieval_allow,
+                "secret_required": secret_required,
+                "secret_satisfied": secret_satisfied,
+                "handoff_allowed": final_decision,
+                "reason_codes": list(final_reasons),
+            },
+            severity="info" if final_decision else "warning",
+        )
         emit(
             "request.end",
             {
@@ -1117,6 +1203,7 @@ class GovernedFlowEvaluator:
         launch_gate_artifact = {
             "machine": gate_result.to_machine_readable(),
             "human": gate_result.to_human_readable(),
+            "governed_request": governed_request_record,
             "flow_metadata": {
                 "trace_id": trace_id,
                 "request_id": request_id,
@@ -1128,6 +1215,12 @@ class GovernedFlowEvaluator:
                 "policy_path": policy_path,
                 "evidence_mode": mode,
                 "handoff_allowed": final_decision,
+                "governed_request": {
+                    "question_preview": governed_request_record["question_preview"],
+                    "question_hash": governed_request_record["question_hash"],
+                    "question_redacted": governed_request_record["question_redacted"],
+                    "contains_sensitive_patterns": governed_request_record["contains_sensitive_patterns"],
+                },
                 "artifacts": {
                     "events_jsonl": _artifact_reference(artifact_paths["events_jsonl"], self._artifact_dir.parent.parent),
                     "audit_records": _artifact_reference(artifact_paths["audit_records"], self._artifact_dir.parent.parent),
@@ -1185,6 +1278,11 @@ class GovernedFlowEvaluator:
             "evidence_mode": mode,
             "environment_mode": self._environment_mode,
             "handoff_allowed": final_decision,
+            "question_preview": governed_request_record["question_preview"],
+            "question_hash": governed_request_record["question_hash"],
+            "question_redacted": governed_request_record["question_redacted"],
+            "contains_sensitive_patterns": governed_request_record["contains_sensitive_patterns"],
+            "governed_request": governed_request_record,
             "dependency_status": dependency_status,
             "identity": identity_evidence,
             "policy": policy_evidence,
@@ -1229,12 +1327,41 @@ class GovernedFlowEvaluator:
             evidence_payload["launch_gate_decision"] = gate_result.decision
             evidence_payload["launch_gate_missing_evidence"] = list(gate_result.missing_evidence)
             evidence_payload["dependency_status"] = dependency_status
+            evidence_payload["question_preview"] = governed_request_record["question_preview"]
+            evidence_payload["question_hash"] = governed_request_record["question_hash"]
+            evidence_payload["question_redacted"] = governed_request_record["question_redacted"]
+            evidence_payload["contains_sensitive_patterns"] = governed_request_record["contains_sensitive_patterns"]
+            evidence_payload["governed_request"] = governed_request_record
             evidence_payload["reason_codes"] = list(
                 dict.fromkeys(_string for _string in list(evidence_payload.get("reason_codes", [])) + list(final_reasons) if _string)
             )
             _write_json(artifact_path, evidence_payload)
+        _write_json(artifact_paths["launch_gate_result"], launch_gate_artifact)
+        _write_json(artifact_paths["governed_flow_summary"], governed_summary)
 
-        relative_artifacts = {name: _artifact_reference(path, repo_root) for name, path in artifact_paths.items()}
+        history_refs = write_history_artifacts(
+            governed_request_history_root,
+            trace_id,
+            {
+                "governed-flow-summary": governed_summary,
+                "identity-evidence": identity_evidence,
+                "policy-evidence": policy_evidence,
+                "retrieval-evidence": retrieval_execution,
+                "secret-evidence": secret_evidence,
+                "trace-correlation": trace_correlation,
+                "launch-gate-result": launch_gate_artifact,
+            },
+        )
+        feed_record = dict(governed_request_record)
+        feed_record["artifact_refs"] = {
+            name: _artifact_reference(Path(path), repo_root)
+            for name, path in history_refs.items()
+        }
+        feed_record["feed_path"] = _artifact_reference(governed_request_feed_path, repo_root)
+        append_governed_request_feed(governed_request_feed_path, feed_record)
+
+        relative_artifacts = dict(current_artifact_refs)
+        relative_artifacts["governed_request_feed"] = _artifact_reference(governed_request_feed_path, repo_root)
 
         return GovernedFlowResult(
             decision=final_decision,
@@ -1255,5 +1382,6 @@ class GovernedFlowEvaluator:
             policy_path=policy_path,
             evidence_mode=mode,
             artifacts=relative_artifacts,
+            governed_request=feed_record,
             dependency_status=dependency_status,
         )

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 
 from backend.api_gateway.server import ControlPlaneRequestHandler
 from backend.posture_service.service import build_control_plane_dashboard
@@ -230,10 +231,11 @@ class StrictLiveHarness:
             return [json.loads(line) for line in raw.splitlines() if line.strip()]
         return json.loads(raw)
 
-    def launch(self, *, token: str | None = "valid-live-token", path: str = "/app") -> HTTPResponse:
+    def launch(self, *, token: str | None = "valid-live-token", path: str = "/app", question: str = "") -> HTTPResponse:
         authorization_header = f"Bearer {token}" if token is not None else ""
+        question_query = f"&question={quote(question, safe='')}" if question else ""
         handler = _FakeLaunchHandler(
-            path=f"/launch/onyx?path={path}&mode=live",
+            path=f"/launch/onyx?path={path}&mode=live{question_query}",
             authorization_header=authorization_header,
             onyx_running=self.scenario.onyx_running,
         )

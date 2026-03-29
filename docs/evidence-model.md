@@ -6,6 +6,7 @@ This repo prefers file-backed evidence artifacts first so reviewers can inspect 
 
 When a governed flow runs, the control plane can emit:
 
+- `overlays/myStarterKit/artifacts/governed-request-feed.json`
 - `overlays/myStarterKit/artifacts/events.jsonl`
 - `overlays/myStarterKit/artifacts/identity-evidence.json`
 - `overlays/myStarterKit/artifacts/policy-evidence.json`
@@ -15,6 +16,8 @@ When a governed flow runs, the control plane can emit:
 - `overlays/myStarterKit/artifacts/trace-correlation.json`
 - `overlays/myStarterKit/artifacts/governed-flow-summary.json`
 - `overlays/myStarterKit/artifacts/launch-gate-result.json`
+
+The request feed stores sanitized governed request previews plus hashes and trace-linked history references. It is intended for reviewer-safe dashboard visibility, not raw transcript replay.
 
 ## Correlation model
 
@@ -28,6 +31,17 @@ Each governed request should keep these relationships stable:
 - `surface`: identifies the governed surface or path
 
 The dashboard uses those values to render reviewer-facing continuity across identity, policy, retrieval, secret, audit, launch-gate, and handoff stages. If `session_id` is unavailable, the trace artifact should record a precise reason rather than a generic missing state.
+
+## Request preview sanitization
+
+Dashboard-visible request content should be derived from a repo-owned sanitization pass:
+
+- long prompts are trimmed to a short preview
+- likely secrets, tokens, passwords, and API keys are redacted
+- a stable `question_hash` is kept for correlation without showing raw content
+- `question_redacted` and `contains_sensitive_patterns` make the redaction state explicit
+
+This repo does not treat the main dashboard as a raw prompt archive.
 
 ## Live-mode mandatory evidence
 
@@ -46,6 +60,7 @@ If required evidence is missing in `live` mode, the launch gate should degrade r
 
 The homepage reads these artifacts into:
 
+- Recent Governed Requests
 - Identity & Session
 - Policy Enforcement
 - Retrieval Boundaries

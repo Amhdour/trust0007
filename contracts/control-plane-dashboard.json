@@ -11,6 +11,7 @@
   "repo_description_suggestion": "Dashboard-first AI Trust & Security Stack Control Plane for governed AI runtime launch readiness, policy enforcement, evidence integrity, and auditable Onyx handoffs.",
   "tabs": [
     { "id": "overview", "label": "Overview" },
+    { "id": "governed-requests", "label": "Governed Requests" },
     { "id": "blocked-actions", "label": "Blocked Actions" },
     { "id": "upstream-posture", "label": "Upstream Posture" },
     { "id": "identity-session", "label": "Identity & Session" },
@@ -30,6 +31,11 @@
       "id": "overview",
       "title": "Operations Snapshot",
       "description": "A high-signal governance summary that answers what is protected, what was blocked, what evidence exists, and whether the platform is ready to launch."
+    },
+    {
+      "id": "governed-requests",
+      "title": "Recent Governed Requests",
+      "description": "Reviewer-safe governed request telemetry with sanitized question previews, allow or deny outcomes, demo-versus-live mode, and trace-linked evidence references."
     },
     {
       "id": "blocked-actions",

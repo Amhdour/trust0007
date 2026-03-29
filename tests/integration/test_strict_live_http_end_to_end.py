@@ -73,10 +73,14 @@ def test_strict_live_handoff_passes_through_http_dependency_chain() -> None:
         launch_cards = _cards(_section(overview, "launch-gate"))
         audit_cards = _cards(_section(overview, "audit-replay"))
         onyx_cards = _cards(_section(overview, "entry-points"))
+        governed_requests = _section(overview, "governed-requests")
+        governed_request_table = next(block for block in governed_requests["blocks"] if block["type"] == "table")
         assert identity_cards["Identity result"]["value"] == "ALLOW"
         assert launch_cards["Evidence mode"]["value"] in {"live current evidence", "recent generated evidence"}
         assert audit_cards["Audit record source"]["value"] == "runtime-generated"
         assert onyx_cards["Latest handoff"]["value"] == "ALLOW"
+        assert governed_request_table["rows"][0]["mode"] == "live"
+        assert governed_request_table["rows"][0]["trace"] == summary["trace_id"]
 
 
 @pytest.mark.parametrize(
@@ -283,3 +287,19 @@ def test_strict_live_dashboard_highlights_missing_live_evidence() -> None:
         assert launch_cards["Evidence mode"]["value"] == "live current evidence"
         assert launch_cards["Missing evidence"]["status"] == "critical"
         assert onyx_cards["Latest handoff"]["value"] == "DENY"
+
+
+def test_strict_live_dashboard_redacts_sensitive_governed_request_preview() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    raw_secret = "sk-STRICTLIVE1234567890ABCDEFGH1234567890"
+
+    with StrictLiveHarness(repo_root, LiveFixtureScenario()) as harness:
+        harness.launch(path="/app", question=f"Investigate token={raw_secret} for runtime access")
+        overview = harness.overview().json()
+        governed_requests = _section(overview, "governed-requests")
+        governed_request_table = next(block for block in governed_requests["blocks"] if block["type"] == "table")
+        overview_text = json.dumps(governed_requests)
+
+        assert "[REDACTED" in overview_text
+        assert raw_secret not in overview_text
+        assert governed_request_table["rows"][0]["mode"] == "live"

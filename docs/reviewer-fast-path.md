@@ -44,6 +44,7 @@ What this proves:
 - trace correlation completed
 - launch-gate used live evidence and passed
 - governed Onyx handoff was approved
+- the dashboard can show a sanitized governed request preview linked back to the same trace and artifact set
 
 What this does not prove:
 
@@ -83,6 +84,30 @@ Use this when you want to inspect live evidence failure rather than a direct dep
   - [dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md)
 
 This proves that missing live evidence or incomplete trace continuity can still block the governed handoff.
+
+## Request Visibility
+
+Use this when you want reviewer-safe visibility into what entered the governed path without dumping raw prompts:
+
+- dashboard section:
+  - `Recent Governed Requests`
+- feed artifact:
+  - [governed-request-feed.json](/workspaces/beta011/overlays/myStarterKit/artifacts/governed-request-feed.json)
+- latest summary:
+  - [governed-flow-summary.json](/workspaces/beta011/overlays/myStarterKit/artifacts/governed-flow-summary.json)
+
+What this shows:
+
+- sanitized question preview
+- allow or deny status
+- live versus demo evidence mode
+- reason codes
+- trace-linked artifact references
+
+What this does not show:
+
+- full conversation history
+- raw prompt dumps in the main dashboard view
 
 ## Mandatory Vs Supporting
 

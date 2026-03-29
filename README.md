@@ -12,6 +12,7 @@ Suggested short repository description:
 - A strict live governed path can allow a runtime handoff only after live identity, live policy, live retrieval, conditional live secret access, trace correlation, and launch-gate evidence all succeed.
 - The same governed path fails closed when Keycloak-compatible identity, OPA, Qdrant, Vault, or trace/evidence requirements fail.
 - The dashboard and artifact set explain why the handoff passed, denied, or downgraded.
+- The dashboard can show recent governed requests as sanitized previews with trace-linked evidence, without exposing raw transcript content in the main reviewer view.
 - The repo distinguishes mandatory path elements from supporting, optional, and reference-only components instead of inflating the architecture.
 
 ## Reviewer Fast Path
@@ -66,6 +67,7 @@ The main fail-closed test coverage is in [tests/integration/test_strict_live_htt
 
 Primary governed-flow artifacts:
 
+- [governed-request-feed.json](/workspaces/beta011/overlays/myStarterKit/artifacts/governed-request-feed.json)
 - [governed-flow-summary.json](/workspaces/beta011/overlays/myStarterKit/artifacts/governed-flow-summary.json)
 - [identity-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/identity-evidence.json)
 - [policy-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/policy-evidence.json)
@@ -78,6 +80,7 @@ Primary governed-flow artifacts:
 
 Panel evidence sources:
 
+- Recent Governed Requests: `governed-request-feed.json` plus per-trace history snapshots under `overlays/myStarterKit/artifacts/governed-request-history/`
 - Identity & Session: `identity-evidence.json` plus `trace-correlation.json`
 - Policy Enforcement: `policy-evidence.json` plus governed events
 - Retrieval Boundaries: `retrieval-evidence.json` plus governed events
@@ -85,6 +88,11 @@ Panel evidence sources:
 - Audit & Replay: `audit-records.jsonl` when present, otherwise clearly labeled adapter-derived reconstruction from governed events
 - Trace Correlation: `trace-correlation.json`
 - Onyx Runtime: `governed-flow-summary.json`, `audit-records.jsonl`, and inspectable allow/deny bundles
+
+Request visibility note:
+
+- The dashboard surfaces sanitized governed request previews and hashes, not raw Onyx chat transcript replay.
+- This feature does not persist full raw prompt text into the main dashboard payload or reviewer-safe request feed.
 
 ## What Is Mandatory Now
 

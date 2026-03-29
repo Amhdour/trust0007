@@ -13,11 +13,13 @@ from backend.evidence_service.service import build_evidence_pack_summary
 from backend.integration_adapter.repository import (
     AUDIT_RECORDS_PATH,
     dashboard_ingestion_relative_path,
+    governed_request_feed_relative_path,
     has_live_governed_flow_artifacts,
     launch_report_relative_path,
     load_latest_audit_records,
     load_dashboard_contract,
     load_eval_summaries,
+    load_latest_governed_request_feed,
     load_latest_governed_flow_events,
     load_latest_governed_flow_summary,
     load_latest_identity_evidence,
@@ -549,6 +551,113 @@ def _bool_label(value: bool) -> str:
     return "yes" if value else "no"
 
 
+def _allow_deny_label(value: bool) -> str:
+    return "ALLOW" if value else "DENY"
+
+
+def _governed_request_feed(
+    feed: list[dict[str, Any]],
+    summary: dict[str, Any],
+) -> list[dict[str, Any]]:
+    if feed:
+        return feed
+
+    fallback = dict(summary.get("governed_request", {}))
+    if not fallback:
+        return []
+
+    fallback.setdefault("timestamp", str(summary.get("generated_at", "")))
+    fallback.setdefault("trace_id", str(summary.get("trace_id", "")))
+    fallback.setdefault("request_id", str(summary.get("request_id", "")))
+    fallback.setdefault("session_id", str(summary.get("session_id", "")))
+    fallback.setdefault("tenant_id", str(summary.get("tenant_id", "")))
+    fallback.setdefault("actor_id", str(summary.get("actor_id", "")))
+    fallback.setdefault("surface", str(summary.get("surface", "")))
+    fallback.setdefault("requested_path", str(summary.get("requested_path", "")))
+    fallback.setdefault("runtime_target", str(summary.get("runtime_target", "onyx")))
+    fallback.setdefault("evidence_mode", str(summary.get("evidence_mode", "")))
+    fallback.setdefault("policy_allow", bool(summary.get("policy", {}).get("allow")))
+    fallback.setdefault("retrieval_allow", bool(summary.get("retrieval", {}).get("allow")))
+    fallback.setdefault("secret_required", bool(summary.get("secret", {}).get("required")))
+    fallback.setdefault("secret_satisfied", bool(summary.get("secret", {}).get("fetched")) or not bool(summary.get("secret", {}).get("required")))
+    fallback.setdefault("handoff_allowed", bool(summary.get("handoff_allowed", summary.get("decision", False))))
+    fallback.setdefault("reason_codes", _string_list(summary.get("reasons", [])))
+    fallback.setdefault("artifact_refs", {"governed_flow_summary": "overlays/myStarterKit/artifacts/governed-flow-summary.json"})
+    return [fallback]
+
+
+def _governed_request_status(record: dict[str, Any]) -> str:
+    return "healthy" if bool(record.get("handoff_allowed")) else "critical"
+
+
+def _governed_request_rows(feed: list[dict[str, Any]]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for item in feed:
+        secret_required = bool(item.get("secret_required"))
+        secret_satisfied = bool(item.get("secret_satisfied"))
+        rows.append(
+            {
+                "timestamp": str(item.get("timestamp", "")),
+                "question": str(item.get("question_preview", "Preview unavailable")),
+                "tenant": str(item.get("tenant_id", "")),
+                "actor_session": " / ".join(
+                    value
+                    for value in (str(item.get("actor_id", "")), str(item.get("session_id", "")))
+                    if value
+                ),
+                "surface": str(item.get("surface") or item.get("requested_path") or ""),
+                "mode": str(item.get("evidence_mode", "")),
+                "identity": _allow_deny_label(bool(item.get("identity_authenticated", True))),
+                "policy": _allow_deny_label(bool(item.get("policy_allow"))),
+                "retrieval": _allow_deny_label(bool(item.get("retrieval_allow"))),
+                "secret": (
+                    "not required"
+                    if not secret_required
+                    else ("satisfied" if secret_satisfied else "missing")
+                ),
+                "handoff": _allow_deny_label(bool(item.get("handoff_allowed"))),
+                "trace": str(item.get("trace_id", "")),
+            }
+        )
+    return rows
+
+
+def _governed_request_records(feed: list[dict[str, Any]]) -> list[dict[str, str]]:
+    records: list[dict[str, str]] = []
+    for item in feed:
+        reason_codes = _string_list(item.get("reason_codes", []))
+        artifact_refs = item.get("artifact_refs", {})
+        summary_href = ""
+        if isinstance(artifact_refs, dict) and artifact_refs.get("governed_flow_summary"):
+            summary_href = _raw(str(artifact_refs.get("governed_flow_summary")))
+        detail = (
+            f"Question preview: {str(item.get('question_preview', 'Preview unavailable'))}. "
+            f"Handoff: {_allow_deny_label(bool(item.get('handoff_allowed')))}. "
+            f"Reasons: {', '.join(reason_codes or ['policy.allow'])}. "
+            f"Redacted: {_bool_label(bool(item.get('question_redacted')))}. "
+            f"Sensitive patterns: {_bool_label(bool(item.get('contains_sensitive_patterns')))}."
+        )
+        records.append(
+            _record(
+                title=str(item.get("question_preview", "Preview unavailable")),
+                meta=" | ".join(
+                    value
+                    for value in (
+                        str(item.get("evidence_mode", "")),
+                        str(item.get("tenant_id", "")),
+                        str(item.get("surface") or item.get("requested_path") or ""),
+                        str(item.get("trace_id", "")),
+                    )
+                    if value
+                ),
+                detail=detail,
+                status=_governed_request_status(item),
+                href=summary_href,
+            )
+        )
+    return records
+
+
 def _upstream_table_rows(components: list[dict[str, Any]]) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for component in components:
@@ -626,11 +735,13 @@ def _build_artifact_inventory(root: Path) -> tuple[list[dict[str, str]], Counter
     reviewer_path = reviewer_bundle_relative_path(root)
     launch_path = launch_report_relative_path(root)
     ingestion_path = dashboard_ingestion_relative_path(root)
+    governed_request_feed_path = governed_request_feed_relative_path(root)
 
     artifact_specs = [
         ("Reviewer evidence bundle", reviewer_path, "review"),
         ("Launch readiness report", launch_path, "launch gate"),
         ("Dashboard ingestion feed", ingestion_path, "telemetry export"),
+        ("Governed request feed", governed_request_feed_path, "request telemetry"),
         ("Governed telemetry sample", SAMPLE_EVENTS, "telemetry feed"),
         ("Governed audit records", AUDIT_RECORDS_PATH, "audit trail"),
         ("Prod-sim governed flow", PROD_SIM_GOVERNED_FLOW, "governed flow"),
@@ -831,6 +942,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     upstream_audit = dict(upstream_inventory.get("audit", {}))
     events, event_feed_label, event_feed_path = _event_feed(resolved_root)
     governed_flow_summary = load_latest_governed_flow_summary(resolved_root)
+    governed_request_feed = _governed_request_feed(
+        load_latest_governed_request_feed(resolved_root),
+        governed_flow_summary,
+    )
     identity_evidence = load_latest_identity_evidence(resolved_root)
     policy_evidence = load_latest_policy_evidence(resolved_root)
     retrieval_evidence = load_latest_retrieval_evidence(resolved_root)
@@ -855,6 +970,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     reviewer_href = _raw(reviewer_bundle_relative_path(resolved_root))
     launch_report_href = _raw(launch_report_relative_path(resolved_root))
     ingestion_href = _raw(dashboard_ingestion_relative_path(resolved_root))
+    governed_request_feed_href = _raw(governed_request_feed_relative_path(resolved_root))
 
     policy_events = [event for event in events if event.get("event_type") == "policy.decision"]
     retrieval_events = [event for event in events if event.get("event_type") == "retrieval.decision"]
@@ -895,6 +1011,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         policy_source=policy_source,
         denied_flow=denied_flow,
     )
+    governed_request_rows = _governed_request_rows(governed_request_feed)
+    governed_request_records = _governed_request_records(governed_request_feed[:5])
+    live_request_count = sum(1 for item in governed_request_feed if str(item.get("evidence_mode", "")).lower() == "live")
+    denied_request_count = sum(1 for item in governed_request_feed if not bool(item.get("handoff_allowed")))
+    redacted_request_count = sum(1 for item in governed_request_feed if bool(item.get("question_redacted")))
     audit_dataset, audit_provenance = _build_audit_dataset(
         audit_records=audit_records,
         events=events,
@@ -1271,6 +1392,56 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         {
             **section_contracts["overview"],
             "blocks": overview_blocks,
+        },
+        {
+            **section_contracts["governed-requests"],
+            "blocks": [
+                {
+                    "type": "cards",
+                    "title": "Reviewer-safe request telemetry",
+                    "items": [
+                        _card("Recent requests", str(len(governed_request_feed)), "healthy" if governed_request_feed else "warning", "Recent governed requests available as sanitized previews rather than raw transcript replay.", governed_request_feed_href),
+                        _card("Denied requests", str(denied_request_count), "critical" if denied_request_count else "healthy", "Governed requests remain visible even when policy, retrieval, secrets, or launch-gate logic denied the handoff.", "#governed-requests"),
+                        _card("Redacted previews", str(redacted_request_count), "warning" if redacted_request_count else "healthy", "Dashboard-visible previews are redacted when likely secrets or sensitive patterns appear.", "#governed-requests"),
+                        _card("Live-mode requests", str(live_request_count), "healthy" if live_request_count else "warning", "Live versus demo request telemetry stays explicit in the main reviewer view.", "#governed-requests"),
+                    ],
+                },
+                {
+                    "type": "records",
+                    "title": "Recent trace-linked requests",
+                    "items": governed_request_records or [
+                        _record("No governed requests recorded", "Reviewer-safe telemetry", "Run a governed flow to generate sanitized request previews and trace-linked evidence artifacts.", "warning")
+                    ],
+                },
+                {
+                    "type": "table",
+                    "title": "Governed request feed",
+                    "columns": [
+                        {"key": "timestamp", "label": "Timestamp"},
+                        {"key": "question", "label": "Sanitized preview"},
+                        {"key": "tenant", "label": "Tenant"},
+                        {"key": "actor_session", "label": "Actor / session"},
+                        {"key": "surface", "label": "Surface"},
+                        {"key": "mode", "label": "Mode"},
+                        {"key": "identity", "label": "Identity"},
+                        {"key": "policy", "label": "Policy"},
+                        {"key": "retrieval", "label": "Retrieval"},
+                        {"key": "secret", "label": "Secret"},
+                        {"key": "handoff", "label": "Handoff"},
+                        {"key": "trace", "label": "Trace ID"},
+                    ],
+                    "rows": governed_request_rows,
+                },
+                {
+                    "type": "links",
+                    "title": "Request evidence",
+                    "items": [
+                        _link("Governed request feed artifact", governed_request_feed_href, "Reviewer-safe request telemetry with sanitized previews, reason codes, and trace-linked history references.", "healthy" if governed_request_feed else "warning"),
+                        _link("Latest governed flow summary", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), "Latest governed request summary tying question preview, trace, allow or deny result, and dependency status together.", "healthy" if governed_flow_summary else "warning"),
+                        _link("Question sanitization note", _raw("docs/evidence-model.md"), "Explains that request visibility uses sanitized previews and hashes, not raw transcript replay.", "neutral"),
+                    ],
+                },
+            ],
         },
         {
             **section_contracts["blocked-actions"],
@@ -2000,6 +2171,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
 
     sources = [
         _link("Governed event feed", _raw(event_feed_path), "Event feed used by the dashboard overview and blocked-actions views.", "healthy"),
+        _link("Governed request feed", governed_request_feed_href, "Reviewer-safe request telemetry with sanitized previews and per-trace evidence history.", "healthy" if governed_request_feed else "warning"),
         _link("Governed audit records", _raw(AUDIT_RECORDS_PATH), "Audit-stage records tied to the same trace/request/session model when a governed flow has run.", "healthy" if audit_provenance == "runtime-generated" else "warning"),
         _link("Policy bundle", policy_href, "Runtime surface, retrieval, and tool governance policy.", "healthy" if policy_source == "overlay" else "warning"),
         _link("Governed flow summary", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), "Latest governed-flow summary including identity, policy, retrieval, secret, trace, and launch-gate evidence.", "healthy" if governed_flow_summary else "warning"),

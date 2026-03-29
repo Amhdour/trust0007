@@ -481,21 +481,22 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             query = parse_qs(parsed.query)
             flow_mode = _governance_mode(self._query_value(query, "mode", ""))
             secret_required = self._query_value(query, "secret_required", "").lower() in {"1", "true", "yes"}
+            question = self._query_value(query, "question", "Demonstrate governed flow through control plane API")
             policy_context = _runtime_policy_context()
             evaluator = _build_governed_flow_evaluator(policy_context, flow_mode=flow_mode)
 
             result = evaluator.run(
                 user_id="api-user",
                 tenant_id="tenant-a",
-                prompt="Demonstrate governed flow through control plane API",
+                prompt=question,
                 requested_tools=["search", "summarize"],
                 retrieval_source="qdrant",
                 retrieval_needed=True,
                 roles=["tenant_user"],
                 request_metadata={"surface": "control-plane.governed-flow"},
                 tool_arguments={
-                    "search": {"query": "Demonstrate governed flow through control plane API"},
-                    "summarize": {"query": "Demonstrate governed flow through control plane API"},
+                    "search": {"query": question},
+                    "summarize": {"query": question},
                 },
                 policy_source=policy_context.source,
                 policy_path=policy_context.relative_path,
@@ -548,6 +549,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
         flow_mode = _governance_mode(query.get("mode", [""])[-1] if query.get("mode") else "")
         live_mode = flow_mode == "live"
+        question = query.get("question", [f"Navigate to Onyx path: {safe_path}"])[-1]
 
         # Run governance check for Onyx handoff
         try:
@@ -558,7 +560,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             flow_result = evaluator.run(
                 user_id="dashboard-user",
                 tenant_id="tenant-dashboard",
-                prompt=f"Navigate to Onyx path: {safe_path}",
+                prompt=question,
                 requested_tools=["onyx"],
                 retrieval_source="qdrant",
                 retrieval_needed=live_mode,
