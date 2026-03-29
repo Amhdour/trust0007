@@ -6,7 +6,7 @@ The repo should be read in tiers instead of as one flat chain:
 
 - **Active now**
   - Dashboard homepage and repo-owned control-plane services
-  - Governed handoff into Onyx
+  - Governed handoff into Onyx as the runtime plane behind the dashboard
   - Langfuse-backed runtime visibility when traces are available
   - Strict live governed path through Keycloak, OPA, Qdrant, and conditional Vault access
 - **Platform dependencies with partial wiring**
@@ -25,7 +25,7 @@ See `docs/upstream-usage-matrix.md` and `evidence/upstream_usage.inventory.json`
 ## 2) Architecture intent
 
 - Make the dashboard the visible product and operational control tower.
-- Provide a secure runtime path for AI requests through identity, policy, and governance controls.
+- Provide a secure runtime path for AI requests through identity, policy, governance, audit, and evidence controls.
 - Separate **control-plane decisions** from **runtime-plane execution**.
 - Emit evidence continuously for post-request assurance and launch-gate decisions.
 
@@ -39,7 +39,7 @@ See `docs/upstream-usage-matrix.md` and `evidence/upstream_usage.inventory.json`
   - live Qdrant-backed retrieval execution
   - conditional Vault-backed secret access
   - trace-correlated evidence and launch-gate approval
-- Evidence is captured in repo-owned artifacts and augmented with Langfuse activity when available.
+- Evidence is captured in repo-owned artifacts first, including explicit audit records, and augmented with Langfuse activity when available.
 
 Envoy, Grafana, Superset, and gVisor remain important to the broader platform story, but they should only be described as active runtime dependencies where the repo proves that depth.
 
@@ -87,7 +87,7 @@ Envoy, Grafana, Superset, and gVisor remain important to the broader platform st
 - **CP6 Secret retrieval gate**: Vault-backed secret access is a conditional mandatory dependency for secret-requiring governed operations.
 - **CP7 Retrieval gate**: Qdrant-backed retrieval is a mandatory live dependency for the strict governed handoff path.
 - **CP8 Risky execution sandboxing**: gVisor remains future isolation depth, not a proven current path.
-- **CP9 Continuous evidence emission**: Langfuse telemetry throughout request lifecycle.
+- **CP9 Continuous evidence emission**: repo-owned artifacts and explicit audit records throughout the request lifecycle, with optional Langfuse export/supporting visibility.
 - **CP10 Post-request assurance**: Grafana/Superset views consumed by launch-gate and evidence workflows.
 
 ## 6) Data flow summary
@@ -110,6 +110,6 @@ Envoy, Grafana, Superset, and gVisor remain important to the broader platform st
 
 ## 8) Evidence flow summary
 
-- During request: identity, policy, retrieval, secret, tool, handoff, and launch-gate events are emitted to repo-owned artifacts under `overlays/myStarterKit/artifacts/`.
+- During request: identity, policy, retrieval, secret, tool, audit, handoff, and launch-gate events are emitted to repo-owned artifacts under `overlays/myStarterKit/artifacts/`.
 - Post request: those artifacts are summarized into dashboard sections and can be exported onward to Langfuse/Grafana drill-downs.
 - In live mode, launch-gate consumes the live governed-flow evidence set and does not silently substitute demo artifacts.

@@ -161,7 +161,31 @@ def test_blocked_actions_section_includes_reason_codes() -> None:
 
     assert records_block["items"]
     assert any(column["key"] == "reason" for column in table_block["columns"])
+    assert any(column["key"] == "request" for column in table_block["columns"])
     assert any(row["reason"] for row in table_block["rows"])
+
+
+def test_dashboard_surfaces_flagship_denied_onyx_proof_and_audit_source() -> None:
+    payload = build_control_plane_dashboard()
+
+    overview = next(section for section in payload["sections"] if section["id"] == "overview")
+    audit = next(section for section in payload["sections"] if section["id"] == "audit-replay")
+
+    overview_record_titles = {
+        item["title"]
+        for block in overview["blocks"]
+        if block["type"] == "records"
+        for item in block["items"]
+    }
+    audit_card_labels = {
+        item["label"]
+        for block in audit["blocks"]
+        if block["type"] == "cards"
+        for item in block["items"]
+    }
+
+    assert "Flagship denied Onyx handoff proof" in overview_record_titles
+    assert "Audit record source" in audit_card_labels
 
 
 def test_contract_files_present() -> None:

@@ -7,6 +7,7 @@ The homepage was upgraded from a general control-plane shell into a reviewer-fac
 The page now leads with:
 
 - operator briefing answers
+- a flagship denied `/launch/onyx` proof path near the top
 - governance KPI cards
 - a dominant Security Readiness / Launch Gate panel
 - explicit live-vs-demo and latest handoff pass/fail cues
@@ -19,6 +20,7 @@ The page now leads with:
 ## Homepage structure
 
 1. Hero: repository positioning, data mode, runtime role, and high-level workflow.
+   - explicit wording that Onyx is the governed runtime plane and the dashboard is the trust/security control plane
 2. Operator briefing: quick answers to what is protected, what was blocked, why, what evidence exists, and launch readiness.
 3. Governance KPIs: policy, retrieval, tool, audit, evidence, and launch metrics.
 4. Security Readiness / Launch Gate: readiness state, control-family summaries, top failing controls, residual risks, and evidence links.
@@ -63,6 +65,7 @@ The page now leads with:
   - `overlays/myStarterKit/artifacts/policy-evidence.json`
   - `overlays/myStarterKit/artifacts/retrieval-evidence.json`
   - `overlays/myStarterKit/artifacts/secret-evidence.json`
+  - `overlays/myStarterKit/artifacts/audit-records.jsonl`
   - `overlays/myStarterKit/artifacts/trace-correlation.json`
   - `overlays/myStarterKit/artifacts/governed-flow-summary.json`
 - upstream posture
@@ -70,6 +73,8 @@ The page now leads with:
   - coverage audit from `backend/integration_adapter/repository.py`
   - reviewer-facing rationale rendered in `backend/posture_service/service.py`
 - audit and reviewer evidence
+  - `overlays/myStarterKit/artifacts/audit-records.jsonl` when a governed flow has run
+  - adapter-derived audit reconstruction from the governed event feed only when no runtime-generated audit artifact exists yet
   - `evidence/reviewer_evidence_bundle.json`
   - `evidence/reviewer/inspectable-live-runtime/*.json`
   - `evidence/prod-sim/*`
@@ -86,6 +91,7 @@ The page now leads with:
   - reviewer bundle links
   - launch-report parsing
   - live governed-flow artifacts when generated
+  - runtime-generated audit records when a governed flow has run
   - live identity, policy, retrieval, secret, and trace evidence panels when those artifacts exist
   - live-log polling from Onyx and Langfuse when reachable
 - Demo-derived fallback:

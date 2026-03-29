@@ -100,13 +100,16 @@ def test_governed_flow_happy_path():
 
         # Verify artifacts were written
         assert "events_jsonl" in result.artifacts
+        assert "audit_records" in result.artifacts
         assert "launch_gate_result" in result.artifacts
 
         # Verify artifact files exist
         events_file = artifact_dir / "events.jsonl"
+        audit_file = artifact_dir / "audit-records.jsonl"
         gate_file = artifact_dir / "launch-gate-result.json"
 
         assert events_file.exists()
+        assert audit_file.exists()
         assert gate_file.exists()
 
         # Verify events were recorded
@@ -117,6 +120,19 @@ def test_governed_flow_happy_path():
         assert "identity.established" in event_types
         assert "policy.decision" in event_types
         assert "request.end" in event_types
+
+        audit_records = [json.loads(line) for line in audit_file.read_text().splitlines()]
+        assert audit_records
+        assert {record["stage"] for record in audit_records} >= {
+            "identity",
+            "policy",
+            "retrieval",
+            "secret",
+            "tool_decision",
+            "tool_execution",
+            "launch_gate",
+            "handoff",
+        }
 
         # Verify launch-gate artifact structure
         gate_data = json.loads(gate_file.read_text())

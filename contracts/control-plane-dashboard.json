@@ -1,7 +1,7 @@
 {
   "title": "AI Trust & Security Stack Control Plane",
   "subtitle": "Trust & Security Operations Dashboard for governed AI runtime enforcement, evidence quality, and launch readiness.",
-  "hero_copy": "This homepage is the visible Trust & Security Operations Dashboard: it shows what is protected, what governance blocked, why it was blocked, which evidence exists, and whether the governed runtime is launch-ready.",
+  "hero_copy": "This homepage is the visible Trust & Security Operations Dashboard: it shows what is protected, what governance blocked, why it was blocked, which evidence exists, and whether the governed runtime is launch-ready. Onyx is the governed runtime plane behind it; this dashboard is the trust/security control plane that decides whether, how, and with what evidence access to Onyx is allowed.",
   "landing_steps": [
     "Identity and session controls",
     "Policy and retrieval enforcement",
@@ -34,7 +34,7 @@
     {
       "id": "blocked-actions",
       "title": "Blocked / Governed Actions",
-      "description": "Recent denied retrievals, denied tool attempts, confirmation-required actions, and blocked Onyx handoffs with traceable reason codes."
+      "description": "Recent denied retrievals, denied tool attempts, confirmation-required actions, and blocked Onyx handoffs, with the denied `/launch/onyx` path treated as flagship reviewer proof."
     },
     {
       "id": "upstream-posture",
@@ -94,7 +94,7 @@
     {
       "id": "entry-points",
       "title": "Onyx Governed Runtime",
-      "description": "Onyx remains a governed runtime behind the dashboard, with visible allow or deny outcomes and auditable handoffs."
+      "description": "Onyx remains the governed runtime plane behind the dashboard control plane, with visible allow or deny outcomes and auditable handoffs."
     }
   ]
 }

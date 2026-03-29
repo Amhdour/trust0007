@@ -44,6 +44,11 @@ def build_evidence_pack_summary(root: Path | None = None) -> dict[str, Any]:
                 "description": "Export shape used for dashboard-level ingestion and replay views.",
             },
             {
+                "label": "Governed Audit Records",
+                "href": _raw_link("overlays/myStarterKit/artifacts/audit-records.jsonl"),
+                "description": "Runtime-generated audit trail for identity, policy, retrieval, secret, tool, handoff, and launch-gate stages when a governed flow has run.",
+            },
+            {
                 "label": "Inspectable Runtime Evidence",
                 "href": _raw_link("evidence/reviewer/inspectable-live-runtime/README.md"),
                 "description": "Reviewer-facing entry point for one allowed and one denied live runtime flow.",

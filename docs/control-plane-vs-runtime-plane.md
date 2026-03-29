@@ -5,12 +5,13 @@ This document describes logical placement, not equal activation depth. For curre
 ## Control plane
 
 The control plane governs **what is allowed** and **under which conditions**.
+In this repo, it is also the primary visible product entry: the reviewer/operator lands on the dashboard first and sees whether access to Onyx is allowed, why, and with what evidence.
 
 ### Components in control plane
 - Keycloak (identity assertions and session context when live identity wiring is enabled)
 - Envoy (ingress enforcement and routing policy when the ingress bridge is enabled)
 - myStarterKit governance layer (runtime governance intent)
-- OPA (policy-language authority and optional sidecar decision engine)
+- OPA (policy-language authority and mandatory live decision engine on the strict governed path)
 - myStarterKit launch gate (evidence-driven readiness/launch decisions)
 
 ### Control-plane outputs
@@ -21,6 +22,7 @@ The control plane governs **what is allowed** and **under which conditions**.
 ## Runtime plane
 
 The runtime plane executes the request path and tool/data interactions.
+In this repo, Onyx is the governed runtime plane behind dashboard-controlled handoffs rather than the primary visible homepage.
 
 ### Components in runtime plane
 - Onyx runtime (reasoning/orchestration)

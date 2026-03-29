@@ -11,6 +11,7 @@ When a governed flow runs, the control plane can emit:
 - `overlays/myStarterKit/artifacts/policy-evidence.json`
 - `overlays/myStarterKit/artifacts/retrieval-evidence.json`
 - `overlays/myStarterKit/artifacts/secret-evidence.json`
+- `overlays/myStarterKit/artifacts/audit-records.jsonl`
 - `overlays/myStarterKit/artifacts/trace-correlation.json`
 - `overlays/myStarterKit/artifacts/governed-flow-summary.json`
 - `overlays/myStarterKit/artifacts/launch-gate-result.json`
@@ -22,8 +23,11 @@ Each governed request should keep these relationships stable:
 - `trace_id`: joins the end-to-end governed flow
 - `request_id`: identifies the request instance
 - `session_id`: links live Keycloak-backed session state when available
+- `actor_id`: identifies the acting principal
+- `tenant_id`: identifies the governed tenant
+- `surface`: identifies the governed surface or path
 
-The dashboard uses those values to render reviewer-facing continuity across identity, policy, retrieval, secret, launch-gate, and handoff stages.
+The dashboard uses those values to render reviewer-facing continuity across identity, policy, retrieval, secret, audit, launch-gate, and handoff stages. If `session_id` is unavailable, the trace artifact should record a precise reason rather than a generic missing state.
 
 ## Live-mode mandatory evidence
 
@@ -49,5 +53,6 @@ The homepage reads these artifacts into:
 - Audit & Replay
 - Trace Correlation
 - Launch Gate
+- Onyx Runtime
 
 Langfuse and Grafana remain useful supporting surfaces, but the repo-owned artifacts are the primary reviewer proof path.

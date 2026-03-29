@@ -211,6 +211,8 @@ def test_live_handoff_uses_mandatory_runtime_dependencies():
     assert summary["retrieval"]["live_backend"] is True
     assert summary["secret"]["fetched"] is True
     assert summary["trace"]["complete"] is True
+    assert summary["trace"]["audit_linkage"]["complete"] is True
+    assert summary["audit"]["record_count"] >= 8
     assert summary["launch_gate"]["decision"] == "pass"
 
 
@@ -251,6 +253,7 @@ def test_live_handoff_trace_breakage_causes_launch_gate_no_go():
 
     assert result.decision is False
     assert summary["trace"]["complete"] is False
+    assert summary["trace"]["session_linkage"]["reason"]
     assert summary["launch_gate"]["decision"] == "no_go"
 
 

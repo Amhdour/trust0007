@@ -2,7 +2,7 @@
 
 This repository is a **dashboard-first AI Trust & Security control plane**. It proves a governed runtime handoff into Onyx, a strict live governed path, dependency-specific fail-closed behavior, and evidence-backed launch readiness without treating every vendored upstream as equally active.
 
-The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and Autonomous Agents**. Onyx is a governed runtime module behind that dashboard, not the primary visible product entry.
+The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and Autonomous Agents**. Onyx is the governed runtime plane behind that dashboard, not the primary visible product entry. This dashboard is the trust/security control plane that decides whether, how, and with what evidence access to Onyx is allowed.
 
 Suggested short repository description:
 `Dashboard-first AI Trust & Security Stack Control Plane for governed AI runtime launch readiness, policy enforcement, evidence integrity, and auditable Onyx handoffs.`
@@ -53,6 +53,7 @@ That path proves:
 
 The strongest “see a deny” and “see a no-go” paths are:
 
+- flagship denied `/launch/onyx` handoff: [denied-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-flow.json)
 - identity denial: [denied-identity-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
 - OPA denial/unavailable: [denied-opa-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
 - retrieval denial: [denied-retrieval-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
@@ -70,9 +71,20 @@ Primary governed-flow artifacts:
 - [policy-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/policy-evidence.json)
 - [retrieval-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/retrieval-evidence.json)
 - [secret-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/secret-evidence.json)
+- [audit-records.jsonl](/workspaces/beta011/overlays/myStarterKit/artifacts/audit-records.jsonl)
 - [trace-correlation.json](/workspaces/beta011/overlays/myStarterKit/artifacts/trace-correlation.json)
 - [launch-gate-result.json](/workspaces/beta011/overlays/myStarterKit/artifacts/launch-gate-result.json)
 - [reviewer evidence bundle](/workspaces/beta011/evidence/reviewer_evidence_bundle.json)
+
+Panel evidence sources:
+
+- Identity & Session: `identity-evidence.json` plus `trace-correlation.json`
+- Policy Enforcement: `policy-evidence.json` plus governed events
+- Retrieval Boundaries: `retrieval-evidence.json` plus governed events
+- Secret Access: `secret-evidence.json`
+- Audit & Replay: `audit-records.jsonl` when present, otherwise clearly labeled adapter-derived reconstruction from governed events
+- Trace Correlation: `trace-correlation.json`
+- Onyx Runtime: `governed-flow-summary.json`, `audit-records.jsonl`, and inspectable allow/deny bundles
 
 ## What Is Mandatory Now
 
@@ -214,7 +226,7 @@ Not every vendored upstream under `upstream/` is an equally active part of the c
 
 - Active now:
   - Onyx is the governed runtime target behind `/launch/onyx`.
-  - Langfuse is the evidence-plane activity source the dashboard can consume live.
+  - Langfuse is a supporting evidence-plane activity source the dashboard can consume live.
   - Keycloak, OPA, Qdrant, and Vault are now active in the strict live governed path, where live identity, live policy, live retrieval, and conditional live secret access are mandatory dependencies.
 - Partially used:
   - Envoy and Grafana are kept because they strengthen real trust boundaries or control outcomes, but they are not yet mandatory request-path dependencies.
@@ -239,7 +251,7 @@ See `docs/strict-live-proof-matrix.md` for the acceptance criteria and pass/fail
 
 - `Onyx` is the primary sample runtime platform for real integration testing in this repo.
 - The in-repo demo is the fast fallback path when the upstream Onyx stack is not running.
-- The dashboard remains the product entrypoint, and Onyx is the governed runtime reached behind it.
+- The dashboard remains the product entrypoint, and Onyx is the governed runtime plane reached behind it through governed handoffs.
 - **Governance enforcement** is now live: `/launch/onyx` blocks denied requests with audit trails.
 
 ## Proof And Dashboard Docs

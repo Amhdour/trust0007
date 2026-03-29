@@ -22,6 +22,7 @@ POLICY_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/policy-evidence.json"
 RETRIEVAL_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/retrieval-evidence.json"
 SECRET_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/secret-evidence.json"
 TRACE_CORRELATION_PATH = "overlays/myStarterKit/artifacts/trace-correlation.json"
+AUDIT_RECORDS_PATH = "overlays/myStarterKit/artifacts/audit-records.jsonl"
 UPSTREAM_INVENTORY_CLASSIFICATIONS = {
     "used_now",
     "partially_used",
@@ -290,6 +291,10 @@ def load_latest_secret_evidence(root: Path | None = None) -> dict[str, Any]:
 
 def load_latest_trace_correlation(root: Path | None = None) -> dict[str, Any]:
     return read_json(repo_root(root) / TRACE_CORRELATION_PATH)
+
+
+def load_latest_audit_records(root: Path | None = None) -> list[dict[str, Any]]:
+    return read_jsonl(repo_root(root) / AUDIT_RECORDS_PATH)
 
 
 def has_live_governed_flow_artifacts(root: Path | None = None) -> bool:

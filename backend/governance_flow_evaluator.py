@@ -7,6 +7,7 @@ import json
 import sys
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -52,6 +53,32 @@ def _artifact_reference(path: Path, root: Path) -> str:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True))
+        handle.write("\n")
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _surface_identifier(base_metadata: dict[str, Any], requested_path: str) -> str:
+    return str(base_metadata.get("surface", "")).strip() or requested_path
+
+
+def _session_linkage(identity_result: IdentityResolutionResult, *, live_mode: bool) -> tuple[str, str]:
+    if identity_result.session_id:
+        return "linked", "session propagated from the identity authority"
+    if not identity_result.authenticated:
+        return "unavailable", "identity failed before a session identifier could be established"
+    if not identity_result.live:
+        return "unavailable", "demo or fallback identity path does not issue a live session identifier"
+    if identity_result.source == "keycloak_userinfo":
+        return "unavailable", "Keycloak userinfo response did not include sid or session_state"
+    return "unavailable", f"{identity_result.source or 'identity source'} did not provide session context"
 
 
 def _metadata_for(component: Any) -> dict[str, Any]:
@@ -199,6 +226,7 @@ class GovernedFlowEvaluator:
         self._artifact_dir.mkdir(parents=True, exist_ok=True)
         artifact_paths = {
             "events_jsonl": self._artifact_dir / "events.jsonl",
+            "audit_records": self._artifact_dir / "audit-records.jsonl",
             "launch_gate_result": self._artifact_dir / "launch-gate-result.json",
             "identity_evidence": self._artifact_dir / "identity-evidence.json",
             "policy_evidence": self._artifact_dir / "policy-evidence.json",
@@ -215,6 +243,9 @@ class GovernedFlowEvaluator:
         sink = JsonlEventSink(str(artifact_paths["events_jsonl"]))
 
         session_id = ""
+        surface_id = _surface_identifier(base_metadata, requested_path)
+        audit_stage_sequence: list[str] = []
+        audit_record_count = 0
 
         def emit(event_type: str, payload: dict[str, Any], severity: str = "info") -> None:
             sink.emit(
@@ -229,11 +260,57 @@ class GovernedFlowEvaluator:
                 )
             )
 
+        def emit_audit(
+            *,
+            stage: str,
+            action: str,
+            outcome: str,
+            actor_id: str,
+            tenant_value: str,
+            session_value: str,
+            reason_codes: list[str] | None = None,
+            component: str = "",
+            severity: str = "info",
+            details: dict[str, Any] | None = None,
+        ) -> None:
+            nonlocal audit_record_count
+            audit_record_count += 1
+            if stage not in audit_stage_sequence:
+                audit_stage_sequence.append(stage)
+            _append_jsonl(
+                artifact_paths["audit_records"],
+                {
+                    "audit_id": f"audit-{uuid.uuid4().hex[:12]}",
+                    "timestamp": _now_iso(),
+                    "trace_id": trace_id,
+                    "request_id": request_id,
+                    "session_id": session_value,
+                    "actor_id": actor_id,
+                    "tenant_id": tenant_value,
+                    "surface": surface_id,
+                    "requested_path": requested_path,
+                    "runtime_target": "onyx",
+                    "stage": stage,
+                    "action": action,
+                    "outcome": outcome,
+                    "component": component,
+                    "policy_source": policy_source,
+                    "policy_path": policy_path,
+                    "evidence_mode": mode,
+                    "provenance": "runtime-generated",
+                    "severity": severity,
+                    "reason_codes": list(reason_codes or []),
+                    "details": dict(details or {}),
+                },
+            )
+
         emit(
             "request.start",
             {
                 "path": requested_path,
-                "actor": user_id,
+                "actor_id": user_id,
+                "tenant_id": tenant_id,
+                "surface": surface_id,
                 "evidence_mode": mode,
                 "environment_mode": self._environment_mode,
             },
@@ -253,25 +330,33 @@ class GovernedFlowEvaluator:
         effective_user_id = identity_result.user_id or user_id
         effective_tenant_id = identity_result.tenant_id or tenant_id
         effective_roles = list(identity_result.roles or identity_roles)
+        session_linkage_status, session_linkage_reason = _session_linkage(identity_result, live_mode=live_mode)
 
         identity_evidence = {
             "step": "identity",
+            "captured_at": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
+            "actor_id": effective_user_id,
+            "tenant_id": effective_tenant_id,
+            "surface": surface_id,
             "requested_path": requested_path,
             "evidence_mode": mode,
             "mandatory": live_mode,
             "authenticated": identity_result.authenticated,
             "live": identity_result.live,
             "source": identity_result.source,
+            "provider_verified": bool(identity_result.authenticated and identity_result.live),
             "user_id": effective_user_id,
-            "tenant_id": effective_tenant_id,
             "roles": effective_roles,
             "token_present": identity_result.token_present,
             "token_active": identity_result.token_active,
             "reason": identity_result.reason,
             "reason_codes": [identity_result.reason] if identity_result.reason else [],
+            "session_linkage_status": session_linkage_status,
+            "session_linkage_reason": session_linkage_reason,
+            "provenance": "runtime-generated",
             "metadata": identity_result.metadata,
         }
         _write_json(artifact_paths["identity_evidence"], identity_evidence)
@@ -279,12 +364,14 @@ class GovernedFlowEvaluator:
             "identity.established",
             {
                 "sub": effective_user_id,
+                "actor_id": effective_user_id,
                 "tenant_id": effective_tenant_id,
                 "roles": effective_roles,
                 "live": identity_result.live,
                 "identity_source": identity_result.source,
                 "reason": identity_result.reason,
-                "surface": str(base_metadata.get("surface", "")),
+                "session_id": session_id,
+                "surface": surface_id,
             },
             severity="info" if identity_result.authenticated else "warning",
         )
@@ -295,8 +382,28 @@ class GovernedFlowEvaluator:
                 "token_present": identity_result.token_present,
                 "token_active": identity_result.token_active,
                 "identity_source": identity_result.source,
+                "session_linkage_status": session_linkage_status,
+                "session_linkage_reason": session_linkage_reason,
+                "surface": surface_id,
             },
             severity="info" if identity_result.authenticated else "warning",
+        )
+        emit_audit(
+            stage="identity",
+            action="identity.established" if identity_result.authenticated else "identity.failed",
+            outcome="allow" if identity_result.authenticated else "deny",
+            actor_id=effective_user_id or user_id,
+            tenant_value=effective_tenant_id or tenant_id,
+            session_value=session_id,
+            reason_codes=[identity_result.reason] if identity_result.reason else [],
+            component=identity_result.source,
+            severity="info" if identity_result.authenticated else "warning",
+            details={
+                "live": identity_result.live,
+                "roles": effective_roles,
+                "session_linkage_status": session_linkage_status,
+                "session_linkage_reason": session_linkage_reason,
+            },
         )
 
         policy_allow = False
@@ -368,54 +475,84 @@ class GovernedFlowEvaluator:
 
         policy_evidence = {
             "step": "policy",
+            "captured_at": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
+            "actor_id": effective_user_id,
+            "tenant_id": effective_tenant_id,
+            "surface": surface_id,
             "evidence_mode": mode,
             "mandatory": live_mode,
             "policy_source": policy_source,
             "policy_path": policy_path,
             "engine": policy_metadata.get("engine", "local"),
+            "engine_reachable": policy_metadata.get("reachable", policy_metadata.get("engine") != "opa"),
             "package_path": policy_metadata.get("package_path", ""),
             "allow": policy_allow,
             "reasons": list(gateway_decision.reasons),
             "reason_codes": list(gateway_decision.reasons),
             "matched_surface": str(policy_metadata.get("matched_surface", "")),
             "identity_live": identity_result.live,
+            "provenance": "runtime-generated",
         }
         _write_json(artifact_paths["policy_evidence"], policy_evidence)
         emit(
             "policy.decision",
             {
                 "allow": policy_allow,
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
                 "policy_source": policy_source,
                 "policy_path": policy_path,
                 "policy_engine": policy_metadata.get("engine", "local"),
+                "policy_engine_reachable": policy_metadata.get("reachable", policy_metadata.get("engine") != "opa"),
                 "package_path": policy_metadata.get("package_path", ""),
-                "surface": str(base_metadata.get("surface", "")),
+                "surface": surface_id,
                 "reason_codes": list(gateway_decision.reasons),
             },
             severity="info" if policy_allow else "warning",
+        )
+        emit_audit(
+            stage="policy",
+            action="policy.decision",
+            outcome="allow" if policy_allow else "deny",
+            actor_id=effective_user_id,
+            tenant_value=effective_tenant_id,
+            session_value=session_id,
+            reason_codes=list(gateway_decision.reasons),
+            component=str(policy_metadata.get("engine", "runtime_policy")),
+            severity="info" if policy_allow else "warning",
+            details={
+                "engine_reachable": policy_metadata.get("reachable", policy_metadata.get("engine") != "opa"),
+                "package_path": policy_metadata.get("package_path", ""),
+                "matched_surface": str(policy_metadata.get("matched_surface", "")),
+            },
         )
 
         retrieval_documents = []
         retrieval_execution = {
             "step": "retrieval",
+            "captured_at": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
+            "actor_id": effective_user_id,
+            "tenant_id": effective_tenant_id,
+            "surface": surface_id,
             "evidence_mode": mode,
             "backend": getattr(self._retrieval_backend, "__class__", type(self._retrieval_backend)).__name__,
             "source": retrieval_source,
-            "tenant_id": effective_tenant_id,
             "filters": {},
             "result_count": 0,
             "live_backend": False,
+            "backend_verified": False,
             "mandatory": retrieval_needed,
             "allow": False,
             "mode": "skipped" if not retrieval_needed else "deny",
             "reasons": [],
             "reason_codes": [],
+            "provenance": "runtime-generated",
         }
         if retrieval_needed and policy_allow:
             retrieval_layer = RetrievalSecurityLayer(
@@ -444,6 +581,7 @@ class GovernedFlowEvaluator:
                         "result_count": len(retrieval_documents),
                         "collection": retrieval_meta.get("collection", ""),
                         "live_backend": live_mode,
+                        "backend_verified": True,
                         "allow": retrieval_allow,
                         "mode": retrieval_result.mode,
                         "reasons": retrieval_reasons,
@@ -456,6 +594,7 @@ class GovernedFlowEvaluator:
                 retrieval_execution.update(
                     {
                         "live_backend": live_mode,
+                        "backend_verified": False,
                         "allow": False,
                         "mode": "deny",
                         "reasons": retrieval_reasons,
@@ -471,6 +610,7 @@ class GovernedFlowEvaluator:
                     "reasons": retrieval_reasons or ["retrieval.denied_by_policy"],
                     "reason_codes": retrieval_reasons or ["retrieval.denied_by_policy"],
                     "live_backend": live_mode,
+                    "backend_verified": False,
                 }
             )
         else:
@@ -483,6 +623,7 @@ class GovernedFlowEvaluator:
                     "reasons": retrieval_reasons,
                     "reason_codes": retrieval_reasons,
                     "live_backend": live_mode and retrieval_needed,
+                    "backend_verified": False,
                 }
             )
 
@@ -491,39 +632,71 @@ class GovernedFlowEvaluator:
             "retrieval.decision",
             {
                 "decision": retrieval_execution["mode"],
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
                 "source": retrieval_source,
                 "docs_filtered": retrieval_execution["result_count"],
                 "reason_codes": retrieval_execution["reasons"],
                 "backend": retrieval_execution["backend"],
                 "live_backend": retrieval_execution["live_backend"],
+                "backend_verified": retrieval_execution["backend_verified"],
+                "surface": surface_id,
             },
             severity="info" if retrieval_execution["allow"] else "warning",
         )
         emit(
             "retrieval.execution",
             {
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
                 "backend": retrieval_execution["backend"],
                 "collection": retrieval_execution.get("collection", ""),
                 "filters": retrieval_execution["filters"],
                 "result_count": retrieval_execution["result_count"],
                 "live_backend": retrieval_execution["live_backend"],
+                "surface": surface_id,
             },
             severity="info" if retrieval_execution["allow"] else "warning",
+        )
+        emit_audit(
+            stage="retrieval",
+            action="retrieval.decision",
+            outcome="allow" if retrieval_execution["allow"] else "deny",
+            actor_id=effective_user_id,
+            tenant_value=effective_tenant_id,
+            session_value=session_id,
+            reason_codes=list(retrieval_execution["reason_codes"]),
+            component=str(retrieval_execution["backend"]),
+            severity="info" if retrieval_execution["allow"] else "warning",
+            details={
+                "source": retrieval_source,
+                "collection": retrieval_execution.get("collection", ""),
+                "filters": retrieval_execution["filters"],
+                "backend_verified": retrieval_execution["backend_verified"],
+                "live_backend": retrieval_execution["live_backend"],
+                "result_count": retrieval_execution["result_count"],
+            },
         )
 
         secret_evidence = {
             "step": "secret",
+            "captured_at": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
+            "actor_id": effective_user_id,
+            "tenant_id": effective_tenant_id,
+            "surface": surface_id,
             "evidence_mode": mode,
             "required": secret_required,
             "mandatory": secret_required,
             "purpose": str(secret_request.get("purpose", "")) if secret_request else "",
             "backend": "vault" if self._secret_provider else "unconfigured",
+            "backend_configured": self._secret_provider is not None,
             "fetched": False,
             "reason": secret_reason,
             "reason_codes": [secret_reason] if secret_reason else [],
+            "provenance": "runtime-generated",
         }
         if secret_required and policy_allow and retrieval_allow and self._secret_provider is not None:
             secret_fetch = self._secret_provider.fetch_if_needed(
@@ -550,12 +723,32 @@ class GovernedFlowEvaluator:
             "secret.access",
             {
                 "required": secret_required,
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
+                "surface": surface_id,
                 "purpose": secret_evidence["purpose"],
                 "backend": secret_evidence["backend"],
                 "fetched": secret_evidence["fetched"],
                 "reason": secret_evidence["reason"],
             },
             severity="info" if secret_satisfied or not secret_required else "warning",
+        )
+        emit_audit(
+            stage="secret",
+            action="secret.access",
+            outcome="allow" if secret_satisfied or not secret_required else "deny",
+            actor_id=effective_user_id,
+            tenant_value=effective_tenant_id,
+            session_value=session_id,
+            reason_codes=list(secret_evidence["reason_codes"]),
+            component=str(secret_evidence["backend"]),
+            severity="info" if secret_satisfied or not secret_required else "warning",
+            details={
+                "required": secret_required,
+                "purpose": secret_evidence["purpose"],
+                "backend_configured": secret_evidence["backend_configured"],
+                "fetched": secret_evidence["fetched"],
+            },
         )
 
         tools_denied = list(getattr(gateway_decision, "denied_tools", []))
@@ -583,7 +776,24 @@ class GovernedFlowEvaluator:
                     tools_allowed.append(tool_name)
                     emit(
                         "tool.execution_attempt",
-                        {"tool_name": tool_name, "status": "executed", "surface": str(base_metadata.get("surface", ""))},
+                        {
+                            "tool_name": tool_name,
+                            "status": "executed",
+                            "actor_id": effective_user_id,
+                            "tenant_id": effective_tenant_id,
+                            "surface": surface_id,
+                        },
+                    )
+                    emit_audit(
+                        stage="tool_execution",
+                        action="tool.execution_attempt",
+                        outcome="executed",
+                        actor_id=effective_user_id,
+                        tenant_value=effective_tenant_id,
+                        session_value=session_id,
+                        reason_codes=list(result.reason_codes),
+                        component=tool_name,
+                        details={"status": "executed"},
                     )
                 else:
                     if tool_name not in tools_denied:
@@ -595,9 +805,23 @@ class GovernedFlowEvaluator:
                             "tool_name": tool_name,
                             "status": result.status,
                             "reasons": result.reason_codes,
-                            "surface": str(base_metadata.get("surface", "")),
+                            "actor_id": effective_user_id,
+                            "tenant_id": effective_tenant_id,
+                            "surface": surface_id,
                         },
                         severity="warning",
+                    )
+                    emit_audit(
+                        stage="tool_execution",
+                        action="tool.execution_attempt",
+                        outcome=result.status,
+                        actor_id=effective_user_id,
+                        tenant_value=effective_tenant_id,
+                        session_value=session_id,
+                        reason_codes=list(result.reason_codes),
+                        component=tool_name,
+                        severity="warning",
+                        details={"status": result.status},
                     )
         else:
             if not policy_allow:
@@ -606,6 +830,19 @@ class GovernedFlowEvaluator:
                 tool_reasons.append("tool.skipped_due_to_retrieval")
             elif not secret_satisfied:
                 tool_reasons.append("tool.skipped_due_to_secret")
+            for tool_name in requested_tools:
+                emit_audit(
+                    stage="tool_execution",
+                    action="tool.execution_attempt",
+                    outcome="skipped",
+                    actor_id=effective_user_id,
+                    tenant_value=effective_tenant_id,
+                    session_value=session_id,
+                    reason_codes=list(dict.fromkeys(tool_reasons)),
+                    component=tool_name,
+                    severity="warning" if tool_reasons else "info",
+                    details={"status": "skipped"},
+                )
 
         emit(
             "tool.decision",
@@ -613,9 +850,23 @@ class GovernedFlowEvaluator:
                 "allowed": tools_allowed,
                 "denied": tools_denied,
                 "reasons": list(dict.fromkeys(tool_reasons)),
-                "surface": str(base_metadata.get("surface", "")),
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
+                "surface": surface_id,
             },
             severity="info" if not tools_denied else "warning",
+        )
+        emit_audit(
+            stage="tool_decision",
+            action="tool.decision",
+            outcome="allow" if not tools_denied else "deny",
+            actor_id=effective_user_id,
+            tenant_value=effective_tenant_id,
+            session_value=session_id,
+            reason_codes=list(dict.fromkeys(tool_reasons)),
+            component="tool_policy",
+            severity="info" if not tools_denied else "warning",
+            details={"allowed": tools_allowed, "denied": tools_denied},
         )
 
         final_reasons = list(
@@ -634,7 +885,15 @@ class GovernedFlowEvaluator:
             and secret_satisfied
             and len(tools_denied) == 0
         )
-        emit("incident.signal", {"signal": "none" if preliminary_decision else "governed_path_blocked"})
+        emit(
+            "incident.signal",
+            {
+                "signal": "none" if preliminary_decision else "governed_path_blocked",
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
+                "surface": surface_id,
+            },
+        )
 
         recorded_events = [json.loads(line) for line in artifact_paths["events_jsonl"].read_text(encoding="utf-8").splitlines() if line.strip()]
         observed_event_types = {event["event_type"] for event in recorded_events}
@@ -652,7 +911,12 @@ class GovernedFlowEvaluator:
         evidence = {
             "identity.live": identity_result.authenticated and identity_result.live,
             "policy.live_opa": bool(policy_metadata.get("engine") == "opa" and policy_metadata.get("reachable", True)),
-            "retrieval.live_backend": bool(retrieval_needed and retrieval_execution["live_backend"] and retrieval_execution["mode"] != "skipped"),
+            "retrieval.live_backend": bool(
+                retrieval_needed
+                and retrieval_execution["live_backend"]
+                and retrieval_execution["backend_verified"]
+                and retrieval_execution["mode"] != "skipped"
+            ),
             "secret.access": bool(secret_required and secret_satisfied) or not secret_required,
             "trace.correlation": trace_complete,
             "handoff.decision": True,
@@ -674,6 +938,9 @@ class GovernedFlowEvaluator:
             "launch_gate.evaluated",
             {
                 "decision": gate_result.decision,
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
+                "surface": surface_id,
                 "score": gate_result.score,
                 "max_score": gate_result.max_score,
                 "missing_evidence": gate_result.missing_evidence,
@@ -681,6 +948,23 @@ class GovernedFlowEvaluator:
                 "evidence_mode": mode,
             },
             severity="info" if gate_result.decision == "pass" else "warning",
+        )
+        emit_audit(
+            stage="launch_gate",
+            action="launch_gate.summary",
+            outcome=gate_result.decision,
+            actor_id=effective_user_id,
+            tenant_value=effective_tenant_id,
+            session_value=session_id,
+            reason_codes=list(gate_result.blockers) + list(gate_result.missing_evidence),
+            component="launch_gate",
+            severity="info" if gate_result.decision == "pass" else "warning",
+            details={
+                "score": gate_result.score,
+                "max_score": gate_result.max_score,
+                "missing_evidence": gate_result.missing_evidence,
+                "blockers": gate_result.blockers,
+            },
         )
         emit("fallback.event", {"applied": False, "evidence_mode": mode})
         emit(
@@ -690,7 +974,9 @@ class GovernedFlowEvaluator:
                 "reason": final_reasons[0] if final_reasons else "",
                 "reason_code": final_reasons[0].split(":")[0] if final_reasons else "",
                 "reasons": final_reasons,
-                "surface": str(base_metadata.get("surface", "")),
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
+                "surface": surface_id,
                 "requested_path": requested_path,
             },
             severity="warning" if not final_decision else "info",
@@ -699,12 +985,33 @@ class GovernedFlowEvaluator:
             "handoff.decision",
             {
                 "runtime_target": "onyx",
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
+                "surface": surface_id,
                 "requested_path": requested_path,
                 "allow": final_decision,
                 "reason_codes": final_reasons,
                 "evidence_mode": mode,
+                "policy_source": policy_source,
+                "policy_path": policy_path,
             },
             severity="info" if final_decision else "warning",
+        )
+        emit_audit(
+            stage="handoff",
+            action="onyx.handoff",
+            outcome="allow" if final_decision else "deny",
+            actor_id=effective_user_id,
+            tenant_value=effective_tenant_id,
+            session_value=session_id,
+            reason_codes=list(final_reasons),
+            component="onyx",
+            severity="info" if final_decision else "warning",
+            details={
+                "policy_source": policy_source,
+                "policy_path": policy_path,
+                "runtime_target": "onyx",
+            },
         )
         emit(
             "request.end",
@@ -712,29 +1019,79 @@ class GovernedFlowEvaluator:
                 "status": "ok" if final_decision else "denied",
                 "decision": final_decision,
                 "evidence_mode": mode,
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
+                "surface": surface_id,
             },
             severity="info" if final_decision else "warning",
         )
 
         final_recorded_events = [json.loads(line) for line in artifact_paths["events_jsonl"].read_text(encoding="utf-8").splitlines() if line.strip()]
         final_observed_event_types = {event["event_type"] for event in final_recorded_events}
+        audit_records = [json.loads(line) for line in artifact_paths["audit_records"].read_text(encoding="utf-8").splitlines() if line.strip()]
+        audit_trace_ids = {str(record.get("trace_id", "")) for record in audit_records if str(record.get("trace_id", ""))}
+        audit_stages_observed = sorted({str(record.get("stage", "")) for record in audit_records if str(record.get("stage", ""))})
         final_required_steps = pre_gate_required_steps + [
             "launch_gate.evaluated",
             "handoff.decision",
             "request.end",
         ]
         final_missing_steps = [step for step in final_required_steps if step not in final_observed_event_types]
-        trace_correlation = {
+        required_identifiers = {
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
+            "actor_id": effective_user_id,
+            "tenant_id": effective_tenant_id,
+            "surface": surface_id,
+        }
+        missing_identifiers = [
+            key
+            for key, value in required_identifiers.items()
+            if not value and not (key == "session_id" and not live_mode)
+        ]
+        required_audit_stages = ["identity", "policy", "retrieval", "secret", "tool_decision", "launch_gate", "handoff"]
+        if requested_tools:
+            required_audit_stages.append("tool_execution")
+        missing_audit_stages = [stage for stage in required_audit_stages if stage not in audit_stages_observed]
+        trace_reason_codes = list(final_missing_steps)
+        trace_reason_codes.extend(f"identifier_missing:{name}" for name in missing_identifiers)
+        if live_mode and not session_id:
+            trace_reason_codes.append("session.linkage_unavailable")
+        trace_reason_codes.extend(f"audit.stage_missing:{stage}" for stage in missing_audit_stages)
+        trace_correlation = {
+            "captured_at": _now_iso(),
+            "trace_id": trace_id,
+            "request_id": request_id,
+            "session_id": session_id,
+            "actor_id": effective_user_id,
+            "tenant_id": effective_tenant_id,
+            "surface": surface_id,
+            "roles": effective_roles,
             "evidence_mode": mode,
             "environment_mode": self._environment_mode,
             "required_steps": final_required_steps,
             "observed_steps": sorted(final_observed_event_types),
             "missing_steps": final_missing_steps,
-            "complete": len(final_missing_steps) == 0 and bool(session_id or not live_mode),
-            "reason_codes": [],
+            "required_identifiers": sorted(required_identifiers),
+            "missing_identifiers": missing_identifiers,
+            "session_linkage": {
+                "status": session_linkage_status,
+                "reason": session_linkage_reason,
+                "required": live_mode,
+                "identity_source": identity_result.source,
+            },
+            "audit_linkage": {
+                "record_count": len(audit_records),
+                "trace_bound": trace_id in audit_trace_ids,
+                "required_stages": required_audit_stages,
+                "observed_stages": audit_stages_observed,
+                "missing_stages": missing_audit_stages,
+                "complete": trace_id in audit_trace_ids and not missing_audit_stages,
+            },
+            "complete": len(final_missing_steps) == 0 and not missing_identifiers and bool(session_id or not live_mode),
+            "reason_codes": list(dict.fromkeys(trace_reason_codes)),
+            "provenance": "runtime-generated",
         }
         _write_json(artifact_paths["trace_correlation"], trace_correlation)
         emit(
@@ -764,11 +1121,17 @@ class GovernedFlowEvaluator:
                 "trace_id": trace_id,
                 "request_id": request_id,
                 "session_id": session_id,
+                "actor_id": effective_user_id,
+                "tenant_id": effective_tenant_id,
+                "surface": surface_id,
                 "policy_source": policy_source,
                 "policy_path": policy_path,
                 "evidence_mode": mode,
                 "handoff_allowed": final_decision,
-                "artifacts": {"events_jsonl": _artifact_reference(artifact_paths["events_jsonl"], self._artifact_dir.parent.parent)},
+                "artifacts": {
+                    "events_jsonl": _artifact_reference(artifact_paths["events_jsonl"], self._artifact_dir.parent.parent),
+                    "audit_records": _artifact_reference(artifact_paths["audit_records"], self._artifact_dir.parent.parent),
+                },
             },
         }
 
@@ -798,14 +1161,23 @@ class GovernedFlowEvaluator:
                 "mandatory": True,
                 "complete": bool(trace_correlation.get("complete")),
             },
+            "audit": {
+                "mandatory": True,
+                "record_count": len(audit_records),
+                "complete": bool(trace_correlation.get("audit_linkage", {}).get("complete")),
+            },
         }
         launch_gate_artifact["flow_metadata"]["dependency_status"] = dependency_status
         _write_json(artifact_paths["launch_gate_result"], launch_gate_artifact)
 
         governed_summary = {
+            "generated_at": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
+            "actor_id": effective_user_id,
+            "tenant_id": effective_tenant_id,
+            "surface": surface_id,
             "decision": final_decision,
             "reasons": final_reasons,
             "runtime_target": "onyx",
@@ -822,6 +1194,12 @@ class GovernedFlowEvaluator:
                 "allowed": tools_allowed,
                 "denied": tools_denied,
                 "reasons": list(dict.fromkeys(tool_reasons)),
+            },
+            "audit": {
+                "record_count": len(audit_records),
+                "stages": audit_stages_observed,
+                "missing_stages": missing_audit_stages,
+                "artifact": _artifact_reference(artifact_paths["audit_records"], repo_root := Path(__file__).resolve().parent.parent),
             },
             "trace": trace_correlation,
             "launch_gate": {
@@ -856,7 +1234,6 @@ class GovernedFlowEvaluator:
             )
             _write_json(artifact_path, evidence_payload)
 
-        repo_root = Path(__file__).resolve().parent.parent
         relative_artifacts = {name: _artifact_reference(path, repo_root) for name, path in artifact_paths.items()}
 
         return GovernedFlowResult(

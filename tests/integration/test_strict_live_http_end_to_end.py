@@ -46,6 +46,7 @@ def test_strict_live_handoff_passes_through_http_dependency_chain() -> None:
         policy = harness.read_artifact("policy-evidence.json")
         retrieval = harness.read_artifact("retrieval-evidence.json")
         secret = harness.read_artifact("secret-evidence.json")
+        audit = harness.read_artifact("audit-records.jsonl", jsonl=True)
         trace = harness.read_artifact("trace-correlation.json")
         launch = harness.read_artifact("launch-gate-result.json")
         summary = harness.read_artifact("governed-flow-summary.json")
@@ -58,18 +59,23 @@ def test_strict_live_handoff_passes_through_http_dependency_chain() -> None:
         assert retrieval["backend"] == "qdrant"
         assert retrieval["result_count"] == 1
         assert secret["backend"] == "vault"
+        assert audit
+        assert any(record["stage"] == "handoff" for record in audit)
         assert trace["complete"] is True
+        assert trace["audit_linkage"]["complete"] is True
         assert launch["machine"]["decision"] == "pass"
         assert launch["flow_metadata"]["handoff_allowed"] is True
 
         overview = harness.overview().json()
-        assert overview["data_mode"]["label"] == "Live governed flow artifacts"
+        assert overview["data_mode"]["label"] == "Live current evidence"
         assert overview["readiness_panel"]["status_label"] == "GO"
         identity_cards = _cards(_section(overview, "identity-session"))
         launch_cards = _cards(_section(overview, "launch-gate"))
+        audit_cards = _cards(_section(overview, "audit-replay"))
         onyx_cards = _cards(_section(overview, "entry-points"))
         assert identity_cards["Identity result"]["value"] == "ALLOW"
-        assert launch_cards["Evidence mode"]["value"] == "LIVE"
+        assert launch_cards["Evidence mode"]["value"] in {"live current evidence", "recent generated evidence"}
+        assert audit_cards["Audit record source"]["value"] == "runtime-generated"
         assert onyx_cards["Latest handoff"]["value"] == "ALLOW"
 
 
@@ -274,6 +280,6 @@ def test_strict_live_dashboard_highlights_missing_live_evidence() -> None:
 
         assert trace_cards["Trace complete"]["value"] == "no"
         assert trace_cards["Missing steps"]["status"] in {"healthy", "critical"}
-        assert launch_cards["Evidence mode"]["value"] == "LIVE"
+        assert launch_cards["Evidence mode"]["value"] == "live current evidence"
         assert launch_cards["Missing evidence"]["status"] == "critical"
         assert onyx_cards["Latest handoff"]["value"] == "DENY"

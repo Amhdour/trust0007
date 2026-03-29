@@ -224,8 +224,11 @@ class StrictLiveHarness:
     def __exit__(self, exc_type, exc, tb) -> None:
         self._stack.close()
 
-    def read_artifact(self, filename: str) -> dict[str, Any]:
-        return json.loads((self.artifact_dir / filename).read_text(encoding="utf-8"))
+    def read_artifact(self, filename: str, *, jsonl: bool = False) -> Any:
+        raw = (self.artifact_dir / filename).read_text(encoding="utf-8")
+        if jsonl:
+            return [json.loads(line) for line in raw.splitlines() if line.strip()]
+        return json.loads(raw)
 
     def launch(self, *, token: str | None = "valid-live-token", path: str = "/app") -> HTTPResponse:
         authorization_header = f"Bearer {token}" if token is not None else ""
