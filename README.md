@@ -138,6 +138,7 @@ Every component that remains in scope is expected to answer:
 - what control gap appears if it is removed
 
 See `docs/upstream-usage-matrix.md` for the reviewer-facing explanation and `evidence/upstream_usage.inventory.json` for the machine-readable inventory surfaced by the dashboard.
+See `docs/strict-live-proof-matrix.md` for the acceptance criteria and pass/fail proof matrix for the strict live governed path.
 
 ## Mandatory Now
 

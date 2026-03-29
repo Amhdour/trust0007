@@ -187,3 +187,18 @@ def test_retrieval_denies_when_docs_fail_trust_or_provenance() -> None:
     assert result.mode == "deny"
     assert "retrieval.provenance_missing" in result.reasons
     assert "retrieval.trust_label_not_allowed" in result.reasons
+
+
+def test_retrieval_denies_when_required_live_query_returns_no_docs() -> None:
+    telemetry = InMemoryRetrievalTelemetry()
+    layer = RetrievalSecurityLayer(
+        backend=StubBackend([]),
+        policy_evaluator=StubPolicyStrict(),
+        telemetry=telemetry,
+    )
+
+    result = layer.evaluate(make_request())
+
+    assert result.allow is False
+    assert result.mode == "deny"
+    assert "retrieval.empty_result" in result.reasons

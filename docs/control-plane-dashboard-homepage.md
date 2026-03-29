@@ -9,6 +9,7 @@ The page now leads with:
 - operator briefing answers
 - governance KPI cards
 - a dominant Security Readiness / Launch Gate panel
+- explicit live-vs-demo and latest handoff pass/fail cues
 - blocked and governed actions
 - six primary trust/security domains
 - asset and protection coverage

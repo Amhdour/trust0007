@@ -261,6 +261,7 @@ class GovernedFlowEvaluator:
             "session_id": session_id,
             "requested_path": requested_path,
             "evidence_mode": mode,
+            "mandatory": live_mode,
             "authenticated": identity_result.authenticated,
             "live": identity_result.live,
             "source": identity_result.source,
@@ -270,6 +271,7 @@ class GovernedFlowEvaluator:
             "token_present": identity_result.token_present,
             "token_active": identity_result.token_active,
             "reason": identity_result.reason,
+            "reason_codes": [identity_result.reason] if identity_result.reason else [],
             "metadata": identity_result.metadata,
         }
         _write_json(artifact_paths["identity_evidence"], identity_evidence)
@@ -370,12 +372,14 @@ class GovernedFlowEvaluator:
             "request_id": request_id,
             "session_id": session_id,
             "evidence_mode": mode,
+            "mandatory": live_mode,
             "policy_source": policy_source,
             "policy_path": policy_path,
             "engine": policy_metadata.get("engine", "local"),
             "package_path": policy_metadata.get("package_path", ""),
             "allow": policy_allow,
             "reasons": list(gateway_decision.reasons),
+            "reason_codes": list(gateway_decision.reasons),
             "matched_surface": str(policy_metadata.get("matched_surface", "")),
             "identity_live": identity_result.live,
         }
@@ -407,9 +411,11 @@ class GovernedFlowEvaluator:
             "filters": {},
             "result_count": 0,
             "live_backend": False,
+            "mandatory": retrieval_needed,
             "allow": False,
             "mode": "skipped" if not retrieval_needed else "deny",
             "reasons": [],
+            "reason_codes": [],
         }
         if retrieval_needed and policy_allow:
             retrieval_layer = RetrievalSecurityLayer(
@@ -441,6 +447,7 @@ class GovernedFlowEvaluator:
                         "allow": retrieval_allow,
                         "mode": retrieval_result.mode,
                         "reasons": retrieval_reasons,
+                        "reason_codes": retrieval_reasons,
                     }
                 )
             except Exception:
@@ -452,6 +459,7 @@ class GovernedFlowEvaluator:
                         "allow": False,
                         "mode": "deny",
                         "reasons": retrieval_reasons,
+                        "reason_codes": retrieval_reasons,
                     }
                 )
         elif retrieval_needed:
@@ -461,6 +469,7 @@ class GovernedFlowEvaluator:
                     "allow": False,
                     "mode": "deny",
                     "reasons": retrieval_reasons or ["retrieval.denied_by_policy"],
+                    "reason_codes": retrieval_reasons or ["retrieval.denied_by_policy"],
                     "live_backend": live_mode,
                 }
             )
@@ -472,6 +481,7 @@ class GovernedFlowEvaluator:
                     "allow": True,
                     "mode": "skipped",
                     "reasons": retrieval_reasons,
+                    "reason_codes": retrieval_reasons,
                     "live_backend": live_mode and retrieval_needed,
                 }
             )
@@ -508,10 +518,12 @@ class GovernedFlowEvaluator:
             "session_id": session_id,
             "evidence_mode": mode,
             "required": secret_required,
+            "mandatory": secret_required,
             "purpose": str(secret_request.get("purpose", "")) if secret_request else "",
             "backend": "vault" if self._secret_provider else "unconfigured",
             "fetched": False,
             "reason": secret_reason,
+            "reason_codes": [secret_reason] if secret_reason else [],
         }
         if secret_required and policy_allow and retrieval_allow and self._secret_provider is not None:
             secret_fetch = self._secret_provider.fetch_if_needed(
@@ -526,13 +538,13 @@ class GovernedFlowEvaluator:
             )
             secret_reason = secret_fetch.reason
             secret_satisfied = secret_fetch.fetched
-            secret_evidence.update({"fetched": secret_fetch.fetched, "reason": secret_fetch.reason})
+            secret_evidence.update({"fetched": secret_fetch.fetched, "reason": secret_fetch.reason, "reason_codes": [secret_fetch.reason] if secret_fetch.reason else []})
         elif secret_required:
             secret_reason = "secret.backend_missing"
             secret_satisfied = False
-            secret_evidence.update({"fetched": False, "reason": secret_reason})
+            secret_evidence.update({"fetched": False, "reason": secret_reason, "reason_codes": [secret_reason]})
         else:
-            secret_evidence.update({"fetched": False, "reason": "not_needed"})
+            secret_evidence.update({"fetched": False, "reason": "not_needed", "reason_codes": ["not_needed"]})
         _write_json(artifact_paths["secret_evidence"], secret_evidence)
         emit(
             "secret.access",
@@ -722,6 +734,7 @@ class GovernedFlowEvaluator:
             "observed_steps": sorted(final_observed_event_types),
             "missing_steps": final_missing_steps,
             "complete": len(final_missing_steps) == 0 and bool(session_id or not live_mode),
+            "reason_codes": [],
         }
         _write_json(artifact_paths["trace_correlation"], trace_correlation)
         emit(
@@ -754,49 +767,11 @@ class GovernedFlowEvaluator:
                 "policy_source": policy_source,
                 "policy_path": policy_path,
                 "evidence_mode": mode,
+                "handoff_allowed": final_decision,
                 "artifacts": {"events_jsonl": _artifact_reference(artifact_paths["events_jsonl"], self._artifact_dir.parent.parent)},
             },
         }
-        _write_json(artifact_paths["launch_gate_result"], launch_gate_artifact)
 
-        governed_summary = {
-            "trace_id": trace_id,
-            "request_id": request_id,
-            "session_id": session_id,
-            "decision": final_decision,
-            "reasons": final_reasons,
-            "runtime_target": "onyx",
-            "requested_path": requested_path,
-            "evidence_mode": mode,
-            "environment_mode": self._environment_mode,
-            "identity": identity_evidence,
-            "policy": policy_evidence,
-            "retrieval": retrieval_execution,
-            "secret": secret_evidence,
-            "tools": {
-                "allowed": tools_allowed,
-                "denied": tools_denied,
-                "reasons": list(dict.fromkeys(tool_reasons)),
-            },
-            "trace": trace_correlation,
-            "launch_gate": {
-                "decision": gate_result.decision,
-                "score": gate_result.score,
-                "max_score": gate_result.max_score,
-                "score_percent": score_percent,
-                "blockers": gate_result.blockers,
-                "missing_evidence": gate_result.missing_evidence,
-                "control_coverage": f"{len([finding for finding in launch_findings if finding['status'] == 'pass'])}/{len(launch_findings)}",
-                "findings": launch_findings,
-                "residual_risks": [
-                    f"missing:{missing}" for missing in gate_result.missing_evidence
-                ] + list(gate_result.blockers),
-            },
-        }
-        _write_json(artifact_paths["governed_flow_summary"], governed_summary)
-
-        repo_root = Path(__file__).resolve().parent.parent
-        relative_artifacts = {name: _artifact_reference(path, repo_root) for name, path in artifact_paths.items()}
         dependency_status = {
             "identity": {
                 "mandatory": live_mode,
@@ -824,6 +799,65 @@ class GovernedFlowEvaluator:
                 "complete": bool(trace_correlation.get("complete")),
             },
         }
+        launch_gate_artifact["flow_metadata"]["dependency_status"] = dependency_status
+        _write_json(artifact_paths["launch_gate_result"], launch_gate_artifact)
+
+        governed_summary = {
+            "trace_id": trace_id,
+            "request_id": request_id,
+            "session_id": session_id,
+            "decision": final_decision,
+            "reasons": final_reasons,
+            "runtime_target": "onyx",
+            "requested_path": requested_path,
+            "evidence_mode": mode,
+            "environment_mode": self._environment_mode,
+            "handoff_allowed": final_decision,
+            "dependency_status": dependency_status,
+            "identity": identity_evidence,
+            "policy": policy_evidence,
+            "retrieval": retrieval_execution,
+            "secret": secret_evidence,
+            "tools": {
+                "allowed": tools_allowed,
+                "denied": tools_denied,
+                "reasons": list(dict.fromkeys(tool_reasons)),
+            },
+            "trace": trace_correlation,
+            "launch_gate": {
+                "decision": gate_result.decision,
+                "score": gate_result.score,
+                "max_score": gate_result.max_score,
+                "score_percent": score_percent,
+                "blockers": gate_result.blockers,
+                "missing_evidence": gate_result.missing_evidence,
+                "control_coverage": f"{len([finding for finding in launch_findings if finding['status'] == 'pass'])}/{len(launch_findings)}",
+                "findings": launch_findings,
+                "residual_risks": [
+                    f"missing:{missing}" for missing in gate_result.missing_evidence
+                ] + list(gate_result.blockers),
+            },
+        }
+        _write_json(artifact_paths["governed_flow_summary"], governed_summary)
+
+        for evidence_payload, artifact_path in (
+            (identity_evidence, artifact_paths["identity_evidence"]),
+            (policy_evidence, artifact_paths["policy_evidence"]),
+            (retrieval_execution, artifact_paths["retrieval_evidence"]),
+            (secret_evidence, artifact_paths["secret_evidence"]),
+            (trace_correlation, artifact_paths["trace_correlation"]),
+        ):
+            evidence_payload["handoff_allowed"] = final_decision
+            evidence_payload["launch_gate_decision"] = gate_result.decision
+            evidence_payload["launch_gate_missing_evidence"] = list(gate_result.missing_evidence)
+            evidence_payload["dependency_status"] = dependency_status
+            evidence_payload["reason_codes"] = list(
+                dict.fromkeys(_string for _string in list(evidence_payload.get("reason_codes", [])) + list(final_reasons) if _string)
+            )
+            _write_json(artifact_path, evidence_payload)
+
+        repo_root = Path(__file__).resolve().parent.parent
+        relative_artifacts = {name: _artifact_reference(path, repo_root) for name, path in artifact_paths.items()}
 
         return GovernedFlowResult(
             decision=final_decision,

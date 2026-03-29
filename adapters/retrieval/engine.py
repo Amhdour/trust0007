@@ -61,8 +61,10 @@ class RetrievalSecurityLayer:
             required_provenance_fields=required_provenance_fields,
         )
 
-        if docs and not filtered and deny_on_empty and filter_failures:
+        if not filtered and deny_on_empty:
             failure_reasons = list(dict.fromkeys(reasons + sorted(filter_failures.elements())))
+            if "retrieval.empty_result" not in failure_reasons:
+                failure_reasons.append("retrieval.empty_result")
             return RetrievalDecision(
                 allow=False,
                 mode="deny",

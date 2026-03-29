@@ -21,7 +21,76 @@
   ],
   "proof_sources": [
     "tests/integration/test_live_governed_runtime_dependencies.py::test_live_handoff_uses_mandatory_runtime_dependencies",
+    "tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_passes_through_http_dependency_chain",
     "backend/governance_flow_evaluator.py",
     "backend/api_gateway/server.py"
-  ]
+  ],
+  "artifact_snapshots": {
+    "identity_evidence": {
+      "trace_id": "trace-review-live-pass",
+      "request_id": "req-review-live-pass",
+      "session_id": "kc-session-123",
+      "evidence_mode": "live",
+      "source": "keycloak_userinfo",
+      "authenticated": true,
+      "live": true,
+      "reason_codes": ["identity.keycloak_validated"],
+      "handoff_allowed": true
+    },
+    "policy_evidence": {
+      "trace_id": "trace-review-live-pass",
+      "engine": "opa",
+      "package_path": "umbrella/policy/decision",
+      "allow": true,
+      "reason_codes": ["policy.allow"],
+      "handoff_allowed": true
+    },
+    "retrieval_evidence": {
+      "trace_id": "trace-review-live-pass",
+      "backend": "qdrant",
+      "live_backend": true,
+      "allow": true,
+      "result_count": 1,
+      "reason_codes": ["retrieval.integration_allowed:qdrant", "retrieval.tenant_scoped:tenant-dashboard"],
+      "handoff_allowed": true
+    },
+    "secret_evidence": {
+      "trace_id": "trace-review-live-pass",
+      "backend": "vault",
+      "required": true,
+      "fetched": true,
+      "reason_codes": ["ok"],
+      "handoff_allowed": true
+    },
+    "trace_correlation": {
+      "trace_id": "trace-review-live-pass",
+      "session_id": "kc-session-123",
+      "evidence_mode": "live",
+      "complete": true,
+      "missing_steps": [],
+      "handoff_allowed": true
+    },
+    "launch_gate_result": {
+      "decision": "pass",
+      "missing_evidence": [],
+      "blockers": [],
+      "handoff_allowed": true
+    },
+    "governed_flow_summary": {
+      "trace_id": "trace-review-live-pass",
+      "request_id": "req-review-live-pass",
+      "session_id": "kc-session-123",
+      "evidence_mode": "live",
+      "decision": true,
+      "handoff_allowed": true,
+      "dependency_status": {
+        "identity": {"mandatory": true, "live": true, "authenticated": true},
+        "policy": {"mandatory": true, "engine": "opa", "allow": true},
+        "retrieval": {"mandatory": true, "live_backend": true, "allow": true},
+        "secret": {"mandatory": true, "fetched": true, "reason": "ok"},
+        "trace": {"mandatory": true, "complete": true}
+      },
+      "launch_gate": {"decision": "pass", "missing_evidence": []}
+    }
+  }
 }

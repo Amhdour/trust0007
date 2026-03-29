@@ -12,7 +12,40 @@
   ],
   "proof_sources": [
     "tests/integration/test_live_governed_runtime_dependencies.py::test_live_handoff_denies_without_keycloak_identity",
+    "tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks",
     "adapters/identity/keycloak.py",
     "backend/governance_flow_evaluator.py"
-  ]
+  ],
+  "artifact_snapshots": {
+    "identity_evidence": {
+      "trace_id": "trace-review-identity-deny",
+      "request_id": "req-review-identity-deny",
+      "session_id": "",
+      "evidence_mode": "live",
+      "mandatory": true,
+      "authenticated": false,
+      "live": false,
+      "source": "missing_token",
+      "reason_codes": ["identity.missing_bearer_token"],
+      "handoff_allowed": false
+    },
+    "launch_gate_result": {
+      "decision": "no_go",
+      "missing_evidence": ["identity.live", "trace.correlation"],
+      "blockers": ["kill_switch_enabled", "mandatory_control_missing:live_identity"],
+      "handoff_allowed": false
+    },
+    "governed_flow_summary": {
+      "trace_id": "trace-review-identity-deny",
+      "request_id": "req-review-identity-deny",
+      "evidence_mode": "live",
+      "decision": false,
+      "handoff_allowed": false,
+      "reasons": ["identity.missing_bearer_token", "launch_gate.no_go"],
+      "dependency_status": {
+        "identity": {"mandatory": true, "live": false, "authenticated": false},
+        "trace": {"mandatory": true, "complete": false}
+      }
+    }
+  }
 }

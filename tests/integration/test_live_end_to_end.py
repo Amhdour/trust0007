@@ -1,4 +1,4 @@
-"""Live end-to-end test proving the governed flow works in the running system.
+"""Repo-local end-to-end test for the dashboard-first governed flow.
 
 This test:
 1. Starts the API gateway server
@@ -7,6 +7,9 @@ This test:
 4. Calls dashboard API to verify it consumes live artifacts
 5. Calls /launch/onyx to verify governance enforcement
 6. Verifies deny path blocks handoff
+
+This file primarily covers the repo-local control-plane path. The strict live
+HTTP dependency chain is proven separately in `test_strict_live_http_end_to_end.py`.
 """
 
 from __future__ import annotations

@@ -9,4 +9,12 @@ Use this folder as the reviewer entry point:
 - `denied-secret-flow.json` documents fail-closed denial when a required secret cannot be retrieved.
 - `live-launch-gate-downgrade.json` documents the live-evidence path where missing trace continuity downgrades readiness and blocks handoff.
 
+Each scenario file now includes:
+- proof sources
+- representative artifact snapshots
+- the final handoff result
+- the dependency status that mattered most to the scenario
+
+Use `docs/strict-live-proof-matrix.md` alongside this folder when you need the exact acceptance criteria and pass/fail test mapping.
+
 The raw files remain under `evidence/prod-sim/` so the evidence stays traceable to the captured responses.

@@ -19,3 +19,18 @@ def test_reviewer_bundle_lists_live_governed_runtime_examples() -> None:
     assert expected <= listed
     for path in expected:
         assert Path(path).is_file()
+
+
+def test_inspectable_live_runtime_examples_include_artifact_snapshots() -> None:
+    inspectable_root = Path("evidence/reviewer/inspectable-live-runtime")
+
+    for path in sorted(inspectable_root.glob("*.json")):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if path.name in {"denied-flow.json"}:
+            continue
+        assert payload["mode"] == "live"
+        assert payload["proof_sources"]
+        assert "artifact_snapshots" in payload
+        summary = payload["artifact_snapshots"].get("governed_flow_summary", {})
+        assert summary.get("evidence_mode") == "live"
+        assert "handoff_allowed" in summary

@@ -67,6 +67,13 @@ def _public_service_url(port: int, path: str = "") -> str:
     return f"{base}{path}"
 
 
+def _onyx_runtime_port() -> int:
+    try:
+        return int(os.environ.get("CONTROL_PLANE_ONYX_PORT", "3010"))
+    except ValueError:
+        return 3010
+
+
 def _governance_mode(explicit: str = "") -> str:
     return (explicit or os.environ.get("CONTROL_PLANE_GOVERNANCE_MODE", "demo")).strip().lower() or "demo"
 
@@ -385,6 +392,24 @@ def _build_governed_flow_evaluator(policy_context: RuntimePolicyContext, *, flow
     )
 
 
+def _dependency_summary_markup(flow_result: GovernedFlowEvaluator | object | None) -> str:
+    if flow_result is None or not hasattr(flow_result, "dependency_status"):
+        return "<li>Dependency status unavailable.</li>"
+    dependency_status = getattr(flow_result, "dependency_status", {}) or {}
+    items = []
+    for name, payload in dependency_status.items():
+        if not isinstance(payload, dict):
+            continue
+        status_bits = []
+        for key in ("mandatory", "live", "authenticated", "allow", "live_backend", "fetched", "complete", "source", "engine", "reason"):
+            value = payload.get(key)
+            if value in {"", None}:
+                continue
+            status_bits.append(f"{escape(str(key))}={escape(str(value))}")
+        items.append(f"<li><strong>{escape(str(name))}</strong>: {', '.join(status_bits) if status_bits else 'status unavailable'}</li>")
+    return "".join(items) or "<li>Dependency status unavailable.</li>"
+
+
 class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     server_version = "control-plane/0.1"
 
@@ -573,6 +598,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         if not governance_allowed:
             denial_reasons = [escape(reason) for reason in (flow_result.reasons if flow_result else [f"Evaluator error: {error_reason or 'governance check failed'}"])]
             artifact_markup = _artifact_list_markup(flow_result.artifacts if flow_result else {})
+            dependency_markup = _dependency_summary_markup(flow_result)
             # Governance denied the handoff
             body = f"""<!doctype html>
 <html lang="en">
@@ -637,13 +663,20 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
       <p>The governance layer has blocked your access to <code>{safe_path_html}</code>.</p>
       <div class="status">
         <strong>Handoff to Onyx was denied by control-plane policy.</strong>
+        <div class="muted">Evidence mode: <code>{escape(flow_result.evidence_mode if flow_result else flow_mode)}</code></div>
         <div class="muted">Governance decision: {flow_result.launch_gate_decision if flow_result else 'error'}</div>
         <div class="muted">Trace ID: <code>{flow_result.trace_id if flow_result else 'unknown'}</code></div>
+        <div class="muted">Session ID: <code>{flow_result.session_id if flow_result and flow_result.session_id else 'missing'}</code></div>
         <div class="muted">Policy source: <code>{escape(flow_result.policy_source if flow_result else 'unknown')}</code> via <code>{escape(flow_result.policy_path if flow_result else 'unknown')}</code></div>
+        <div class="muted">Missing evidence: <code>{escape(', '.join(flow_result.launch_gate_missing_evidence) if flow_result and flow_result.launch_gate_missing_evidence else 'none')}</code></div>
       </div>
       <p><strong>Reasons for denial:</strong></p>
       <ul>
         {"".join(f"<li>{reason}</li>" for reason in denial_reasons)}
+      </ul>
+      <p><strong>Dependency status:</strong></p>
+      <ul>
+        {dependency_markup}
       </ul>
       <p><strong>Evidence generated for this decision:</strong></p>
       <ul>
@@ -663,10 +696,11 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             return
 
         # Governance allowed the handoff, proceed with link
-        local_url = f"http://127.0.0.1:3010{safe_path}"
-        public_url = _public_service_url(3010, safe_path)
+        onyx_port = _onyx_runtime_port()
+        local_url = f"http://127.0.0.1:{onyx_port}{safe_path}"
+        public_url = _public_service_url(onyx_port, safe_path)
         local_ready = self._url_is_reachable(local_url)
-        codespaces_visible = self._url_is_reachable(_public_service_url(3010))
+        codespaces_visible = self._url_is_reachable(_public_service_url(onyx_port))
 
         if local_ready and codespaces_visible:
             runtime_summary = (
@@ -809,6 +843,9 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
       <div class="status">
         <strong>{status_headline}</strong>
         <div class="muted">{status_detail}</div>
+        <div class="muted">Evidence mode: <code>{escape(flow_result.evidence_mode if flow_result else flow_mode)}</code></div>
+        <div class="muted">Session ID: <code>{flow_result.session_id if flow_result and flow_result.session_id else 'missing'}</code></div>
+        <div class="muted">Missing evidence: <code>{escape(', '.join(flow_result.launch_gate_missing_evidence) if flow_result and flow_result.launch_gate_missing_evidence else 'none')}</code></div>
       </div>
       <div class="actions">
         <a class="button" href="{public_url}">Open Onyx</a>
@@ -820,10 +857,17 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         Trace: <code>{flow_result.trace_id if flow_result else 'unknown'}</code><br>
         Decision: <code>{flow_result.launch_gate_decision if flow_result else 'pass'}</code><br>
         Policy Source: <code>{escape(flow_result.policy_source if flow_result else 'unknown')}</code> via <code>{escape(flow_result.policy_path if flow_result else 'unknown')}</code><br>
+        Identity: {"Live" if flow_result and flow_result.dependency_status.get('identity', {}).get('live') else "Fallback"} |
         Policy: {"Allow" if flow_result and flow_result.policy_allow else "Deny"} |
         Retrieval: {"Allow" if flow_result and flow_result.retrieval_allow else "Deny"} |
+        Secret: {"Allow" if flow_result and (not flow_result.dependency_status.get('secret', {}).get('mandatory') or flow_result.dependency_status.get('secret', {}).get('fetched')) else "Deny"} |
+        Trace: {"Complete" if flow_result and flow_result.dependency_status.get('trace', {}).get('complete') else "Incomplete"} |
         Tools: {"Allow" if flow_result and not flow_result.denied_tools else "Deny"}<br>
         Reasons: <code>{escape(", ".join(flow_result.reasons) if flow_result and flow_result.reasons else "policy.allow")}</code><br>
+        <strong>Dependency status:</strong>
+        <ul>
+          {_dependency_summary_markup(flow_result)}
+        </ul>
         Evidence:
         <ul>
           {_artifact_list_markup(flow_result.artifacts if flow_result else {})}

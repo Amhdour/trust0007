@@ -22,6 +22,15 @@
     "governed-flow-summary.json",
     "launch-gate-result.json"
   ],
+  "strict_live_acceptance_criteria": [
+    "identity resolved through Keycloak-compatible HTTP interaction",
+    "policy decided through OPA HTTP interaction",
+    "retrieval executed through Qdrant HTTP interaction",
+    "secret fetched through Vault HTTP interaction when required",
+    "trace correlation complete",
+    "launch gate uses live evidence",
+    "final handoff result visible in artifacts and dashboard"
+  ],
   "sample_audit_events": {
     "events": [
       {
@@ -36,6 +45,7 @@
   },
   "inspectable_evidence": {
     "entry_point": "evidence/reviewer/inspectable-live-runtime/README.md",
+    "proof_matrix": "docs/strict-live-proof-matrix.md",
     "bundles": [
       "evidence/reviewer/inspectable-live-runtime/allowed-flow.json",
       "evidence/reviewer/inspectable-live-runtime/denied-flow.json",

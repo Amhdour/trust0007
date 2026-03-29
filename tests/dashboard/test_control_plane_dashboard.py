@@ -94,7 +94,24 @@ def test_upstream_usage_inventory_is_machine_readable() -> None:
 
 
 def test_launch_gate_summary_maps_existing_report() -> None:
-    summary = build_launch_gate_summary()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        (root / "launch-gate").mkdir(parents=True, exist_ok=True)
+        (root / "launch-gate" / "evaluator.py").write_text(
+            Path("launch-gate/evaluator.py").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        (root / "launch-gate" / "starter_launch_readiness_report.json").write_text(
+            Path("launch-gate/starter_launch_readiness_report.json").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        (root / "telemetry" / "exports").mkdir(parents=True, exist_ok=True)
+        (root / "telemetry" / "exports" / "sample_events.jsonl").write_text(
+            Path("telemetry/exports/sample_events.jsonl").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+        summary = build_launch_gate_summary(root)
 
     assert summary["status"] == "conditional"
     assert summary["readiness_score"] > 0
@@ -171,7 +188,10 @@ def test_upstream_usage_matrix_doc_exists() -> None:
 def test_live_mode_docs_exist() -> None:
     live_demo = Path("docs/live-vs-demo-matrix.md").read_text(encoding="utf-8")
     evidence_model = Path("docs/evidence-model.md").read_text(encoding="utf-8")
+    proof_matrix = Path("docs/strict-live-proof-matrix.md").read_text(encoding="utf-8")
 
     assert "live" in live_demo
     assert "demo" in live_demo
     assert "trace_id" in evidence_model
+    assert "Acceptance criteria" in proof_matrix
+    assert "strict live governed path" in proof_matrix.lower()

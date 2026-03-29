@@ -50,6 +50,7 @@ Inspect:
 
 ```bash
 pytest -q tests/integration/test_live_governed_runtime_dependencies.py
+pytest -q tests/integration/test_strict_live_http_end_to_end.py
 ```
 
 That suite covers:
@@ -59,7 +60,8 @@ That suite covers:
 - retrieval backend unavailable or invalid -> deny
 - required secret unavailable -> deny
 - broken trace correlation -> launch-gate `no_go`
+- full HTTP-level strict live pass and fail scenarios through the real control-plane server boundary
 
 ## 6. Review the evidence bundle
 
-Use `evidence/reviewer_evidence_bundle.json` and `evidence/reviewer/inspectable-live-runtime/` for reviewer-facing summaries of allowed, denied, and downgraded live-mode scenarios.
+Use `evidence/reviewer_evidence_bundle.json`, `evidence/reviewer/inspectable-live-runtime/`, and `docs/strict-live-proof-matrix.md` for reviewer-facing summaries of allowed, denied, and downgraded live-mode scenarios.

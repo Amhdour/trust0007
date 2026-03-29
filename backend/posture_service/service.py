@@ -40,6 +40,20 @@ from backend.launch_gate_service.service import build_launch_gate_summary
 POLICY_BUNDLE_PATH = "overlays/myStarterKit/policies/bundles/default/policy.json"
 INSPECTABLE_ALLOWED_FLOW = "evidence/reviewer/inspectable-live-runtime/allowed-flow.json"
 INSPECTABLE_DENIED_FLOW = "evidence/reviewer/inspectable-live-runtime/denied-flow.json"
+INSPECTABLE_IDENTITY_DENY = "evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json"
+INSPECTABLE_OPA_DENY = "evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json"
+INSPECTABLE_RETRIEVAL_DENY = "evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json"
+INSPECTABLE_SECRET_DENY = "evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json"
+INSPECTABLE_TRACE_DOWNGRADE = "evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json"
+INSPECTABLE_SCENARIOS = [
+    INSPECTABLE_ALLOWED_FLOW,
+    INSPECTABLE_DENIED_FLOW,
+    INSPECTABLE_IDENTITY_DENY,
+    INSPECTABLE_OPA_DENY,
+    INSPECTABLE_RETRIEVAL_DENY,
+    INSPECTABLE_SECRET_DENY,
+    INSPECTABLE_TRACE_DOWNGRADE,
+]
 PROD_SIM_EVENTS = "evidence/prod-sim/events.jsonl"
 PROD_SIM_GOVERNED_FLOW = "evidence/prod-sim/governed-flow-response.json"
 PROD_SIM_LAUNCH_GATE = "evidence/prod-sim/launch-gate-result.json"
@@ -249,7 +263,7 @@ def _artifact_integrity(path: Path, relative_path: str, root: Path) -> tuple[str
     if not path.exists():
         return "critical", "Artifact missing from checkout"
 
-    if relative_path in {INSPECTABLE_ALLOWED_FLOW, INSPECTABLE_DENIED_FLOW}:
+    if relative_path in INSPECTABLE_SCENARIOS:
         document = read_json(path)
         referenced = [root / artifact for artifact in _string_list(document.get("artifacts"))]
         missing = [artifact for artifact in referenced if not artifact.exists()]
@@ -449,6 +463,11 @@ def _build_artifact_inventory(root: Path) -> tuple[list[dict[str, str]], Counter
         ("Prod-sim events", PROD_SIM_EVENTS, "audit trail"),
         ("Inspectable allowed flow", INSPECTABLE_ALLOWED_FLOW, "inspectable evidence"),
         ("Inspectable denied flow", INSPECTABLE_DENIED_FLOW, "inspectable evidence"),
+        ("Inspectable identity denial", INSPECTABLE_IDENTITY_DENY, "inspectable evidence"),
+        ("Inspectable OPA denial", INSPECTABLE_OPA_DENY, "inspectable evidence"),
+        ("Inspectable retrieval denial", INSPECTABLE_RETRIEVAL_DENY, "inspectable evidence"),
+        ("Inspectable secret denial", INSPECTABLE_SECRET_DENY, "inspectable evidence"),
+        ("Inspectable trace downgrade", INSPECTABLE_TRACE_DOWNGRADE, "inspectable evidence"),
     ]
 
     inventory: list[dict[str, str]] = []
@@ -678,6 +697,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     secret_required = bool(secret_evidence.get("required"))
     secret_fetched = bool(secret_evidence.get("fetched"))
     trace_complete = bool(trace_correlation.get("complete"))
+    latest_handoff_allowed = bool(governed_flow_summary.get("handoff_allowed", governed_flow_summary.get("decision", False)))
+    latest_reason_codes = _string_list(governed_flow_summary.get("reasons", []))
+    latest_handoff_reason = latest_reason_codes[0] if latest_reason_codes else "policy.allow"
+    latest_missing_evidence = _string_list(governed_flow_summary.get("launch_gate", {}).get("missing_evidence", []))
     audit_events = reviewer.get("sample_audit_events", {}).get("events", [])
     blocked_attacks = reviewer.get("blocked_attack_summary", {}).get("blocked_attacks", [])
 
@@ -1116,6 +1139,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Governed surfaces", str(len(surfaces)), "healthy", "Registered runtime surfaces protected by policy path rules.", "#entry-points"),
                         _card("Identity source", str(identity_evidence.get("source", "demo_fallback")), "healthy" if identity_live else "warning", "Latest governed flow identity source. Live mode should show Keycloak-backed validation.", _raw("overlays/myStarterKit/artifacts/identity-evidence.json")),
                         _card("Session correlation", latest_session_id or "missing", "healthy" if latest_session_id else "critical", "Latest governed flow session identifier used for trace correlation.", "#trace-correlation"),
+                        _card("Identity result", "ALLOW" if identity_evidence.get("authenticated") else "DENY", "healthy" if identity_evidence.get("authenticated") else "critical", f"Latest identity reason: {identity_evidence.get('reason', 'unknown')}.", _raw("overlays/myStarterKit/artifacts/identity-evidence.json")),
                     ],
                 },
                 {
@@ -1153,6 +1177,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Top deny reason", _top_reason(policy_reason_counts), "warning" if policy_reason_counts else "neutral", "Dominant governance rationale across denies and blocked runtime handoffs.", "#blocked-actions"),
                         _card("Policy source", policy_source.upper(), "healthy" if policy_source == "overlay" else "warning", f"Current runtime policy bundle path: {policy_path}.", policy_href),
                         _card("Decision engine", policy_engine.upper(), "healthy" if policy_engine == "opa" else "warning", "Latest governed-flow policy engine. Live mode should show OPA as the active decision path.", _raw("overlays/myStarterKit/artifacts/policy-evidence.json")),
+                        _card("Latest policy result", "ALLOW" if policy_evidence.get("allow") else "DENY", "healthy" if policy_evidence.get("allow") else "critical", f"Latest policy reasons: {', '.join(_string_list(policy_evidence.get('reason_codes')) or _string_list(policy_evidence.get('reasons')) or ['unknown'])}.", _raw("overlays/myStarterKit/artifacts/policy-evidence.json")),
                     ],
                 },
                 {
@@ -1201,6 +1226,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Allowed sources", str(len(retrieval_sources)), "healthy", "Sources explicitly modeled in policy.", policy_href),
                         _card("Tenant/source pairs", str(len(retrieval_rows)), "healthy", "Tenant-scoped retrieval boundaries declared in policy.", policy_href),
                         _card("Latest backend", str(retrieval_evidence.get("backend", "demo")), "healthy" if retrieval_live_backend else "warning", "Latest governed-flow retrieval backend. Live mode should show a real backend path such as Qdrant.", _raw("overlays/myStarterKit/artifacts/retrieval-evidence.json")),
+                        _card("Latest retrieval result", "ALLOW" if retrieval_evidence.get("allow") else "DENY", "healthy" if retrieval_evidence.get("allow") else "critical", f"Latest retrieval reasons: {', '.join(_string_list(retrieval_evidence.get('reason_codes')) or _string_list(retrieval_evidence.get('reasons')) or ['unknown'])}.", _raw("overlays/myStarterKit/artifacts/retrieval-evidence.json")),
                     ],
                 },
                 {
@@ -1256,6 +1282,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Secret required", "yes" if secret_required else "no", "warning" if secret_required else "neutral", "Whether the latest governed flow required a live secret lookup.", _raw("overlays/myStarterKit/artifacts/secret-evidence.json")),
                         _card("Secret fetched", "yes" if secret_fetched else "no", "healthy" if secret_fetched or not secret_required else "critical", "Required secret access must succeed in live mode or the governed operation fails closed.", _raw("overlays/myStarterKit/artifacts/secret-evidence.json")),
                         _card("Secret backend", str(secret_evidence.get("backend", "unconfigured")), "healthy" if secret_evidence.get("backend") == "vault" else "warning", "Latest governed-flow secret backend.", _raw("overlays/myStarterKit/artifacts/secret-evidence.json")),
+                        _card("Secret reason", str(secret_evidence.get("reason", "unknown")), "healthy" if secret_fetched or not secret_required else "critical", "Latest governed-flow secret access reason code.", _raw("overlays/myStarterKit/artifacts/secret-evidence.json")),
                     ],
                 },
                 {
@@ -1353,7 +1380,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Audit coverage", f"{audit_coverage}%", "healthy" if audit_coverage >= 60 else "warning", "Observed traces tied to explicit audit events in the reviewer bundle.", reviewer_href),
                         _card("Trace coverage", f"{trace_coverage}%", "healthy" if trace_coverage >= 80 else "warning", "Requests with visible completion telemetry in the current feed.", _raw(event_feed_path)),
                         _card("Trace continuity", "complete" if trace_complete else "incomplete", "healthy" if trace_complete else "critical", "Latest governed flow trace continuity across identity, policy, retrieval, secret, tool, and handoff steps.", _raw("overlays/myStarterKit/artifacts/trace-correlation.json")),
-                        _card("Replay bundles", "2", "healthy", "Inspectable allowed and denied runtime bundles are available for evaluator review.", _raw(INSPECTABLE_ALLOWED_FLOW)),
+                        _card("Replay bundles", str(len(INSPECTABLE_SCENARIOS)), "healthy", "Inspectable pass/fail live-governed examples are available for evaluator review.", _raw(INSPECTABLE_ALLOWED_FLOW)),
                         _card("Blocked attacks", str(evidence_summary.get("blocked_count", 0)), "healthy", "Reviewer evidence bundle records blocked hostile scenarios.", reviewer_href),
                         _card("Eval pass / total", f"{eval_passed} / {eval_total}", "healthy" if eval_total == 0 or eval_passed == eval_total else "warning", "Latest available evaluation summary for the governed stack.", ingestion_href),
                     ],
@@ -1420,6 +1447,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Latest trace", latest_trace_id or "missing", "healthy" if latest_trace_id else "critical", "Latest governed-flow trace identifier.", _raw("overlays/myStarterKit/artifacts/trace-correlation.json")),
                         _card("Latest session", latest_session_id or "missing", "healthy" if latest_session_id else "warning", "Latest governed-flow session identifier tied to the trace.", _raw("overlays/myStarterKit/artifacts/trace-correlation.json")),
                         _card("Trace complete", "yes" if trace_complete else "no", "healthy" if trace_complete else "critical", "Whether the latest governed flow recorded the required end-to-end control steps under one correlated trace.", _raw("overlays/myStarterKit/artifacts/trace-correlation.json")),
+                        _card("Missing steps", str(len(_string_list(trace_correlation.get("missing_steps", [])))), "healthy" if not _string_list(trace_correlation.get("missing_steps", [])) else "critical", "Missing trace-correlation steps for the latest governed flow.", _raw("overlays/myStarterKit/artifacts/trace-correlation.json")),
                     ],
                 },
                 {
@@ -1458,6 +1486,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Failing controls", str(len(failing_controls)), "critical" if failing_controls else "healthy", "Controls that are not in a full pass state.", launch_report_href),
                         _card("Residual risks", str(len(residual_risks)), "warning" if residual_risks else "healthy", "Remaining launch caveats or hardening tasks.", launch_report_href),
                         _card("Evidence mode", str(launch_summary.get("evidence_mode", "demo")).upper(), "healthy" if str(launch_summary.get("evidence_mode", "")) == "live" else "warning", "Live mode should compute readiness from governed-flow evidence artifacts instead of sample/demo telemetry.", launch_report_href),
+                        _card("Missing evidence", str(len(launch_summary.get("missing_controls", []))), "healthy" if not launch_summary.get("missing_controls") else "critical", "Launch-gate missing evidence currently blocking or downgrading readiness.", launch_report_href),
                     ],
                 },
                 {
@@ -1575,6 +1604,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Allowed handoff evidence", "Visible", "healthy", "Inspectable evidence bundle for an allowed runtime handoff is present.", _raw(INSPECTABLE_ALLOWED_FLOW)),
                         _card("Denied handoff evidence", "Visible", "critical", "Inspectable evidence bundle for a denied runtime handoff is present.", _raw(INSPECTABLE_DENIED_FLOW)),
                         _card("Recent handoff outcomes", str(len(onyx_handoffs)), "healthy", "Recent governed handoff outcomes are visible to reviewers.", "#entry-points"),
+                        _card("Latest handoff", "ALLOW" if latest_handoff_allowed else "DENY", "healthy" if latest_handoff_allowed else "critical", f"Latest governed handoff reason: {latest_handoff_reason}.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json")),
+                        _card("Latest evidence mode", str(governed_flow_summary.get("evidence_mode", event_feed_label)).upper(), "healthy" if live_evidence_mode else "warning", "Current governed handoff evidence mode.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json")),
+                        _card("Missing handoff evidence", ", ".join(latest_missing_evidence) or "none", "healthy" if not latest_missing_evidence else "critical", "Live-mode missing evidence that affected the latest handoff or launch-gate result.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json")),
                     ],
                 },
                 {
