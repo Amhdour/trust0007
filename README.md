@@ -117,10 +117,24 @@ docker-compose -f compose/docker-compose.prod-sim.yml up
 
 Not every vendored upstream under `upstream/` is an equally active part of the current architecture.
 
-- Active now: Onyx and Langfuse materially contribute to the current governed runtime or evidence path.
-- Partially used: Keycloak, Envoy, OPA, Vault, Qdrant, and Grafana are present through containers, policy, adapters, or bridge configs, but some are not yet mandatory request-path dependencies.
-- Optional future: Superset and gVisor stay in scope only as future analytics or isolation depth.
-- Reference only: supporting snapshots such as Keycloak Quickstarts, the OPA Envoy Plugin, and the Langfuse Python SDK are retained for implementation reference, not for active architecture claims.
+- Active now:
+  - Onyx is the governed runtime target behind `/launch/onyx`.
+  - Langfuse is the evidence-plane activity source the dashboard can consume live.
+- Partially used:
+  - Keycloak, Envoy, OPA, Vault, Qdrant, and Grafana are kept because they strengthen real trust boundaries or control outcomes, but several are not yet proven mandatory request-path dependencies.
+- Optional future:
+  - Superset and gVisor remain in scope only as future analytics or isolation depth.
+- Reference only:
+  - Keycloak Quickstarts, the OPA Envoy Plugin, and the Langfuse Python SDK are retained as implementation references, not as active architecture claims.
+
+Every component that remains in scope is expected to answer:
+
+- what it does
+- where it sits in the runtime
+- why it is necessary
+- what governance signal it emits
+- what evidence artifact it contributes
+- what control gap appears if it is removed
 
 See `docs/upstream-usage-matrix.md` for the reviewer-facing explanation and `evidence/upstream_usage.inventory.json` for the machine-readable inventory surfaced by the dashboard.
 

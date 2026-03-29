@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 
 from backend.integration_adapter.repository import (
+    list_upstream_component_paths,
     load_dashboard_contract,
     load_runtime_policy_bundle,
     load_upstream_usage_inventory,
@@ -69,21 +70,27 @@ def test_dashboard_includes_upstream_integration_posture_section() -> None:
     upstream_section = next(section for section in payload["sections"] if section["id"] == "upstream-posture")
     cards_block = next(block for block in upstream_section["blocks"] if block["type"] == "cards")
     table_block = next(block for block in upstream_section["blocks"] if block["type"] == "table")
+    audit_block = next(block for block in upstream_section["blocks"] if block["title"] == "Inventory audit")
     links_block = next(block for block in upstream_section["blocks"] if block["type"] == "links")
 
     labels = {item["label"] for item in cards_block["items"]}
-    assert {"Used now", "Partially used", "Optional / future", "Reference only"} <= labels
+    assert {"Used now", "Partially used", "Optional / future", "Reference only", "Inventory coverage"} <= labels
     assert any(row["component"] == "Onyx" and row["classification"] == "used_now" for row in table_block["rows"])
+    assert any(column["key"] == "path_status" for column in table_block["columns"])
+    assert any(item["title"] == "Inventory coverage" for item in audit_block["items"])
     assert any(item["label"] == "Upstream usage API" for item in links_block["items"])
 
 
 def test_upstream_usage_inventory_is_machine_readable() -> None:
     inventory = load_upstream_usage_inventory()
 
-    assert inventory["inventory_version"] == 1
+    assert inventory["inventory_version"] == 2
     assert inventory["components"]
+    assert inventory["audit"]["inventory_covers_all_upstreams"] is True
+    assert set(inventory["upstream_paths"]) == set(list_upstream_component_paths())
     assert any(component["component_name"] == "Onyx" for component in inventory["components"])
     assert any(component["classification"] == "reference_only" for component in inventory["components"])
+    assert any(component["runtime_path_status"] == "mandatory" for component in inventory["components"])
 
 
 def test_launch_gate_summary_maps_existing_report() -> None:

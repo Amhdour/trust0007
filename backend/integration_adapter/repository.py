@@ -16,6 +16,12 @@ DASHBOARD_INGESTION_PRIMARY = "overlays/myStarterKit/artifacts/dashboard/dashboa
 DASHBOARD_INGESTION_FALLBACK = "telemetry/exports/mystarterkit_dashboard_feed.json"
 DASHBOARD_CONTRACT_PATH = "contracts/control-plane-dashboard.json"
 UPSTREAM_USAGE_INVENTORY_PATH = "evidence/upstream_usage.inventory.json"
+UPSTREAM_INVENTORY_CLASSIFICATIONS = {
+    "used_now",
+    "partially_used",
+    "optional_future",
+    "reference_only",
+}
 
 
 @dataclass(frozen=True)
@@ -47,6 +53,17 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
         if line.strip():
             records.append(json.loads(line))
     return records
+
+
+def list_upstream_component_paths(root: Path | None = None) -> list[str]:
+    upstream_root = repo_root(root) / "upstream"
+    if not upstream_root.exists():
+        return []
+    return sorted(
+        str(path.relative_to(repo_root(root)))
+        for path in upstream_root.iterdir()
+        if path.is_dir()
+    )
 
 
 def parse_compose_services(path: Path) -> list[str]:
@@ -114,7 +131,73 @@ def load_dashboard_contract(root: Path | None = None) -> dict[str, Any]:
 
 
 def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
-    return read_json(repo_root(root) / UPSTREAM_USAGE_INVENTORY_PATH)
+    inventory = read_json(repo_root(root) / UPSTREAM_USAGE_INVENTORY_PATH)
+    components = list(inventory.get("components", []))
+    component_paths = list_upstream_component_paths(root)
+
+    path_to_components: dict[str, list[dict[str, Any]]] = {}
+    invalid_components: list[str] = []
+    for component in components:
+        component_name = str(component.get("component_name", "")).strip()
+        component_path = str(component.get("upstream_path", "")).strip()
+        classification = str(component.get("classification", "")).strip()
+        if component_path:
+            path_to_components.setdefault(component_path, []).append(component)
+        required_fields = (
+            component_name,
+            component_path,
+            classification,
+            str(component.get("runtime_role", "")).strip(),
+            str(component.get("runtime_location", "")).strip(),
+            str(component.get("necessity_rationale", "")).strip(),
+            str(component.get("removal_impact", "")).strip(),
+            str(component.get("missing_integration_depth", "")).strip(),
+        )
+        if not all(required_fields) or classification not in UPSTREAM_INVENTORY_CLASSIFICATIONS:
+            invalid_components.append(component_name or component_path or "unknown-component")
+
+    classification_counts = {
+        classification: sum(1 for component in components if component.get("classification") == classification)
+        for classification in sorted(UPSTREAM_INVENTORY_CLASSIFICATIONS)
+    }
+    runtime_path_counts = {
+        status: sum(1 for component in components if component.get("runtime_path_status") == status)
+        for status in ("mandatory", "supporting", "optional", "reference")
+    }
+    dashboard_visible_components = [
+        str(component.get("component_name", "Component"))
+        for component in components
+        if bool(component.get("dashboard_visible"))
+    ]
+    source_snapshot_required = [
+        str(component.get("component_name", "Component"))
+        for component in components
+        if bool(component.get("source_snapshot_required"))
+    ]
+    missing_paths = [path for path in component_paths if path not in path_to_components]
+    extra_paths = [path for path in path_to_components if path not in component_paths]
+    duplicate_paths = sorted(path for path, mapped in path_to_components.items() if len(mapped) > 1)
+
+    enriched_inventory = dict(inventory)
+    enriched_inventory["component_count"] = len(components)
+    enriched_inventory["upstream_paths"] = component_paths
+    enriched_inventory["classification_counts"] = classification_counts
+    enriched_inventory["audit"] = {
+        "inventory_path": UPSTREAM_USAGE_INVENTORY_PATH,
+        "component_paths_in_repo": component_paths,
+        "classified_paths": sorted(path_to_components),
+        "missing_paths": missing_paths,
+        "extra_paths": extra_paths,
+        "duplicate_paths": duplicate_paths,
+        "invalid_components": sorted(invalid_components),
+        "inventory_covers_all_upstreams": not missing_paths and not extra_paths and not duplicate_paths,
+        "dashboard_visible_components": dashboard_visible_components,
+        "dashboard_visible_count": len(dashboard_visible_components),
+        "source_snapshot_required_components": source_snapshot_required,
+        "source_snapshot_required_count": len(source_snapshot_required),
+        "runtime_path_counts": runtime_path_counts,
+    }
+    return enriched_inventory
 
 
 def launch_report_relative_path(root: Path | None = None) -> str:

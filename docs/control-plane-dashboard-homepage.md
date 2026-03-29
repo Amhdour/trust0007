@@ -43,6 +43,7 @@ The page now leads with:
   - contract labels from `contracts/control-plane-dashboard.json`
 - `/api/control-plane/upstream-usage`
   - built from `evidence/upstream_usage.inventory.json`
+  - enriched with repo-backed inventory coverage, runtime-path status, and dashboard-signal counts
   - used to keep the dashboard's upstream posture section machine-readable and reviewer-auditable
 - launch readiness
   - `backend/launch_gate_service/service.py`
@@ -54,6 +55,10 @@ The page now leads with:
 - blocked actions and governance KPIs
   - live governed flow artifacts when present
   - otherwise `telemetry/exports/sample_events.jsonl`
+- upstream posture
+  - component inventory from `evidence/upstream_usage.inventory.json`
+  - coverage audit from `backend/integration_adapter/repository.py`
+  - reviewer-facing rationale rendered in `backend/posture_service/service.py`
 - audit and reviewer evidence
   - `evidence/reviewer_evidence_bundle.json`
   - `evidence/reviewer/inspectable-live-runtime/*.json`

@@ -362,7 +362,8 @@ def _upstream_table_rows(components: list[dict[str, Any]]) -> list[dict[str, str
             {
                 "component": str(component.get("component_name", "Component")),
                 "classification": str(component.get("classification", "reference_only")),
-                "role": str(component.get("runtime_role", "Role not documented.")),
+                "path_status": str(component.get("runtime_path_status", "reference")),
+                "location": str(component.get("runtime_location", "Runtime location not documented.")),
                 "signal": signals[0] if signals else "No dedicated governance signal yet.",
                 "evidence": evidence[0] if evidence else "No evidence artifact listed.",
                 "dev": _bool_label(bool(component.get("enabled_in_dev"))),
@@ -379,13 +380,15 @@ def _upstream_record_items(components: list[dict[str, Any]]) -> list[dict[str, s
             meta=" | ".join(
                 (
                     str(component.get("classification", "reference_only")),
+                    str(component.get("runtime_path_status", "reference")),
                     str(component.get("recommended_action", "review classification")),
                 )
             ),
             detail=" ".join(
                 part
                 for part in (
-                    str(component.get("runtime_role", "")).strip(),
+                    f"Why it stays: {str(component.get('necessity_rationale', '')).strip()}",
+                    f"Current gap: {str(component.get('missing_integration_depth', '')).strip()}",
                     f"Removal impact: {str(component.get('removal_impact', '')).strip()}",
                 )
                 if part
@@ -398,6 +401,28 @@ def _upstream_record_items(components: list[dict[str, Any]]) -> list[dict[str, s
             }.get(str(component.get("classification", "")), "neutral"),
         )
         for component in components
+    ]
+
+
+def _upstream_audit_cards(inventory: dict[str, Any]) -> list[dict[str, str]]:
+    components = list(inventory.get("components", []))
+    counts = inventory.get("classification_counts", {})
+    audit = inventory.get("audit", {})
+    runtime_path_counts = audit.get("runtime_path_counts", {})
+    covered = len(audit.get("classified_paths", []))
+    total_paths = len(audit.get("component_paths_in_repo", []))
+    coverage_status = "healthy" if audit.get("inventory_covers_all_upstreams") else "critical"
+    dashboard_visible_count = int(audit.get("dashboard_visible_count", 0))
+
+    return [
+        _card("Used now", str(counts.get("used_now", 0)), "healthy", "Components that currently strengthen the repo's real runtime or evidence path.", "#upstream-posture"),
+        _card("Partially used", str(counts.get("partially_used", 0)), "warning", "Components present through containers, policy, adapters, or bridge configs without full mandatory-path proof.", "#upstream-posture"),
+        _card("Optional / future", str(counts.get("optional_future", 0)), "neutral", "Components intentionally kept out of active architecture claims until they produce reviewer-visible outcomes.", "#upstream-posture"),
+        _card("Reference only", str(counts.get("reference_only", 0)), "neutral", "Vendored snapshots retained for compatibility or implementation reference only.", "#upstream-posture"),
+        _card("Inventory coverage", f"{covered} / {total_paths or len(components)}", coverage_status, "Every vendored upstream path should be classified exactly once.", "#upstream-posture"),
+        _card("Dashboard-visible signals", str(dashboard_visible_count), "healthy" if dashboard_visible_count else "warning", "Components with a reviewer-visible posture, evidence, or activity signal on the homepage.", "#upstream-posture"),
+        _card("Mandatory path components", str(runtime_path_counts.get("mandatory", 0)), "healthy", "Components the repo currently treats as part of the proved runtime or evidence path.", "#upstream-posture"),
+        _card("Supporting path components", str(runtime_path_counts.get("supporting", 0)), "warning" if runtime_path_counts.get("supporting", 0) else "neutral", "Components that strengthen the platform but are not yet proven as mandatory request-path dependencies.", "#upstream-posture"),
     ]
 
 
@@ -593,7 +618,13 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     services = load_service_inventory(resolved_root)
     upstream_inventory = load_upstream_usage_inventory(resolved_root)
     upstream_components = list(upstream_inventory.get("components", []))
-    upstream_counts = _upstream_components_by_classification(upstream_components)
+    upstream_counts = Counter(
+        {
+            key: int(value)
+            for key, value in dict(upstream_inventory.get("classification_counts", {})).items()
+        }
+    ) or _upstream_components_by_classification(upstream_components)
+    upstream_audit = dict(upstream_inventory.get("audit", {}))
     events, event_feed_label, event_feed_path = _event_feed(resolved_root)
     policy_bundle = load_runtime_policy_bundle(resolved_root)
     policy = policy_bundle.document
@@ -791,7 +822,13 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 _card("Dashboard mode", "Governance-first", "healthy", "This homepage leads with governance outcomes and readiness, not raw runtime usage.", "#overview"),
                 _card("Data source", event_feed_label, "healthy" if has_live_governed_flow_artifacts(resolved_root) else "warning", f"Primary feed: {event_feed_path}.", _raw(event_feed_path)),
                 _card("Runtime position", "Onyx behind governed handoffs", "healthy", "Onyx remains visible as a governed runtime reached through dashboard-controlled surfaces.", "#entry-points"),
-                _card("Upstream discipline", f"{upstream_counts['used_now']} active / {len(upstream_components)} inventoried", "healthy", "Vendored upstreams are classified by real runtime use, not by mere presence under `upstream/`.", "#upstream-posture"),
+                _card(
+                    "Upstream discipline",
+                    f"{upstream_counts['used_now']} active / {len(upstream_audit.get('component_paths_in_repo', upstream_components))} vendored",
+                    "healthy" if upstream_audit.get("inventory_covers_all_upstreams") else "warning",
+                    "Vendored upstreams are classified by real runtime use, not by mere presence under `upstream/`.",
+                    "#upstream-posture",
+                ),
                 _card("Portfolio framing", "Layer Retrofit + Launch Gate", "healthy", "The homepage is tuned for evaluator review of enforcement, evidence, and launch readiness.", _raw("docs/control-plane-dashboard-homepage.md")),
             ],
         },
@@ -983,12 +1020,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 {
                     "type": "cards",
                     "title": "Upstream usage classification",
-                    "items": [
-                        _card("Used now", str(upstream_counts["used_now"]), "healthy", "Components that currently strengthen the repo's real runtime or evidence path.", "#upstream-posture"),
-                        _card("Partially used", str(upstream_counts["partially_used"]), "warning", "Components present through containers, policy, adapters, or bridge configs without full mandatory-path proof.", "#upstream-posture"),
-                        _card("Optional / future", str(upstream_counts["optional_future"]), "neutral", "Components intentionally kept out of active architecture claims until they produce reviewer-visible outcomes.", "#upstream-posture"),
-                        _card("Reference only", str(upstream_counts["reference_only"]), "neutral", "Vendored snapshots retained for compatibility or implementation reference only.", "#upstream-posture"),
-                    ],
+                    "items": _upstream_audit_cards(upstream_inventory),
                 },
                 {
                     "type": "table",
@@ -996,7 +1028,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "columns": [
                         {"key": "component", "label": "Component"},
                         {"key": "classification", "label": "Classification"},
-                        {"key": "role", "label": "Runtime role"},
+                        {"key": "path_status", "label": "Path status"},
+                        {"key": "location", "label": "Where it sits"},
                         {"key": "signal", "label": "Governance signal"},
                         {"key": "evidence", "label": "Evidence artifact"},
                         {"key": "dev", "label": "Dev"},
@@ -1008,6 +1041,33 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "type": "records",
                     "title": "Why each component stays or shrinks",
                     "items": _upstream_record_items(upstream_components),
+                },
+                {
+                    "type": "records",
+                    "title": "Inventory audit",
+                    "items": [
+                        _record(
+                            "Inventory coverage",
+                            f"{len(upstream_audit.get('classified_paths', []))} classified / {len(upstream_audit.get('component_paths_in_repo', []))} vendored paths",
+                            "Every top-level vendored upstream path is expected to have one classification entry and no duplicates.",
+                            "healthy" if upstream_audit.get("inventory_covers_all_upstreams") else "critical",
+                            _dashboard_url("/api/control-plane/upstream-usage"),
+                        ),
+                        _record(
+                            "Dashboard-visible components",
+                            ", ".join(upstream_audit.get("dashboard_visible_components", [])[:6]) or "none recorded",
+                            "Only components with reviewer-visible outcomes should feel active on the homepage.",
+                            "healthy" if upstream_audit.get("dashboard_visible_count", 0) else "warning",
+                            "#upstream-posture",
+                        ),
+                        _record(
+                            "Source snapshot required",
+                            ", ".join(upstream_audit.get("source_snapshot_required_components", [])[:6]) or "none required",
+                            "These are the few components whose vendored source snapshot is currently part of a real repo-owned workflow, test target, or launch path.",
+                            "neutral",
+                            _raw("docs/upstream-usage-matrix.md"),
+                        ),
+                    ],
                 },
                 {
                     "type": "links",
