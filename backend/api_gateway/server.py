@@ -41,6 +41,29 @@ ARTIFACT_DIR = Path(
 ).resolve()
 
 
+def _is_static_candidate(path: Path) -> bool:
+    return path.exists() and path.is_file() and (STATIC_ROOT in path.parents or path == STATIC_ROOT / "index.html")
+
+
+def _resolve_static_path(request_path: str) -> Path:
+    if request_path in {"", "/"}:
+        return STATIC_ROOT / "index.html"
+
+    relative_path = request_path.lstrip("/")
+    raw_candidate = (STATIC_ROOT / relative_path).resolve()
+    candidates = [raw_candidate]
+
+    if not Path(relative_path).suffix:
+        candidates.append((STATIC_ROOT / f"{relative_path}.html").resolve())
+        candidates.append((STATIC_ROOT / relative_path / "index.html").resolve())
+
+    for candidate in candidates:
+        if _is_static_candidate(candidate):
+            return candidate
+
+    return STATIC_ROOT / "index.html"
+
+
 @dataclass(frozen=True)
 class RuntimePolicyContext:
     document: dict
@@ -521,11 +544,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             )
 
     def _serve_static(self, request_path: str) -> None:
-        relative_path = "index.html" if request_path in {"", "/"} else request_path.lstrip("/")
-        candidate = (STATIC_ROOT / relative_path).resolve()
-        if not candidate.exists() or not candidate.is_file() or STATIC_ROOT not in candidate.parents and candidate != STATIC_ROOT / "index.html":
-            candidate = STATIC_ROOT / "index.html"
-        self._send_file(candidate)
+        self._send_file(_resolve_static_path(request_path))
 
     def _serve_repo_file(self, relative_path: str) -> None:
         candidate = (REPO_ROOT / unquote(relative_path)).resolve()

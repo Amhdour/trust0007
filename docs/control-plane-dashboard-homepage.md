@@ -4,6 +4,8 @@
 
 The homepage was upgraded from a general control-plane shell into a plain-language safety and review dashboard.
 
+It now has a companion client-facing explanation layer at `/client-overview` for non-technical audiences. That page summarizes the same system state with simpler visuals and links back into the technical dashboard when deeper inspection is needed.
+
 The page now leads with:
 
 - a plain-language first layer for non-technical readers

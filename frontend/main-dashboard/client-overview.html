@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Client Overview | AI Safety and Review Dashboard</title>
+    <link rel="stylesheet" href="/client-overview.css" />
+  </head>
+  <body>
+    <div class="client-shell">
+      <header class="client-hero">
+        <div class="hero-copy-block">
+          <p class="eyebrow">Client Overview</p>
+          <h1 id="client-hero-title">AI Safety Layer In Plain English</h1>
+          <p id="client-hero-copy" class="hero-copy">
+            Loading a simple explanation of what the system checks, what it blocks, and whether it is safe to use now.
+          </p>
+          <div class="hero-meta" id="client-hero-meta"></div>
+        </div>
+        <div class="hero-actions">
+          <a class="hero-action-button" href="/">Open technical dashboard</a>
+          <a class="hero-action-button secondary" href="/raw/docs/client-overview.md">Read explainer notes</a>
+        </div>
+      </header>
+
+      <section class="note-panel">
+        <p>
+          This page is the simple explanation layer. It summarizes the real system state for clients and non-technical
+          reviewers. The technical dashboard and raw evidence are still available for deeper inspection.
+        </p>
+      </section>
+
+      <section class="panel" aria-labelledby="traffic-title">
+        <div class="section-head">
+          <p class="eyebrow">At a glance</p>
+          <h2 id="traffic-title">Traffic-Light Summary</h2>
+          <p class="section-description">
+            Green means the proof currently supports the claim, yellow means something important needs attention, and
+            red means a serious issue or blocker is visible.
+          </p>
+        </div>
+        <div id="traffic-summary-root" class="traffic-grid">
+          <section class="loading-card">Preparing summary cards.</section>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="process-title">
+        <div class="section-head">
+          <p class="eyebrow">How it works</p>
+          <h2 id="process-title">Simple Safety Check Flow</h2>
+          <p class="section-description">
+            This shows the plain-language path a request takes before the AI system is allowed to answer.
+          </p>
+        </div>
+        <div id="process-root">
+          <section class="loading-card">Preparing process diagram.</section>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="comparison-title">
+        <div class="section-head">
+          <p class="eyebrow">Why this matters</p>
+          <h2 id="comparison-title">Direct AI Access Vs Checked AI Access</h2>
+          <p class="section-description">
+            This comparison explains the value of the control plane in one visual.
+          </p>
+        </div>
+        <div id="comparison-root">
+          <section class="loading-card">Preparing comparison view.</section>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="examples-title">
+        <div class="section-head">
+          <p class="eyebrow">Examples</p>
+          <h2 id="examples-title">Allowed And Blocked Examples</h2>
+          <p class="section-description">
+            These examples show one request that passed and one request that was blocked, along with the proof that
+            was saved.
+          </p>
+        </div>
+        <div id="examples-root">
+          <section class="loading-card">Preparing example cards.</section>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="readiness-title">
+        <div class="section-head">
+          <p class="eyebrow">Current state</p>
+          <h2 id="readiness-title">Can It Be Used Safely Now?</h2>
+          <p class="section-description">
+            This is the client-facing version of the launch and readiness decision.
+          </p>
+        </div>
+        <div id="readiness-root">
+          <section class="loading-card">Preparing readiness gauge.</section>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="links-title">
+        <div class="section-head">
+          <p class="eyebrow">Go deeper</p>
+          <h2 id="links-title">Technical Dashboard And Proof Links</h2>
+          <p class="section-description">
+            Use these links when someone wants the full technical dashboard, raw proof, or the reviewer fast path.
+          </p>
+        </div>
+        <div id="links-root" class="link-grid">
+          <section class="loading-card">Preparing deep links.</section>
+        </div>
+      </section>
+    </div>
+
+    <noscript>This page needs JavaScript enabled to load the live client summary.</noscript>
+    <script src="/client-overview.js" defer></script>
+  </body>
+</html>

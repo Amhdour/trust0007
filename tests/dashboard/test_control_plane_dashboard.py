@@ -8,6 +8,7 @@ from backend.integration_adapter.repository import (
     load_runtime_policy_bundle,
     load_upstream_usage_inventory,
 )
+from backend.api_gateway.server import _resolve_static_path
 from backend.launch_gate_service.service import build_launch_gate_summary
 from backend.posture_service.service import build_control_plane_dashboard
 
@@ -45,6 +46,25 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "payload.audience_paths" in js
     assert "block.collapsed" in js
     assert "/api/control-plane/overview" in js
+
+
+def test_client_overview_assets_exist_and_reuse_real_dashboard_signals() -> None:
+    html = Path("frontend/main-dashboard/client-overview.html").read_text(encoding="utf-8")
+    js = Path("frontend/main-dashboard/client-overview.js").read_text(encoding="utf-8")
+    css = Path("frontend/main-dashboard/client-overview.css").read_text(encoding="utf-8")
+
+    assert 'id="traffic-summary-root"' in html
+    assert 'id="process-root"' in html
+    assert 'id="examples-root"' in html
+    assert "/api/control-plane/overview" in js
+    assert "/raw/evidence/reviewer/inspectable-live-runtime/allowed-flow.json" in js
+    assert "/raw/evidence/reviewer/inspectable-live-runtime/denied-flow.json" in js
+    assert ".comparison-grid" in css
+    assert ".gauge" in css
+
+
+def test_static_router_supports_client_overview_entrypoint() -> None:
+    assert _resolve_static_path("/client-overview").name == "client-overview.html"
 
 
 def test_dashboard_payload_uses_shared_contract_fields() -> None:
@@ -248,6 +268,7 @@ def test_live_mode_docs_exist() -> None:
     proof_matrix = Path("docs/strict-live-proof-matrix.md").read_text(encoding="utf-8")
     reviewer_fast_path = Path("docs/reviewer-fast-path.md").read_text(encoding="utf-8")
     visual_proof = Path("docs/dashboard-visual-proof.md").read_text(encoding="utf-8")
+    client_overview = Path("docs/client-overview.md").read_text(encoding="utf-8")
 
     assert "live" in live_demo
     assert "demo" in live_demo
@@ -256,6 +277,8 @@ def test_live_mode_docs_exist() -> None:
     assert "strict live governed path" in proof_matrix.lower()
     assert "See A Pass" in reviewer_fast_path
     assert "Visual Previews" in visual_proof
+    assert "/client-overview" in client_overview
+    assert "technical dashboard" in client_overview.lower()
 
 
 def test_visual_proof_assets_exist() -> None:

@@ -30,6 +30,16 @@ If you only have a minute, start here:
 9. Launch-gate no-go artifact: [live-launch-gate-downgrade.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
 10. Visual dashboard proof guide: [docs/dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md)
 
+## Client Overview
+
+If you need the simplest presentation layer first:
+
+- client-facing page: `/client-overview`
+- explainer notes: [docs/client-overview.md](/workspaces/beta011/docs/client-overview.md)
+- technical dashboard: `/`
+
+The client overview is intentionally lighter than the technical dashboard. It explains what the system checks, what it blocks, why that matters, and whether it looks safe to use now, while linking back to the technical proof.
+
 ## Passing Strict Live Flow
 
 The strongest “see a pass” path is:
@@ -264,6 +274,7 @@ See `docs/strict-live-proof-matrix.md` for the acceptance criteria and pass/fail
 
 ## Proof And Dashboard Docs
 
+- [docs/client-overview.md](/workspaces/beta011/docs/client-overview.md): client-facing explanation layer and how it maps back to the technical dashboard
 - [docs/reviewer-fast-path.md](/workspaces/beta011/docs/reviewer-fast-path.md): shortest path to see a pass, a deny, and a no-go
 - [docs/strict-live-proof-matrix.md](/workspaces/beta011/docs/strict-live-proof-matrix.md): acceptance criteria and dependency-by-dependency proof matrix
 - [docs/dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md): what to look for in the dashboard for pass and deny cases
