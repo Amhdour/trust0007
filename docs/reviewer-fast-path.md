@@ -18,7 +18,7 @@ This page is the fastest way to inspect what the repo proves without reading the
 On the homepage itself, start with:
 
 - the mode banner
-- the short “How to read this dashboard” guide
+- the short “How to read this dashboard” guide if you need help interpreting the page
 - the command summary
 - the newest governed request spotlight
 - the flagship denied `/launch/onyx` proof spotlight

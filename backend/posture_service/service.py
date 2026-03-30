@@ -1522,9 +1522,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "title": "What this homepage proves",
             "items": [
                 _card("Protected now", f"{len(surfaces)} surfaces / {len(tenants)} tenants / {len(all_tools)} tools", "healthy", "The repo shows what is under governance without pretending every vendored component is equally active.", "#asset-coverage", display_label="What the system is watching", display_detail="Shows the main product surfaces, customer spaces, and AI actions currently under protection."),
-                _card("Blocked now", str(len(blocked_actions)), "critical" if blocked_actions else "healthy", f"Recent governed interventions stay visible with a top deny reason of {_top_reason(policy_reason_counts)}.", "#blocked-actions", display_label="What the system stopped", display_detail="Shows recent blocked access, blocked data access, or blocked AI actions."),
-                _card("Evidence posture", f"{len(artifact_inventory) - artifact_counts['missing']} present", "healthy" if artifact_counts["missing"] == 0 else "warning", f"Primary feed: {event_feed_path}.", "#evidence-integrity", display_label="What proof we have", display_detail="Shows whether review artifacts, traces, and reports are present for inspection."),
-            ],
+                _card("Classification discipline", f"{upstream_counts['used_now']} active / {upstream_counts['partially_used']} supporting", "healthy" if upstream_audit.get("inventory_covers_all_upstreams") else "critical", "Mandatory, supporting, optional, and reference-only upstream claims stay explicit.", "#upstream-posture", display_label="Connected systems in use", display_detail="Shows which connected components are actively part of the proven path today."),
+            ][:2],
         },
         {
             "type": "links",
@@ -2262,8 +2261,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "type": "cards",
                     "title": "Safety-check summary",
                     "items": [
-                        _card("Readiness status", launch_summary["status"].upper(), _status_from_launch(launch_summary["status"]), "Current launch verdict from the launch-gate summary.", launch_report_href, display_label="Current safety decision", display_value=_readiness_display(launch_summary["status"]), display_detail="The current decision on whether the system is safe enough to use."),
-                        _card("Readiness score", str(launch_summary["readiness_score"]), _status_from_launch(launch_summary["status"]), "Readiness score synthesized from the launch report findings.", launch_report_href, display_label="Safety score", display_value=f"{launch_summary['readiness_score']}/100", display_detail="A higher score means more of the required safety checks passed."),
+                        _card("Readiness status", launch_summary["status"].upper(), _status_from_launch(launch_summary["status"]), "Current launch verdict from the launch-gate summary.", launch_report_href, display_label="Current safety decision", display_value=_readiness_display(launch_summary["status"]), display_detail=f"Current score: {launch_summary['readiness_score']}/100."),
                         _card("Failing controls", str(len(failing_controls)), "critical" if failing_controls else "healthy", "Controls that are not in a full pass state.", launch_report_href, display_label="Important issues still open", display_detail="These are the main issues still keeping the system from a cleaner ready state."),
                         _card(
                             "Evidence mode",
@@ -2278,7 +2276,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                             display_label="Proof used for this decision",
                             display_detail="Shows whether the safety decision came from live proof or from demo/sample material.",
                         ),
-                    ],
+                    ][:3],
                 },
                 {
                     "type": "records",
@@ -2352,8 +2350,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Fresh artifacts", str(artifact_counts["fresh"]), "healthy", "Artifacts updated recently enough for evaluator trust.", "#evidence-integrity", display_label="Current proof items", display_detail="These proof items were updated recently enough to trust for review."),
                         _card("Stale artifacts", str(artifact_counts["stale"]), "critical" if artifact_counts["stale"] else "healthy", "Artifacts present but old enough to warrant attention.", "#evidence-integrity", display_label="Out-of-date proof items", display_detail="These proof items are old enough to need attention."),
                         _card("Missing artifacts", str(artifact_counts["missing"]), "critical" if artifact_counts["missing"] else "healthy", "Expected evidence that is missing from the checkout.", "#evidence-integrity", display_label="Missing proof items", display_detail="These proof items are expected but not currently present."),
-                        _card("Verified artifacts", str(artifact_counts["verified"]), "healthy", "Artifacts whose structure or bundle references were checked.", "#evidence-integrity", display_label="Proof items verified", display_detail="These proof items were checked for structure or bundle completeness."),
-                    ],
+                    ][:3],
                 },
                 {
                     "type": "table",
@@ -2406,9 +2403,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "items": [
                         _card("Onyx visibility", "Governed runtime plane", "healthy" if onyx_available else "warning", "Onyx remains behind dashboard-controlled handoffs; this control plane decides whether access is allowed and what evidence must exist.", _raw("docs/onyx-integration.md"), display_label="AI system being protected", display_value="Onyx", display_detail="This dashboard decides when access to the AI system is allowed and what proof is required."),
                         _card("Latest handoff", "ALLOW" if latest_handoff_allowed else "DENY", "healthy" if latest_handoff_allowed else "critical", f"Latest governed handoff reason: {latest_handoff_reason}.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), display_label="Latest access decision", display_value=_allow_deny_display(latest_handoff_allowed), display_detail="Shows whether the latest checked access into the AI system was allowed or blocked."),
-                        _card("Latest evidence mode", _freshness_label(timestamp=str(governed_flow_summary.get("generated_at", "")), evidence_mode=str(governed_flow_summary.get("evidence_mode", "")), provenance="runtime-generated" if governed_flow_summary else "sample/demo"), "healthy" if live_evidence_mode else "warning", "Current governed handoff evidence mode and freshness for the runtime plane proof.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), display_label="Proof used for the latest access decision", display_detail="Shows whether the latest AI-access decision was supported by live proof or demo/sample proof."),
                         _card("Missing handoff evidence", ", ".join(latest_missing_evidence) or "none", "healthy" if not latest_missing_evidence else "critical", "Live-mode missing evidence that affected the latest handoff or launch-gate result.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), display_label="Missing proof for access decision", display_value=", ".join(latest_missing_evidence) or "none", display_detail="Missing proof can cause AI access to be blocked or downgraded."),
-                    ],
+                    ][:3],
                 },
                 {
                     "type": "records",

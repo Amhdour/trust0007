@@ -16,7 +16,7 @@ These are lightweight proof previews, not literal runtime screenshots. They high
 Open [dashboard-live-pass.svg](/workspaces/beta011/docs/images/dashboard-live-pass.svg) and look for:
 
 - mode banner: `LIVE GOVERNED MODE`
-- short “How to read this dashboard” help block
+- short “How to read this dashboard” help block with expandable detail
 - top command summary showing combined readiness-and-score, latest handoff, top failing control, and evidence freshness
 - newest governed request spotlight with a trace-linked record
 - primary pass / deny / generate proof links in a lighter inline strip near the top

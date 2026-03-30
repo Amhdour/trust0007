@@ -12,6 +12,7 @@ The page now leads with:
 - a compact command summary instead of a long KPI wall
 - a short “How to read this dashboard” guide near the top
 - a prominent live-vs-demo mode banner with consequence text
+- a compact mode-interpretation disclosure instead of always-open consequence text
 - the newest governed request preview near the top
 - one flagship denied `/launch/onyx` proof callout instead of repeated near-identical summaries
 - direct pass / deny / generate actions in a lighter inline strip
@@ -20,6 +21,7 @@ The page now leads with:
 - collapsed sample tables for secondary depth
 - reviewer-first proof sections before deeper operator diagnostics
 - a smaller quick-jump navigation row instead of a full always-open section list
+- a compact reading guide with expandable question detail instead of a full-height explainer block
 
 ## Homepage structure
 
@@ -27,9 +29,9 @@ The page now leads with:
    - explicit wording that Onyx is the governed runtime plane and the dashboard is the trust/security control plane
 2. Mode banner: explicit `LIVE GOVERNED MODE` or `DEMO / FALLBACK MODE` framing with consequence text.
 3. How to read this dashboard:
-   - what the colors mean
-   - the main questions the page answers
-   - where the technical detail lives
+   - compact color/status meaning at first glance
+   - expandable question-and-interpretation detail
+   - a shorter first-read block that does not compete with the command summary
 4. Command summary:
    - combined readiness verdict and score
    - latest handoff allow / deny

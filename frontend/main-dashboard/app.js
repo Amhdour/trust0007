@@ -131,23 +131,26 @@ function renderModeBanner(modeBanner) {
                 <strong>${escapeHtml(chip.display_value || chip.value || "")}</strong>
               </article>
             `,
-          )
-          .join("")}
+              )
+              .join("")}
       </div>
       ${
         consequences.length
           ? `
-            <div class="mode-banner-consequences">
-              ${consequences
-                .map(
-                  (item) => `
-                    <article class="mode-consequence-card">
-                      <p>${escapeHtml(item)}</p>
-                    </article>
-                  `,
-                )
-                .join("")}
-            </div>
+            <details class="mode-banner-disclosure">
+              <summary>How to interpret this mode</summary>
+              <div class="mode-banner-consequences">
+                ${consequences
+                  .map(
+                    (item) => `
+                      <article class="mode-consequence-card">
+                        <p>${escapeHtml(item)}</p>
+                      </article>
+                    `,
+                  )
+                  .join("")}
+              </div>
+            </details>
           `
           : ""
       }
@@ -388,43 +391,43 @@ function renderReadingGuide(guide) {
       <h2 id="guide-title">${escapeHtml(guide.title || "How to read this dashboard")}</h2>
       <p class="section-description">${escapeHtml(guide.intro || "")}</p>
     </div>
-    <div class="reading-guide-grid">
-      <section class="guide-card">
-        <h3>Color meaning</h3>
-        <div class="guide-status-grid">
-          ${statuses
-            .map(
-              (item) => `
-                <article class="guide-status-row">
-                  <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(item.label || statusLabel(item.status || "neutral"))}</div>
-                  <p>${escapeHtml(item.detail || "")}</p>
-                </article>
-              `,
-            )
-            .join("")}
-        </div>
-      </section>
-      <section class="guide-card">
-        <h3>Main questions this page answers</h3>
-        <div class="guide-question-grid">
-          ${questions
-            .map(
-              (item) => `
-                <a class="guide-question-card"${linkAttributes(item.href)}>
-                  <div class="card-topline">
-                    <span class="metric-label">${escapeHtml(item.question || "")}</span>
-                    <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(statusLabel(item.status || "neutral"))}</div>
-                  </div>
-                  <strong>${escapeHtml(item.answer || "")}</strong>
-                  <p>${escapeHtml(item.detail || "")}</p>
-                </a>
-              `,
-            )
-            .join("")}
-        </div>
-      </section>
+    <div class="guide-status-summary">
+      ${statuses
+        .map(
+          (item) => `
+            <article class="guide-status-chip-card">
+              <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(item.label || statusLabel(item.status || "neutral"))}</div>
+              <p>${escapeHtml(item.detail || "")}</p>
+            </article>
+          `,
+        )
+        .join("")}
     </div>
-    <p class="guide-note">${escapeHtml(guide.technical_note || "")}</p>
+    <details class="guide-disclosure">
+      <summary>Show the main questions and technical note</summary>
+      <div class="reading-guide-grid">
+        <section class="guide-card">
+          <h3>Main questions this page answers</h3>
+          <div class="guide-question-grid">
+            ${questions
+              .map(
+                (item) => `
+                  <a class="guide-question-card"${linkAttributes(item.href)}>
+                    <div class="card-topline">
+                      <span class="metric-label">${escapeHtml(item.question || "")}</span>
+                      ${renderStatusPill(item.status || "neutral", { hideHealthy: true, hideNeutral: true })}
+                    </div>
+                    <strong>${escapeHtml(item.answer || "")}</strong>
+                    <p>${escapeHtml(item.detail || "")}</p>
+                  </a>
+                `,
+              )
+              .join("")}
+          </div>
+          <p class="guide-note">${escapeHtml(guide.technical_note || "")}</p>
+        </section>
+      </div>
+    </details>
   `;
 }
 
