@@ -6,6 +6,7 @@ const heroMeta = document.getElementById("hero-meta");
 const heroSteps = document.getElementById("hero-steps");
 const modeBannerRoot = document.getElementById("mode-banner-root");
 const briefingRoot = document.getElementById("briefing-root");
+const readingGuideRoot = document.getElementById("reading-guide-root");
 const kpiRoot = document.getElementById("kpi-root");
 const sourcesRoot = document.getElementById("sources");
 const liveLogRoot = document.getElementById("live-log-root");
@@ -26,6 +27,15 @@ function escapeHtml(value) {
 
 function statusClass(status) {
   return `status-pill status-${status || "neutral"}`;
+}
+
+function statusLabel(status) {
+  return {
+    healthy: "Good",
+    warning: "Needs attention",
+    critical: "Serious issue",
+    neutral: "For context",
+  }[status || "neutral"] || String(status || "neutral");
 }
 
 function isInternalHref(href) {
@@ -68,7 +78,7 @@ function renderHero(payload) {
   const mode = payload.data_mode || {};
   heroMeta.innerHTML = `
     <span class="chip">${escapeHtml(payload.runtime_module || "Governed runtime")}</span>
-    <span class="${statusClass(mode.status || "neutral")}">${escapeHtml(mode.label || "Dashboard mode")}</span>
+    <span class="${statusClass(mode.status || "neutral")}" title="${escapeHtml(mode.label || "Dashboard mode")}">${escapeHtml(mode.display_label || mode.label || "Dashboard mode")}</span>
     <span class="chip">Generated ${escapeHtml(formatTimestamp(payload.generated_at))}</span>
   `;
 
@@ -97,19 +107,19 @@ function renderModeBanner(modeBanner) {
       <div class="mode-banner-head">
         <div>
           <p class="eyebrow">Governance mode</p>
-          <h2>${escapeHtml(modeBanner.label || "Governance mode unavailable")}</h2>
-          <p class="section-description">${escapeHtml(modeBanner.summary || "")}</p>
+          <h2>${escapeHtml(modeBanner.display_label || modeBanner.label || "Governance mode unavailable")}</h2>
+          <p class="section-description">${escapeHtml(modeBanner.display_summary || modeBanner.summary || "")}</p>
         </div>
-        <div class="${statusClass(modeBanner.status || "neutral")}">${escapeHtml(modeBanner.status || "neutral")}</div>
+        <div class="${statusClass(modeBanner.status || "neutral")}" title="${escapeHtml(modeBanner.status || "neutral")}">${escapeHtml(statusLabel(modeBanner.status || "neutral"))}</div>
       </div>
-      <p class="mode-banner-detail">${escapeHtml(modeBanner.detail || "")}</p>
+      <p class="mode-banner-detail">${escapeHtml(modeBanner.display_detail || modeBanner.detail || "")}</p>
       <div class="mode-banner-chips">
         ${chips
           .map(
             (chip) => `
               <article class="mode-chip">
-                <span class="mode-chip-label">${escapeHtml(chip.label || "")}</span>
-                <strong>${escapeHtml(chip.value || "")}</strong>
+                <span class="mode-chip-label">${escapeHtml(chip.display_label || chip.label || "")}</span>
+                <strong>${escapeHtml(chip.display_value || chip.value || "")}</strong>
               </article>
             `,
           )
@@ -166,12 +176,12 @@ function renderSpotlight(item, className = "spotlight-card") {
   return `
     <${item.href ? "a" : "article"} class="${className}"${linkAttributes(item.href)}>
       <div class="card-topline">
-        <p class="eyebrow">${escapeHtml(item.eyebrow || "")}</p>
-        <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
+        <p class="eyebrow">${escapeHtml(item.display_eyebrow || item.eyebrow || "")}</p>
+        <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(statusLabel(item.status || "neutral"))}</div>
       </div>
-      <h3>${escapeHtml(item.title || "")}</h3>
-      <p class="record-detail">${escapeHtml(item.detail || "")}</p>
-      ${renderFieldGrid(item.fields)}
+      <h3>${escapeHtml(item.display_title || item.title || "")}</h3>
+      <p class="record-detail">${escapeHtml(item.display_detail || item.detail || "")}</p>
+      ${renderFieldGrid(item.display_fields || item.fields)}
     </${item.href ? "a" : "article"}>
   `;
 }
@@ -190,8 +200,8 @@ function renderBriefing(commandCenter) {
     <div class="command-summary-grid">
       <section class="command-primary-panel">
         <div class="command-primary-head">
-          <p class="eyebrow">Executive state</p>
-          <p class="record-detail">Read this first for readiness, latest handoff, top blocker, and evidence freshness.</p>
+          <p class="eyebrow">Safety summary</p>
+          <p class="record-detail">Read this first for whether the system looks safe to use, what happened most recently, and what proof supports that view.</p>
         </div>
         ${renderCards(cards, "cards-grid command-cards-grid")}
       </section>
@@ -200,10 +210,10 @@ function renderBriefing(commandCenter) {
         ${renderSpotlight(flagshipProof, "command-focus-panel spotlight-card")}
         <section class="command-focus-panel action-panel">
           <div class="card-topline">
-            <p class="eyebrow">Primary actions</p>
+            <p class="eyebrow">Helpful next steps</p>
           </div>
-          <h3>Review or refresh governed proof</h3>
-          <p class="record-detail">Open the strongest pass and deny artifacts, or generate a fresh governed flow without hunting through deeper sections.</p>
+          <h3>Open examples or create fresh proof</h3>
+          <p class="record-detail">Use these links to see approved and blocked examples, or run a fresh checked flow for updated proof.</p>
           ${renderLinks(actions, "command-link-grid")}
         </section>
       </div>
@@ -219,11 +229,11 @@ function renderCards(items, className = "cards-grid") {
           (item) => `
             <${item.href ? "a" : "article"} class="metric-card"${linkAttributes(item.href)}>
               <div class="card-topline">
-                <div class="metric-label">${escapeHtml(item.label || "")}</div>
-                <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
+                <div class="metric-label">${escapeHtml(item.display_label || item.label || "")}</div>
+                <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(statusLabel(item.status || "neutral"))}</div>
               </div>
-              <div class="metric-value">${escapeHtml(item.value || "")}</div>
-              <div class="metric-detail">${escapeHtml(item.detail || "")}</div>
+              <div class="metric-value">${escapeHtml(item.display_value || item.value || "")}</div>
+              <div class="metric-detail">${escapeHtml(item.display_detail || item.detail || "")}</div>
             </${item.href ? "a" : "article"}>
           `,
         )
@@ -243,10 +253,10 @@ function renderKpis(paths) {
         <section class="audience-lane">
           <div class="audience-lane-head">
             <div>
-              <p class="eyebrow">${escapeHtml(path.title === "Reviewer View" ? "Start here" : "Then drill deeper")}</p>
+              <p class="eyebrow">${escapeHtml(String(path.title || "").toLowerCase().includes("technical") ? "Then drill deeper" : "Start here")}</p>
               <h3>${escapeHtml(path.title || "")}</h3>
             </div>
-            <div class="${statusClass(path.status || "neutral")}">${escapeHtml(path.status || "neutral")}</div>
+            <div class="${statusClass(path.status || "neutral")}" title="${escapeHtml(path.status || "neutral")}">${escapeHtml(statusLabel(path.status || "neutral"))}</div>
           </div>
           <p class="record-detail">${escapeHtml(path.detail || "")}</p>
           ${renderLinks(path.links || [], "audience-link-grid")}
@@ -264,11 +274,11 @@ function renderRecords(items) {
           (item) => `
             <${item.href ? "a" : "article"} class="record-card"${linkAttributes(item.href)}>
               <div class="card-topline">
-                <div class="record-meta-label">${escapeHtml(item.meta || "")}</div>
-                <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
+                <div class="record-meta-label">${escapeHtml(item.display_meta || item.meta || "")}</div>
+                <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(statusLabel(item.status || "neutral"))}</div>
               </div>
-              <h3>${escapeHtml(item.title || "")}</h3>
-              <p class="record-detail">${escapeHtml(item.detail || "")}</p>
+              <h3>${escapeHtml(item.display_title || item.title || "")}</h3>
+              <p class="record-detail">${escapeHtml(item.display_detail || item.detail || "")}</p>
             </${item.href ? "a" : "article"}>
           `,
         )
@@ -321,16 +331,70 @@ function renderLinks(items, className = "link-grid") {
           (item) => `
             <a class="link-card"${linkAttributes(item.href)}>
               <div class="card-topline">
-                <span class="metric-label">Drill through</span>
-                <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
+                <span class="metric-label">More detail</span>
+                <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(statusLabel(item.status || "neutral"))}</div>
               </div>
-              <h3>${escapeHtml(item.label || "")}</h3>
-              <p class="link-description">${escapeHtml(item.description || "")}</p>
+              <h3>${escapeHtml(item.display_label || item.label || "")}</h3>
+              <p class="link-description">${escapeHtml(item.display_description || item.description || "")}</p>
             </a>
           `,
         )
         .join("")}
     </div>
+  `;
+}
+
+function renderReadingGuide(guide) {
+  if (!readingGuideRoot) {
+    return;
+  }
+
+  const statuses = Array.isArray(guide.statuses) ? guide.statuses : [];
+  const questions = Array.isArray(guide.questions) ? guide.questions : [];
+
+  readingGuideRoot.innerHTML = `
+    <div class="section-head">
+      <p class="eyebrow">Quick help</p>
+      <h2 id="guide-title">${escapeHtml(guide.title || "How to read this dashboard")}</h2>
+      <p class="section-description">${escapeHtml(guide.intro || "")}</p>
+    </div>
+    <div class="reading-guide-grid">
+      <section class="guide-card">
+        <h3>Color meaning</h3>
+        <div class="guide-status-grid">
+          ${statuses
+            .map(
+              (item) => `
+                <article class="guide-status-row">
+                  <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(item.label || statusLabel(item.status || "neutral"))}</div>
+                  <p>${escapeHtml(item.detail || "")}</p>
+                </article>
+              `,
+            )
+            .join("")}
+        </div>
+      </section>
+      <section class="guide-card">
+        <h3>Main questions this page answers</h3>
+        <div class="guide-question-grid">
+          ${questions
+            .map(
+              (item) => `
+                <a class="guide-question-card"${linkAttributes(item.href)}>
+                  <div class="card-topline">
+                    <span class="metric-label">${escapeHtml(item.question || "")}</span>
+                    <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(statusLabel(item.status || "neutral"))}</div>
+                  </div>
+                  <strong>${escapeHtml(item.answer || "")}</strong>
+                  <p>${escapeHtml(item.detail || "")}</p>
+                </a>
+              `,
+            )
+            .join("")}
+        </div>
+      </section>
+    </div>
+    <p class="guide-note">${escapeHtml(guide.technical_note || "")}</p>
   `;
 }
 
@@ -373,8 +437,8 @@ function renderSections(sections) {
               <h2>${escapeHtml(section.group_label || nextGroup)}</h2>
               <p class="section-description">${
                 nextGroup === "reviewer"
-                  ? "Start with reviewer-safe proof, launch posture, request visibility, and flagship pass or deny evidence."
-                  : "Continue into operator diagnostics, control-domain detail, and deeper evidence or inventory slices."
+                  ? "Start here for the plain-language safety story: what happened, what was stopped, what proof exists, and whether the system looks safe to use."
+                  : "Continue here for the engineering detail: raw reasons, traces, evidence links, and lower-level control information."
               }</p>
             </section>
           `
@@ -560,6 +624,7 @@ async function boot() {
     renderHero(payload);
     renderModeBanner(payload.mode_banner || {});
     renderBriefing(payload.command_center || {});
+    renderReadingGuide(payload.reading_guide || {});
     renderKpis(payload.audience_paths || []);
     renderTabs(payload.tabs);
     renderSections(payload.sections);
@@ -578,6 +643,9 @@ async function boot() {
     }
     if (kpiRoot) {
       kpiRoot.innerHTML = "";
+    }
+    if (readingGuideRoot) {
+      readingGuideRoot.innerHTML = "";
     }
     if (modeBannerRoot) {
       modeBannerRoot.innerHTML = "";

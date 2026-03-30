@@ -16,6 +16,7 @@ These are lightweight proof previews, not literal runtime screenshots. They high
 Open [dashboard-live-pass.svg](/workspaces/beta011/docs/images/dashboard-live-pass.svg) and look for:
 
 - mode banner: `LIVE GOVERNED MODE`
+- short “How to read this dashboard” help block
 - top command summary showing readiness, score, latest handoff, top failing control, and evidence freshness
 - newest governed request spotlight with a trace-linked record
 - primary pass / deny / generate actions near the top
@@ -74,9 +75,9 @@ Do not treat the visuals as stronger evidence than the underlying artifacts and 
 
 The current dashboard hierarchy is intentionally split into:
 
-- Reviewer View:
+- Plain-Language Review:
   - mode banner, command summary, flagship proof, launch posture, governed requests, evidence freshness, upstream posture
-- Operator Drilldown:
+- Technical Details:
   - identity, policy, retrieval, secret, audit, trace, and deeper inventories
 
-Reviewers should not need the operator drilldown to understand the top-level state.
+Reviewers should not need the technical-details sections to understand the top-level state.

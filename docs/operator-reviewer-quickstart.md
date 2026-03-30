@@ -24,13 +24,13 @@ Configure the live-mode variables in `compose/.env` before expecting live enforc
 
 Check these sections on the homepage:
 
-- `Identity & Session`
-- `Policy Enforcement`
-- `Retrieval Boundaries`
-- `Secret Access`
-- `Trace Correlation`
-- `Launch Gate`
-- `Upstream Integration Posture`
+- `Who Is Trying To Use It`
+- `Rules Being Applied`
+- `What Information It Can Access`
+- `Protected Keys And Passwords`
+- `Did We Follow The Full Process?`
+- `Safety Check Before Use`
+- `Connected Parts Of The System`
 
 The page should make `live` vs `demo` mode obvious.
 

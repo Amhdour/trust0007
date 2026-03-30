@@ -2,11 +2,13 @@
 
 ## What changed
 
-The homepage was upgraded from a general control-plane shell into a reviewer-facing Trust & Security Operations Dashboard.
+The homepage was upgraded from a general control-plane shell into a plain-language safety and review dashboard.
 
 The page now leads with:
 
+- a plain-language first layer for non-technical readers
 - a compact command summary instead of a long KPI wall
+- a short “How to read this dashboard” guide near the top
 - a prominent live-vs-demo mode banner with consequence text
 - the newest governed request preview near the top
 - one flagship denied `/launch/onyx` proof callout instead of repeated near-identical summaries
@@ -21,7 +23,11 @@ The page now leads with:
 1. Hero: repository positioning, data mode, runtime role, and high-level workflow.
    - explicit wording that Onyx is the governed runtime plane and the dashboard is the trust/security control plane
 2. Mode banner: explicit `LIVE GOVERNED MODE` or `DEMO / FALLBACK MODE` framing with consequence text.
-3. Command summary:
+3. How to read this dashboard:
+   - what the colors mean
+   - the main questions the page answers
+   - where the technical detail lives
+4. Command summary:
    - readiness verdict
    - readiness score
    - latest handoff allow / deny
@@ -30,29 +36,29 @@ The page now leads with:
    - newest governed request spotlight
    - flagship denied `/launch/onyx` proof spotlight
    - primary actions
-4. Reviewer / operator lanes: clear split between proof-first reviewer flow and deeper operator diagnostics.
-5. Sticky tab groups:
-   - Reviewer View
-   - Operator Drilldown
-6. Drill-down sections grouped into:
-   - Reviewer View
-   - Operations Snapshot
-   - Recent Governed Requests
-   - Blocked / Governed Actions
-   - Launch Gate
-   - Onyx Governed Runtime
-   - Evidence Integrity & Freshness
-   - Upstream Integration Posture
-   - Operator Drilldown
-   - Identity & Session
-   - Policy Enforcement
-   - Retrieval Boundaries
-   - Secret Access
-   - Tool / MCP Governance
-   - Audit & Replay
-   - Trace Correlation
-   - Asset / Protection Coverage
-7. Recent activity feed and raw source links.
+5. Plain-language review / technical-details lanes: clear split between simple safety meaning and deeper engineering proof.
+6. Sticky tab groups:
+   - Plain-Language Review
+   - Technical Details
+7. Drill-down sections grouped into:
+   - Plain-Language Review
+   - Big Picture
+   - Recent Requests
+   - What The System Stopped
+   - Safety Check Before Use
+   - AI System Access
+   - How Reliable The Proof Is
+   - Connected Parts Of The System
+   - Technical Details
+   - Who Is Trying To Use It
+   - Rules Being Applied
+   - What Information It Can Access
+   - Protected Keys And Passwords
+   - What Actions The AI Can Take
+   - What Happened And How We Review It
+   - Did We Follow The Full Process?
+   - What The System Is Watching
+8. Recent activity feed and raw source links.
 
 ## Where each panel gets its data
 
@@ -126,20 +132,53 @@ The dashboard should always make this visible through the data-mode badge in the
 ## Summary vs drilldown
 
 - The homepage top area should answer the platform-state question in under 10 seconds.
+- The first layer should read like a safety and review report, not like a backend console.
 - The top command summary is for decisive state, not exhaustive evidence listing.
 - Heavy inventories stay available, but the homepage now shows only high-signal slices, capped rows, and collapsed sample tables before deeper drill-through.
-- Reviewer sections prioritize proof posture, flagship pass/deny evidence, governed request visibility, and launch readiness.
-- Operator sections prioritize diagnostics, trace continuity, auditability, and deeper control-domain inspection.
+- Plain-language review sections prioritize proof posture, flagship pass/deny evidence, governed request visibility, and launch readiness.
+- Technical-details sections prioritize diagnostics, trace continuity, auditability, and deeper control-domain inspection.
 
-## Reviewer vs operator split
+## Plain-Language Layer
 
-- Reviewer View should be enough to answer:
+- Non-technical readers should be able to understand the first layer without knowing terms like trace correlation, governed runtime, retrieval boundaries, or audit replay.
+- The page therefore prefers:
+  - simple display titles
+  - plain-language summaries
+  - human-readable status wording
+  - short helper explanations
+- The technical meaning is still preserved in:
+  - lower technical sections
+  - raw evidence links
+  - trace IDs
+  - policy source and path details
+  - reason codes
+  - machine-readable artifacts
+
+## Terminology Mapping
+
+| Technical term | Plain-language dashboard label |
+| --- | --- |
+| Launch gate | Safety check before use |
+| Governed runtime / Onyx runtime | AI system access |
+| Evidence integrity & freshness | How reliable the proof is |
+| Upstream integration posture | Connected parts of the system |
+| Identity & session | Who is trying to use it |
+| Policy enforcement | Rules being applied |
+| Retrieval boundaries | What information it can access |
+| Secret access | Protected keys and passwords |
+| Tool / MCP governance | What actions the AI can take |
+| Audit & replay | What happened and how we review it |
+| Trace correlation | Did we follow the full process? |
+
+## Plain-language vs technical split
+
+- Plain-Language Review should be enough to answer:
   - what is protected
   - what was blocked
   - why it was blocked
   - what evidence exists
   - whether the system is launch-ready
-- Operator Drilldown should be where you inspect:
+- Technical Details should be where you inspect:
   - identity/session detail
   - policy engine behavior
   - retrieval boundaries
@@ -147,4 +186,4 @@ The dashboard should always make this visible through the data-mode badge in the
   - audit and trace linkage
   - deeper inventories
 
-The same dashboard serves both audiences, but the operator path should never bury the reviewer fast path.
+The same dashboard serves both audiences, but the technical path should never bury the plain-language fast path.

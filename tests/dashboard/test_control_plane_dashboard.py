@@ -36,10 +36,12 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="hero-copy"' in html
     assert 'id="briefing-root"' in html
     assert 'id="mode-banner-root"' in html
+    assert 'id="reading-guide-root"' in html
     assert "payload.title" in js
     assert "payload.landing_steps" in js
     assert "payload.mode_banner" in js
     assert "payload.command_center" in js
+    assert "payload.reading_guide" in js
     assert "payload.audience_paths" in js
     assert "block.collapsed" in js
     assert "/api/control-plane/overview" in js
@@ -77,8 +79,8 @@ def test_dashboard_tabs_and_sections_have_reviewer_operator_grouping() -> None:
     tab_groups = {tab["group_label"] for tab in payload["tabs"]}
     section_groups = {section["group_label"] for section in payload["sections"]}
 
-    assert {"Reviewer View", "Operator Drilldown"} <= tab_groups
-    assert {"Reviewer View", "Operator Drilldown"} <= section_groups
+    assert {"Plain-Language Review", "Technical Details"} <= tab_groups
+    assert {"Plain-Language Review", "Technical Details"} <= section_groups
 
 
 def test_dashboard_includes_upstream_integration_posture_section() -> None:

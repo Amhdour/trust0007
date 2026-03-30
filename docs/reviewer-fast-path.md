@@ -18,6 +18,7 @@ This page is the fastest way to inspect what the repo proves without reading the
 On the homepage itself, start with:
 
 - the mode banner
+- the short “How to read this dashboard” guide
 - the command summary
 - the newest governed request spotlight
 - the flagship denied `/launch/onyx` proof spotlight
@@ -98,7 +99,7 @@ This proves that missing live evidence or incomplete trace continuity can still 
 Use this when you want reviewer-safe visibility into what entered the governed path without dumping raw prompts:
 
 - dashboard section:
-  - `Recent Governed Requests`
+  - `Recent Requests`
 - feed artifact:
   - [governed-request-feed.json](/workspaces/beta011/overlays/myStarterKit/artifacts/governed-request-feed.json)
 - latest summary:
@@ -115,8 +116,8 @@ What this shows:
 Where to look on the dashboard:
 
 - top command summary for the newest request, latest handoff, and flagship proof actions
-- `Recent Governed Requests` for the latest request slice
-- `Blocked / Governed Actions` for the deny timeline
+- `Recent Requests` for the latest request slice
+- `What The System Stopped` for the deny timeline
 
 What this does not show:
 
@@ -157,10 +158,20 @@ Use this order when you want the fastest high-confidence review:
    - confirm a sanitized preview, result, trace, tenant, evidence mode, and timestamp are visible
 4. Flagship denied handoff spotlight:
    - confirm denied `/launch/onyx` proof is easy to find without scrolling through inventories
-5. Reviewer View sections:
-   - use `Operations Snapshot`, `Blocked / Governed Actions`, `Launch Gate`, `Evidence Integrity`, and `Upstream Integration Posture`
+5. Plain-language review sections:
+   - use `Big Picture`, `What The System Stopped`, `Safety Check Before Use`, `How Reliable The Proof Is`, and `Connected Parts Of The System`
 
-Only move into the Operator Drilldown after the reviewer story is already clear.
+Only move into `Technical Details` after the plain-language story is already clear.
+
+## Plain-Language First Layer
+
+The homepage is now designed so a non-technical reviewer can understand the first layer quickly:
+
+- green means the current proof supports the claim
+- yellow means something important needs attention
+- red means a serious issue or blocker is visible
+- the top layer explains first
+- the lower sections and raw links prove the explanation technically
 
 ## Portfolio Framing
 

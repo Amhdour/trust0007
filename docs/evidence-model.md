@@ -30,7 +30,7 @@ Each governed request should keep these relationships stable:
 - `tenant_id`: identifies the governed tenant
 - `surface`: identifies the governed surface or path
 
-The dashboard uses those values to render reviewer-facing continuity across identity, policy, retrieval, secret, audit, launch-gate, and handoff stages. If `session_id` is unavailable, the trace artifact should record a precise reason rather than a generic missing state.
+The dashboard uses those values to render reviewer-facing continuity across identity, policy, retrieval, secret, audit, launch-gate, and handoff stages. In the plain-language first layer, those same technical checks are shown under friendlier headings so non-technical readers can understand what happened before opening the deeper evidence. If `session_id` is unavailable, the trace artifact should record a precise reason rather than a generic missing state.
 
 ## Request preview sanitization
 
@@ -60,14 +60,14 @@ If required evidence is missing in `live` mode, the launch gate should degrade r
 
 The homepage reads these artifacts into:
 
-- Recent Governed Requests
-- Identity & Session
-- Policy Enforcement
-- Retrieval Boundaries
-- Secret Access
-- Audit & Replay
-- Trace Correlation
-- Launch Gate
-- Onyx Runtime
+- Recent Requests
+- Who Is Trying To Use It
+- Rules Being Applied
+- What Information It Can Access
+- Protected Keys And Passwords
+- What Happened And How We Review It
+- Did We Follow The Full Process?
+- Safety Check Before Use
+- AI System Access
 
 Langfuse and Grafana remain useful supporting surfaces, but the repo-owned artifacts are the primary reviewer proof path.

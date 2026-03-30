@@ -215,9 +215,9 @@ def test_live_dashboard_consumes_artifacts():
         assert "readiness_panel" in dashboard_data
         dashboard_text = json.dumps(dashboard_data)
         assert trace_id in dashboard_text
-        assert "Blocked / Governed Actions" in dashboard_text
-        assert "Upstream Integration Posture" in dashboard_text
-        assert "Onyx Governed Runtime" in dashboard_text
+        assert "What The System Stopped" in dashboard_text
+        assert "Connected Parts Of The System" in dashboard_text
+        assert "AI System Access" in dashboard_text
 
         upstream_response = http_get(server.url("/api/control-plane/upstream-usage"), timeout=10)
         assert upstream_response.status_code == 200

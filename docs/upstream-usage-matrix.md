@@ -2,7 +2,7 @@
 
 This document is the repo-wide upstream integration audit for the current checkout. It answers one question strictly: which vendored upstream components materially strengthen the current dashboard-first control plane, and which ones are only platform scaffolding, optional future depth, or reference snapshots.
 
-The machine-readable source of truth lives in `evidence/upstream_usage.inventory.json`. The control-plane API surfaces the same data at `/api/control-plane/upstream-usage`, and the homepage renders it in the Upstream Integration Posture section.
+The machine-readable source of truth lives in `evidence/upstream_usage.inventory.json`. The control-plane API surfaces the same data at `/api/control-plane/upstream-usage`, and the homepage renders it in the `Connected Parts Of The System` section.
 
 ## Audit method
 

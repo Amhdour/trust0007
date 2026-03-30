@@ -66,6 +66,7 @@ a {
 
 .hero,
 .briefing-panel,
+.guide-panel,
 .kpi-panel,
 .live-log-panel,
 .dashboard-section,
@@ -344,6 +345,7 @@ h3 {
 }
 
 .briefing-panel,
+.guide-panel,
 .kpi-panel,
 .live-log-panel,
 .dashboard-section,
@@ -356,6 +358,62 @@ h3 {
 .dashboard-root {
   display: grid;
   gap: 18px;
+}
+
+.reading-guide-grid {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.guide-card,
+.guide-question-card {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 239, 229, 0.82));
+}
+
+.guide-card {
+  padding: 18px;
+}
+
+.guide-status-grid,
+.guide-question-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.guide-status-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.guide-status-row p,
+.guide-question-card p,
+.guide-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.guide-question-card {
+  display: block;
+  padding: 16px 18px;
+}
+
+.guide-question-card strong {
+  display: block;
+  margin: 10px 0 8px;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.guide-note {
+  margin-top: 14px;
 }
 
 .briefing-grid {
@@ -807,6 +865,7 @@ tbody tr:last-child td {
 
   .hero,
   .briefing-panel,
+  .guide-panel,
   .kpi-panel,
   .live-log-panel,
   .dashboard-section,
@@ -830,6 +889,10 @@ tbody tr:last-child td {
 
 @media (max-width: 1080px) {
   .command-focus-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reading-guide-grid {
     grid-template-columns: 1fr;
   }
 }
