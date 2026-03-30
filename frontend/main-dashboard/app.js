@@ -4,9 +4,9 @@ const heroTitle = document.getElementById("hero-title");
 const heroCopy = document.getElementById("hero-copy");
 const heroMeta = document.getElementById("hero-meta");
 const heroSteps = document.getElementById("hero-steps");
+const modeBannerRoot = document.getElementById("mode-banner-root");
 const briefingRoot = document.getElementById("briefing-root");
 const kpiRoot = document.getElementById("kpi-root");
-const readinessRoot = document.getElementById("readiness-root");
 const sourcesRoot = document.getElementById("sources");
 const liveLogRoot = document.getElementById("live-log-root");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
@@ -85,36 +85,145 @@ function renderHero(payload) {
     .join("");
 }
 
-function renderBriefing(items) {
+function renderModeBanner(modeBanner) {
+  if (!modeBannerRoot) {
+    return;
+  }
+
+  const chips = Array.isArray(modeBanner.chips) ? modeBanner.chips : [];
+  const consequences = Array.isArray(modeBanner.consequences) ? modeBanner.consequences : [];
+  modeBannerRoot.innerHTML = `
+    <section class="mode-banner mode-${escapeHtml(modeBanner.status || "neutral")}">
+      <div class="mode-banner-head">
+        <div>
+          <p class="eyebrow">Governance mode</p>
+          <h2>${escapeHtml(modeBanner.label || "Governance mode unavailable")}</h2>
+          <p class="section-description">${escapeHtml(modeBanner.summary || "")}</p>
+        </div>
+        <div class="${statusClass(modeBanner.status || "neutral")}">${escapeHtml(modeBanner.status || "neutral")}</div>
+      </div>
+      <p class="mode-banner-detail">${escapeHtml(modeBanner.detail || "")}</p>
+      <div class="mode-banner-chips">
+        ${chips
+          .map(
+            (chip) => `
+              <article class="mode-chip">
+                <span class="mode-chip-label">${escapeHtml(chip.label || "")}</span>
+                <strong>${escapeHtml(chip.value || "")}</strong>
+              </article>
+            `,
+          )
+          .join("")}
+      </div>
+      ${
+        consequences.length
+          ? `
+            <div class="mode-banner-consequences">
+              ${consequences
+                .map(
+                  (item) => `
+                    <article class="mode-consequence-card">
+                      <p>${escapeHtml(item)}</p>
+                    </article>
+                  `,
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderFieldGrid(fields) {
+  const items = Array.isArray(fields) ? fields.filter((field) => field && (field.label || field.value)) : [];
+  if (!items.length) {
+    return "";
+  }
+
+  return `
+    <div class="spotlight-field-grid">
+      ${items
+        .map(
+          (field) => `
+            <article class="spotlight-field">
+              <span class="spotlight-field-label">${escapeHtml(field.label || "")}</span>
+              <strong class="spotlight-field-value">${escapeHtml(field.value || "")}</strong>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderSpotlight(item, className = "spotlight-card") {
+  if (!item) {
+    return "";
+  }
+
+  return `
+    <${item.href ? "a" : "article"} class="${className}"${linkAttributes(item.href)}>
+      <div class="card-topline">
+        <p class="eyebrow">${escapeHtml(item.eyebrow || "")}</p>
+        <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
+      </div>
+      <h3>${escapeHtml(item.title || "")}</h3>
+      <p class="record-detail">${escapeHtml(item.detail || "")}</p>
+      ${renderFieldGrid(item.fields)}
+    </${item.href ? "a" : "article"}>
+  `;
+}
+
+function renderBriefing(commandCenter) {
   if (!briefingRoot) {
     return;
   }
 
-  briefingRoot.innerHTML = (Array.isArray(items) ? items : [])
-    .map(
-      (item) => `
-        <${item.href ? "a" : "article"} class="briefing-card"${linkAttributes(item.href)}>
-          <p class="briefing-question">${escapeHtml(item.question || "")}</p>
-          <h3>${escapeHtml(item.answer || "")}</h3>
-          <p class="briefing-detail">${escapeHtml(item.detail || "")}</p>
-          <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
-        </${item.href ? "a" : "article"}>
-      `,
-    )
-    .join("");
+  const cards = Array.isArray(commandCenter.cards) ? commandCenter.cards : [];
+  const latestRequest = commandCenter.latest_request || {};
+  const flagshipProof = commandCenter.flagship_proof || {};
+  const actions = Array.isArray(commandCenter.actions) ? commandCenter.actions : [];
+
+  briefingRoot.innerHTML = `
+    <div class="command-summary-grid">
+      <section class="command-primary-panel">
+        <div class="command-primary-head">
+          <p class="eyebrow">Executive state</p>
+          <p class="record-detail">Read this first for readiness, latest handoff, top blocker, and evidence freshness.</p>
+        </div>
+        ${renderCards(cards, "cards-grid command-cards-grid")}
+      </section>
+      <div class="command-focus-grid">
+        ${renderSpotlight(latestRequest, "command-focus-panel spotlight-card")}
+        ${renderSpotlight(flagshipProof, "command-focus-panel spotlight-card")}
+        <section class="command-focus-panel action-panel">
+          <div class="card-topline">
+            <p class="eyebrow">Primary actions</p>
+          </div>
+          <h3>Review or refresh governed proof</h3>
+          <p class="record-detail">Open the strongest pass and deny artifacts, or generate a fresh governed flow without hunting through deeper sections.</p>
+          ${renderLinks(actions, "command-link-grid")}
+        </section>
+      </div>
+    </div>
+  `;
 }
 
-function renderCards(items) {
+function renderCards(items, className = "cards-grid") {
   return `
-    <div class="cards-grid">
+    <div class="${className}">
       ${(Array.isArray(items) ? items : [])
         .map(
           (item) => `
             <${item.href ? "a" : "article"} class="metric-card"${linkAttributes(item.href)}>
-              <div class="metric-label">${escapeHtml(item.label || "")}</div>
+              <div class="card-topline">
+                <div class="metric-label">${escapeHtml(item.label || "")}</div>
+                <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
+              </div>
               <div class="metric-value">${escapeHtml(item.value || "")}</div>
               <div class="metric-detail">${escapeHtml(item.detail || "")}</div>
-              <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
             </${item.href ? "a" : "article"}>
           `,
         )
@@ -123,11 +232,28 @@ function renderCards(items) {
   `;
 }
 
-function renderKpis(items) {
+function renderKpis(paths) {
   if (!kpiRoot) {
     return;
   }
-  kpiRoot.innerHTML = renderCards(items);
+
+  kpiRoot.innerHTML = (Array.isArray(paths) ? paths : [])
+    .map(
+      (path) => `
+        <section class="audience-lane">
+          <div class="audience-lane-head">
+            <div>
+              <p class="eyebrow">${escapeHtml(path.title === "Reviewer View" ? "Start here" : "Then drill deeper")}</p>
+              <h3>${escapeHtml(path.title || "")}</h3>
+            </div>
+            <div class="${statusClass(path.status || "neutral")}">${escapeHtml(path.status || "neutral")}</div>
+          </div>
+          <p class="record-detail">${escapeHtml(path.detail || "")}</p>
+          ${renderLinks(path.links || [], "audience-link-grid")}
+        </section>
+      `,
+    )
+    .join("");
 }
 
 function renderRecords(items) {
@@ -137,10 +263,12 @@ function renderRecords(items) {
         .map(
           (item) => `
             <${item.href ? "a" : "article"} class="record-card"${linkAttributes(item.href)}>
+              <div class="card-topline">
+                <div class="record-meta-label">${escapeHtml(item.meta || "")}</div>
+                <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
+              </div>
               <h3>${escapeHtml(item.title || "")}</h3>
-              <p class="record-meta">${escapeHtml(item.meta || "")}</p>
               <p class="record-detail">${escapeHtml(item.detail || "")}</p>
-              <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
             </${item.href ? "a" : "article"}>
           `,
         )
@@ -150,7 +278,7 @@ function renderRecords(items) {
 }
 
 function renderTable(block) {
-  return `
+  const tableMarkup = `
     <div class="table-wrap">
       <table>
         <thead>
@@ -172,6 +300,17 @@ function renderTable(block) {
       </table>
     </div>
   `;
+
+  if (!block.collapsed) {
+    return tableMarkup;
+  }
+
+  return `
+    <details class="table-disclosure">
+      <summary>${escapeHtml(block.summary || "Open table sample")}</summary>
+      ${tableMarkup}
+    </details>
+  `;
 }
 
 function renderLinks(items, className = "link-grid") {
@@ -181,7 +320,10 @@ function renderLinks(items, className = "link-grid") {
         .map(
           (item) => `
             <a class="link-card"${linkAttributes(item.href)}>
-              <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
+              <div class="card-topline">
+                <span class="metric-label">Drill through</span>
+                <div class="${statusClass(item.status || "neutral")}">${escapeHtml(item.status || "neutral")}</div>
+              </div>
               <h3>${escapeHtml(item.label || "")}</h3>
               <p class="link-description">${escapeHtml(item.description || "")}</p>
             </a>
@@ -218,72 +360,29 @@ function renderBlocks(blocks) {
     .join("");
 }
 
-function renderReadiness(panel) {
-  if (!readinessRoot) {
-    return;
-  }
-
-  const controlFamilies = Array.isArray(panel.control_families) ? panel.control_families : [];
-  const failingControls = Array.isArray(panel.top_failing_controls) ? panel.top_failing_controls : [];
-  const residualRisks = Array.isArray(panel.residual_risks) ? panel.residual_risks : [];
-  const evidenceLinks = Array.isArray(panel.evidence_links) ? panel.evidence_links : [];
-
-  readinessRoot.innerHTML = `
-    <div class="readiness-shell">
-      <div class="readiness-main">
-        <div class="section-head">
-          <p class="eyebrow">Security readiness / launch gate</p>
-          <h2 id="readiness-title">Current Readiness State: ${escapeHtml(panel.status_label || "UNKNOWN")}</h2>
-          <p class="section-description">${escapeHtml(panel.summary || "")}</p>
-        </div>
-        <div class="readiness-score-band">
-          <div class="readiness-score ${statusClass(panel.status || "neutral")}">
-            <span class="readiness-score-label">Readiness score</span>
-            <strong>${escapeHtml(panel.score || "0")}</strong>
-            <span class="readiness-score-detail">${escapeHtml(panel.coverage || "")} controls passing</span>
-          </div>
-          <div class="hero-meta">
-            <span class="${statusClass(panel.status || "neutral")}">${escapeHtml(panel.status_label || "unknown")}</span>
-            <span class="chip">Generated ${escapeHtml(formatTimestamp(panel.generated_at))}</span>
-          </div>
-        </div>
-        <div class="readiness-family-grid">
-          ${controlFamilies
-            .map(
-              (family) => `
-                <article class="readiness-family-card">
-                  <div class="${statusClass(family.status || "neutral")}">${escapeHtml(family.status || "neutral")}</div>
-                  <h3>${escapeHtml(family.family || "")}</h3>
-                  <p class="readiness-family-score">${escapeHtml(family.score || "0")}%</p>
-                  <p class="record-detail">${escapeHtml(family.detail || "")}</p>
-                </article>
-              `,
-            )
-            .join("")}
-        </div>
-      </div>
-      <div class="readiness-side">
-        <section class="readiness-side-panel">
-          <p class="eyebrow">Top failing controls</p>
-          ${failingControls.length ? renderRecords(failingControls) : "<p class=\"record-detail\">No failing controls listed.</p>"}
-        </section>
-        <section class="readiness-side-panel">
-          <p class="eyebrow">Residual risks</p>
-          ${residualRisks.length ? renderRecords(residualRisks) : "<p class=\"record-detail\">No residual risks listed.</p>"}
-        </section>
-        <section class="readiness-side-panel">
-          <p class="eyebrow">Underlying evidence</p>
-          ${renderLinks(evidenceLinks, "readiness-link-grid")}
-        </section>
-      </div>
-    </div>
-  `;
-}
-
 function renderSections(sections) {
+  let activeGroup = "";
   root.innerHTML = (Array.isArray(sections) ? sections : [])
-    .map(
-      (section) => `
+    .map((section) => {
+      const nextGroup = section.group || "";
+      const groupBanner =
+        nextGroup && nextGroup !== activeGroup
+          ? `
+            <section class="section-group-banner section-group-${escapeHtml(nextGroup)}">
+              <p class="eyebrow">${escapeHtml(section.group_label || nextGroup)}</p>
+              <h2>${escapeHtml(section.group_label || nextGroup)}</h2>
+              <p class="section-description">${
+                nextGroup === "reviewer"
+                  ? "Start with reviewer-safe proof, launch posture, request visibility, and flagship pass or deny evidence."
+                  : "Continue into operator diagnostics, control-domain detail, and deeper evidence or inventory slices."
+              }</p>
+            </section>
+          `
+          : "";
+      activeGroup = nextGroup;
+
+      return `
+        ${groupBanner}
         <section class="dashboard-section section-${escapeHtml(section.id || "")}" data-section="${escapeHtml(section.id || "")}" id="${escapeHtml(section.id || "")}">
           <div class="section-head">
             <p class="eyebrow">${escapeHtml(section.id || "")}</p>
@@ -292,18 +391,38 @@ function renderSections(sections) {
           </div>
           ${renderBlocks(section.blocks)}
         </section>
-      `,
-    )
+      `;
+    })
     .join("");
 }
 
 function renderTabs(tabs) {
-  tabStrip.innerHTML = (Array.isArray(tabs) ? tabs : [])
+  const groups = new Map();
+  for (const tab of Array.isArray(tabs) ? tabs : []) {
+    const groupLabel = tab.group_label || "Sections";
+    if (!groups.has(groupLabel)) {
+      groups.set(groupLabel, []);
+    }
+    groups.get(groupLabel).push(tab);
+  }
+
+  tabStrip.innerHTML = Array.from(groups.entries())
     .map(
-      (tab) => `
-        <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}">
-          ${escapeHtml(tab.label || "")}
-        </button>
+      ([groupLabel, groupTabs]) => `
+        <section class="tab-group">
+          <p class="eyebrow">${escapeHtml(groupLabel)}</p>
+          <div class="tab-group-row">
+            ${groupTabs
+              .map(
+                (tab) => `
+                  <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}">
+                    ${escapeHtml(tab.label || "")}
+                  </button>
+                `,
+              )
+              .join("")}
+          </div>
+        </section>
       `,
     )
     .join("");
@@ -323,7 +442,10 @@ function renderSources(sources) {
     .map(
       (source) => `
         <a class="source-card"${linkAttributes(source.href)}>
-          <div class="${statusClass(source.status || "neutral")}">${escapeHtml(source.status || "neutral")}</div>
+          <div class="card-topline">
+            <span class="metric-label">Source</span>
+            <div class="${statusClass(source.status || "neutral")}">${escapeHtml(source.status || "neutral")}</div>
+          </div>
           <h3>${escapeHtml(source.label || "")}</h3>
           <p class="source-description">${escapeHtml(source.description || "")}</p>
         </a>
@@ -436,9 +558,9 @@ async function boot() {
 
     const payload = await response.json();
     renderHero(payload);
-    renderBriefing(payload.operator_briefing);
-    renderKpis(payload.kpis);
-    renderReadiness(payload.readiness_panel || {});
+    renderModeBanner(payload.mode_banner || {});
+    renderBriefing(payload.command_center || {});
+    renderKpis(payload.audience_paths || []);
     renderTabs(payload.tabs);
     renderSections(payload.sections);
     renderSources(payload.sources);
@@ -457,8 +579,8 @@ async function boot() {
     if (kpiRoot) {
       kpiRoot.innerHTML = "";
     }
-    if (readinessRoot) {
-      readinessRoot.innerHTML = "";
+    if (modeBannerRoot) {
+      modeBannerRoot.innerHTML = "";
     }
   }
 }

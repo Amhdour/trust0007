@@ -15,6 +15,14 @@ This page is the fastest way to inspect what the repo proves without reading the
 5. Inspect one launch-gate no-go artifact:
    - [live-launch-gate-downgrade.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
 
+On the homepage itself, start with:
+
+- the mode banner
+- the command summary
+- the newest governed request spotlight
+- the flagship denied `/launch/onyx` proof spotlight
+- the reviewer-view tab group
+
 ## See A Pass
 
 Use this path when you want the strongest positive proof:
@@ -104,6 +112,12 @@ What this shows:
 - reason codes
 - trace-linked artifact references
 
+Where to look on the dashboard:
+
+- top command summary for the newest request, latest handoff, and flagship proof actions
+- `Recent Governed Requests` for the latest request slice
+- `Blocked / Governed Actions` for the deny timeline
+
 What this does not show:
 
 - full conversation history
@@ -130,6 +144,23 @@ What this does not show:
   - Keycloak Quickstarts
   - OPA Envoy Plugin
   - Langfuse Python SDK
+
+## Homepage Reading Order
+
+Use this order when you want the fastest high-confidence review:
+
+1. Mode banner:
+   - decide whether the page is claiming strict live proof or demo/fallback proof
+2. Command summary:
+   - read readiness, score, latest handoff, top failing control, and evidence freshness
+3. Newest governed request spotlight:
+   - confirm a sanitized preview, result, trace, tenant, evidence mode, and timestamp are visible
+4. Flagship denied handoff spotlight:
+   - confirm denied `/launch/onyx` proof is easy to find without scrolling through inventories
+5. Reviewer View sections:
+   - use `Operations Snapshot`, `Blocked / Governed Actions`, `Launch Gate`, `Evidence Integrity`, and `Upstream Integration Posture`
+
+Only move into the Operator Drilldown after the reviewer story is already clear.
 
 ## Portfolio Framing
 

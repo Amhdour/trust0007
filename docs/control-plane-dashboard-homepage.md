@@ -6,30 +6,44 @@ The homepage was upgraded from a general control-plane shell into a reviewer-fac
 
 The page now leads with:
 
-- operator briefing answers
-- a flagship denied `/launch/onyx` proof path near the top
-- governance KPI cards
-- a dominant Security Readiness / Launch Gate panel
-- explicit live-vs-demo and latest handoff pass/fail cues
-- blocked and governed actions
-- recent governed requests as sanitized previews
-- six primary trust/security domains
-- asset and protection coverage
-- evidence integrity and freshness
-- governed Onyx runtime outcomes
+- a compact command summary instead of a long KPI wall
+- a prominent live-vs-demo mode banner with consequence text
+- the newest governed request preview near the top
+- one flagship denied `/launch/onyx` proof callout instead of repeated near-identical summaries
+- direct pass / deny / generate actions
+- reviewer and operator navigation lanes
+- lighter homepage summaries for heavy inventories and tables
+- collapsed sample tables for secondary depth
+- reviewer-first proof sections before deeper operator diagnostics
 
 ## Homepage structure
 
 1. Hero: repository positioning, data mode, runtime role, and high-level workflow.
    - explicit wording that Onyx is the governed runtime plane and the dashboard is the trust/security control plane
-2. Operator briefing: quick answers to what is protected, what was blocked, why, what evidence exists, and launch readiness.
-3. Governance KPIs: policy, retrieval, tool, audit, evidence, and launch metrics.
-4. Security Readiness / Launch Gate: readiness state, control-family summaries, top failing controls, residual risks, and evidence links.
-5. Drill-down sections:
+2. Mode banner: explicit `LIVE GOVERNED MODE` or `DEMO / FALLBACK MODE` framing with consequence text.
+3. Command summary:
+   - readiness verdict
+   - readiness score
+   - latest handoff allow / deny
+   - top failing control
+   - evidence freshness summary
+   - newest governed request spotlight
+   - flagship denied `/launch/onyx` proof spotlight
+   - primary actions
+4. Reviewer / operator lanes: clear split between proof-first reviewer flow and deeper operator diagnostics.
+5. Sticky tab groups:
+   - Reviewer View
+   - Operator Drilldown
+6. Drill-down sections grouped into:
+   - Reviewer View
    - Operations Snapshot
    - Recent Governed Requests
    - Blocked / Governed Actions
+   - Launch Gate
+   - Onyx Governed Runtime
+   - Evidence Integrity & Freshness
    - Upstream Integration Posture
+   - Operator Drilldown
    - Identity & Session
    - Policy Enforcement
    - Retrieval Boundaries
@@ -37,11 +51,8 @@ The page now leads with:
    - Tool / MCP Governance
    - Audit & Replay
    - Trace Correlation
-   - Launch Gate
    - Asset / Protection Coverage
-   - Evidence Integrity & Freshness
-   - Onyx Governed Runtime
-6. Recent activity feed and raw source links.
+7. Recent activity feed and raw source links.
 
 ## Where each panel gets its data
 
@@ -111,3 +122,29 @@ The dashboard should always make this visible through the data-mode badge in the
 - The homepage request feed is reviewer-safe operational evidence, not raw chat replay.
 - Each row shows a sanitized question preview, governance outcome, evidence mode, and trace-linked artifact references.
 - If a prompt contains likely secrets or sensitive tokens, the preview is redacted before it becomes dashboard-visible.
+
+## Summary vs drilldown
+
+- The homepage top area should answer the platform-state question in under 10 seconds.
+- The top command summary is for decisive state, not exhaustive evidence listing.
+- Heavy inventories stay available, but the homepage now shows only high-signal slices, capped rows, and collapsed sample tables before deeper drill-through.
+- Reviewer sections prioritize proof posture, flagship pass/deny evidence, governed request visibility, and launch readiness.
+- Operator sections prioritize diagnostics, trace continuity, auditability, and deeper control-domain inspection.
+
+## Reviewer vs operator split
+
+- Reviewer View should be enough to answer:
+  - what is protected
+  - what was blocked
+  - why it was blocked
+  - what evidence exists
+  - whether the system is launch-ready
+- Operator Drilldown should be where you inspect:
+  - identity/session detail
+  - policy engine behavior
+  - retrieval boundaries
+  - secret posture
+  - audit and trace linkage
+  - deeper inventories
+
+The same dashboard serves both audiences, but the operator path should never bury the reviewer fast path.

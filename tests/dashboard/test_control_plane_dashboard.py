@@ -35,11 +35,13 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="hero-title"' in html
     assert 'id="hero-copy"' in html
     assert 'id="briefing-root"' in html
-    assert 'id="readiness-root"' in html
+    assert 'id="mode-banner-root"' in html
     assert "payload.title" in js
     assert "payload.landing_steps" in js
-    assert "payload.operator_briefing" in js
-    assert "payload.readiness_panel" in js
+    assert "payload.mode_banner" in js
+    assert "payload.command_center" in js
+    assert "payload.audience_paths" in js
+    assert "block.collapsed" in js
     assert "/api/control-plane/overview" in js
 
 
@@ -57,11 +59,26 @@ def test_dashboard_payload_uses_shared_contract_fields() -> None:
 def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     payload = build_control_plane_dashboard()
 
+    assert payload["mode_banner"]["label"] in {"LIVE GOVERNED MODE", "DEMO / FALLBACK MODE"}
+    assert len(payload["command_center"]["cards"]) >= 5
+    assert payload["command_center"]["latest_request"]["title"]
+    assert payload["command_center"]["flagship_proof"]["title"] == "Denied /launch/onyx handoff"
+    assert payload["mode_banner"]["consequences"]
+    assert len(payload["audience_paths"]) == 2
     assert len(payload["operator_briefing"]) == 5
     assert len(payload["kpis"]) >= 10
     assert payload["readiness_panel"]["status_label"] in {"GO", "CONDITIONAL", "NO-GO"}
-    assert payload["readiness_panel"]["control_families"]
     assert payload["data_mode"]["label"]
+
+
+def test_dashboard_tabs_and_sections_have_reviewer_operator_grouping() -> None:
+    payload = build_control_plane_dashboard()
+
+    tab_groups = {tab["group_label"] for tab in payload["tabs"]}
+    section_groups = {section["group_label"] for section in payload["sections"]}
+
+    assert {"Reviewer View", "Operator Drilldown"} <= tab_groups
+    assert {"Reviewer View", "Operator Drilldown"} <= section_groups
 
 
 def test_dashboard_includes_upstream_integration_posture_section() -> None:
@@ -70,14 +87,14 @@ def test_dashboard_includes_upstream_integration_posture_section() -> None:
     upstream_section = next(section for section in payload["sections"] if section["id"] == "upstream-posture")
     cards_block = next(block for block in upstream_section["blocks"] if block["type"] == "cards")
     table_block = next(block for block in upstream_section["blocks"] if block["type"] == "table")
-    audit_block = next(block for block in upstream_section["blocks"] if block["title"] == "Inventory audit")
     links_block = next(block for block in upstream_section["blocks"] if block["type"] == "links")
 
     labels = {item["label"] for item in cards_block["items"]}
-    assert {"Used now", "Partially used", "Optional / future", "Reference only", "Inventory coverage"} <= labels
+    assert {"Used now", "Partially used", "Inventory coverage", "Mandatory path components"} <= labels
     assert any(row["component"] == "Onyx" and row["classification"] == "used_now" for row in table_block["rows"])
+    assert len(table_block["rows"]) <= 5
+    assert table_block["collapsed"] is True
     assert any(column["key"] == "path_status" for column in table_block["columns"])
-    assert any(item["title"] == "Inventory coverage" for item in audit_block["items"])
     assert any(item["label"] == "Upstream usage API" for item in links_block["items"])
 
 
@@ -186,6 +203,20 @@ def test_dashboard_surfaces_flagship_denied_onyx_proof_and_audit_source() -> Non
 
     assert "Flagship denied Onyx handoff proof" in overview_record_titles
     assert "Audit record source" in audit_card_labels
+
+
+def test_heavy_homepage_tables_are_reduced_to_summary_slices() -> None:
+    payload = build_control_plane_dashboard()
+
+    capped_sections = {"governed-requests", "blocked-actions", "upstream-posture", "asset-coverage", "evidence-integrity"}
+    for section in payload["sections"]:
+        if section["id"] not in capped_sections:
+            continue
+        for block in section["blocks"]:
+            if block["type"] == "table":
+                assert len(block["rows"]) <= 5
+                assert block["collapsed"] is True
+                assert block["summary"]
 
 
 def test_contract_files_present() -> None:

@@ -10,97 +10,127 @@
   ],
   "repo_description_suggestion": "Dashboard-first AI Trust & Security Stack Control Plane for governed AI runtime launch readiness, policy enforcement, evidence integrity, and auditable Onyx handoffs.",
   "tabs": [
-    { "id": "overview", "label": "Overview" },
-    { "id": "governed-requests", "label": "Governed Requests" },
-    { "id": "blocked-actions", "label": "Blocked Actions" },
-    { "id": "upstream-posture", "label": "Upstream Posture" },
-    { "id": "identity-session", "label": "Identity & Session" },
-    { "id": "policy-enforcement", "label": "Policy Enforcement" },
-    { "id": "retrieval-boundaries", "label": "Retrieval Boundaries" },
-    { "id": "secret-access", "label": "Secret Access" },
-    { "id": "tool-mcp-governance", "label": "Tool / MCP Governance" },
-    { "id": "audit-replay", "label": "Audit & Replay" },
-    { "id": "trace-correlation", "label": "Trace Correlation" },
-    { "id": "launch-gate", "label": "Launch Gate" },
-    { "id": "asset-coverage", "label": "Asset Coverage" },
-    { "id": "evidence-integrity", "label": "Evidence Integrity" },
-    { "id": "entry-points", "label": "Onyx Runtime" }
+    { "id": "overview", "label": "Overview", "group": "reviewer", "group_label": "Reviewer View" },
+    { "id": "governed-requests", "label": "Governed Requests", "group": "reviewer", "group_label": "Reviewer View" },
+    { "id": "blocked-actions", "label": "Blocked Actions", "group": "reviewer", "group_label": "Reviewer View" },
+    { "id": "launch-gate", "label": "Launch Gate", "group": "reviewer", "group_label": "Reviewer View" },
+    { "id": "entry-points", "label": "Onyx Runtime", "group": "reviewer", "group_label": "Reviewer View" },
+    { "id": "evidence-integrity", "label": "Evidence Integrity", "group": "reviewer", "group_label": "Reviewer View" },
+    { "id": "upstream-posture", "label": "Upstream Posture", "group": "reviewer", "group_label": "Reviewer View" },
+    { "id": "identity-session", "label": "Identity & Session", "group": "operator", "group_label": "Operator Drilldown" },
+    { "id": "policy-enforcement", "label": "Policy Enforcement", "group": "operator", "group_label": "Operator Drilldown" },
+    { "id": "retrieval-boundaries", "label": "Retrieval Boundaries", "group": "operator", "group_label": "Operator Drilldown" },
+    { "id": "secret-access", "label": "Secret Access", "group": "operator", "group_label": "Operator Drilldown" },
+    { "id": "tool-mcp-governance", "label": "Tool / MCP Governance", "group": "operator", "group_label": "Operator Drilldown" },
+    { "id": "audit-replay", "label": "Audit & Replay", "group": "operator", "group_label": "Operator Drilldown" },
+    { "id": "trace-correlation", "label": "Trace Correlation", "group": "operator", "group_label": "Operator Drilldown" },
+    { "id": "asset-coverage", "label": "Asset Coverage", "group": "operator", "group_label": "Operator Drilldown" }
   ],
   "sections": [
     {
       "id": "overview",
       "title": "Operations Snapshot",
-      "description": "A high-signal governance summary that answers what is protected, what was blocked, what evidence exists, and whether the platform is ready to launch."
+      "description": "A reviewer-first proof snapshot that anchors the dashboard's command summary in flagship pass or deny evidence, mode framing, and primary drill-through links.",
+      "group": "reviewer",
+      "group_label": "Reviewer View"
     },
     {
       "id": "governed-requests",
       "title": "Recent Governed Requests",
-      "description": "Reviewer-safe governed request telemetry with sanitized question previews, allow or deny outcomes, demo-versus-live mode, and trace-linked evidence references."
+      "description": "Reviewer-safe governed request telemetry with sanitized question previews, allow or deny outcomes, demo-versus-live mode, and trace-linked evidence references.",
+      "group": "reviewer",
+      "group_label": "Reviewer View"
     },
     {
       "id": "blocked-actions",
       "title": "Blocked / Governed Actions",
-      "description": "Recent denied retrievals, denied tool attempts, confirmation-required actions, and blocked Onyx handoffs, with the denied `/launch/onyx` path treated as flagship reviewer proof."
-    },
-    {
-      "id": "upstream-posture",
-      "title": "Upstream Integration Posture",
-      "description": "A strict inventory of which vendored upstreams are active now, partially wired, optional for future work, or reference-only."
-    },
-    {
-      "id": "identity-session",
-      "title": "Identity & Session",
-      "description": "Tenant, role, surface, and session boundaries that establish who may reach each governed interface."
-    },
-    {
-      "id": "policy-enforcement",
-      "title": "Policy Enforcement",
-      "description": "Decision volume, deny posture, policy sources, and the dominant reasons governance intercepted activity."
-    },
-    {
-      "id": "retrieval-boundaries",
-      "title": "Retrieval Boundaries",
-      "description": "Tenant-scoped retrieval source protection, blocked data access, and trust or provenance requirements."
-    },
-    {
-      "id": "secret-access",
-      "title": "Secret Access",
-      "description": "Conditional Vault-backed secret access posture for governed operations that require protected runtime credentials."
-    },
-    {
-      "id": "tool-mcp-governance",
-      "title": "Tool / MCP Governance",
-      "description": "Allowed, denied, and confirmation-required tool actions plus MCP server exposure and sandbox requirements."
-    },
-    {
-      "id": "audit-replay",
-      "title": "Audit & Replay",
-      "description": "Audit coverage, replay bundles, governed flow traces, and reviewer-ready evidence entry points."
-    },
-    {
-      "id": "trace-correlation",
-      "title": "Trace Correlation",
-      "description": "Stable trace, request, and session relationships across identity, policy, retrieval, secret access, tool governance, and handoff decisions."
+      "description": "Recent denied retrievals, denied tool attempts, confirmation-required actions, and blocked Onyx handoffs, with the denied `/launch/onyx` path treated as flagship reviewer proof.",
+      "group": "reviewer",
+      "group_label": "Reviewer View"
     },
     {
       "id": "launch-gate",
       "title": "Launch Gate",
-      "description": "Current launch readiness state, failing controls, residual risks, and drill-down evidence for go or no-go decisions."
-    },
-    {
-      "id": "asset-coverage",
-      "title": "Asset / Protection Coverage",
-      "description": "The surfaces, tenants, roles, policy bundles, retrieval sources, tools, MCP servers, and runtimes under governance."
-    },
-    {
-      "id": "evidence-integrity",
-      "title": "Evidence Integrity & Freshness",
-      "description": "Artifact existence, freshness signals, integrity checks, and missing-evidence warnings for reviewer trust."
+      "description": "Current launch readiness state, failing controls, residual risks, and drill-down evidence for go or no-go decisions.",
+      "group": "reviewer",
+      "group_label": "Reviewer View"
     },
     {
       "id": "entry-points",
       "title": "Onyx Governed Runtime",
-      "description": "Onyx remains the governed runtime plane behind the dashboard control plane, with visible allow or deny outcomes and auditable handoffs."
+      "description": "Onyx remains the governed runtime plane behind the dashboard control plane, with visible allow or deny outcomes and auditable handoffs.",
+      "group": "reviewer",
+      "group_label": "Reviewer View"
+    },
+    {
+      "id": "evidence-integrity",
+      "title": "Evidence Integrity & Freshness",
+      "description": "Artifact existence, freshness signals, integrity checks, and missing-evidence warnings for reviewer trust.",
+      "group": "reviewer",
+      "group_label": "Reviewer View"
+    },
+    {
+      "id": "upstream-posture",
+      "title": "Upstream Integration Posture",
+      "description": "A strict inventory of which vendored upstreams are active now, partially wired, optional for future work, or reference-only.",
+      "group": "reviewer",
+      "group_label": "Reviewer View"
+    },
+    {
+      "id": "identity-session",
+      "title": "Identity & Session",
+      "description": "Tenant, role, surface, and session boundaries that establish who may reach each governed interface.",
+      "group": "operator",
+      "group_label": "Operator Drilldown"
+    },
+    {
+      "id": "policy-enforcement",
+      "title": "Policy Enforcement",
+      "description": "Decision volume, deny posture, policy sources, and the dominant reasons governance intercepted activity.",
+      "group": "operator",
+      "group_label": "Operator Drilldown"
+    },
+    {
+      "id": "retrieval-boundaries",
+      "title": "Retrieval Boundaries",
+      "description": "Tenant-scoped retrieval source protection, blocked data access, and trust or provenance requirements.",
+      "group": "operator",
+      "group_label": "Operator Drilldown"
+    },
+    {
+      "id": "secret-access",
+      "title": "Secret Access",
+      "description": "Conditional Vault-backed secret access posture for governed operations that require protected runtime credentials.",
+      "group": "operator",
+      "group_label": "Operator Drilldown"
+    },
+    {
+      "id": "tool-mcp-governance",
+      "title": "Tool / MCP Governance",
+      "description": "Allowed, denied, and confirmation-required tool actions plus MCP server exposure and sandbox requirements.",
+      "group": "operator",
+      "group_label": "Operator Drilldown"
+    },
+    {
+      "id": "audit-replay",
+      "title": "Audit & Replay",
+      "description": "Audit coverage, replay bundles, governed flow traces, and reviewer-ready evidence entry points.",
+      "group": "operator",
+      "group_label": "Operator Drilldown"
+    },
+    {
+      "id": "trace-correlation",
+      "title": "Trace Correlation",
+      "description": "Stable trace, request, and session relationships across identity, policy, retrieval, secret access, tool governance, and handoff decisions.",
+      "group": "operator",
+      "group_label": "Operator Drilldown"
+    },
+    {
+      "id": "asset-coverage",
+      "title": "Asset / Protection Coverage",
+      "description": "The surfaces, tenants, roles, policy bundles, retrieval sources, tools, MCP servers, and runtimes under governance.",
+      "group": "operator",
+      "group_label": "Operator Drilldown"
     }
   ]
 }

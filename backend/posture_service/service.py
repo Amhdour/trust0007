@@ -86,6 +86,27 @@ def _link(label: str, href: str, description: str, status: str = "neutral") -> d
     return {"label": label, "href": href, "description": description, "status": status}
 
 
+def _spotlight(
+    *,
+    eyebrow: str,
+    title: str,
+    detail: str,
+    status: str = "neutral",
+    href: str = "",
+    fields: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    item: dict[str, Any] = {
+        "eyebrow": eyebrow,
+        "title": title,
+        "detail": detail,
+        "status": status,
+        "fields": fields or [],
+    }
+    if href:
+        item["href"] = href
+    return item
+
+
 def _raw(path: str) -> str:
     return f"/raw/{quote(path)}"
 
@@ -537,6 +558,8 @@ def _section_meta(contract: dict[str, Any]) -> dict[str, dict[str, str]]:
             "id": str(section.get("id", "")),
             "title": str(section.get("title", "")),
             "description": str(section.get("description", "")),
+            "group": str(section.get("group", "")),
+            "group_label": str(section.get("group_label", "")),
         }
         for section in contract.get("sections", [])
         if section.get("id")
@@ -553,6 +576,47 @@ def _bool_label(value: bool) -> str:
 
 def _allow_deny_label(value: bool) -> str:
     return "ALLOW" if value else "DENY"
+
+
+def _take_rows(rows: list[dict[str, str]], limit: int = 5) -> list[dict[str, str]]:
+    return rows[:limit]
+
+
+def _important_upstream_components(components: list[dict[str, Any]], limit: int = 5) -> list[dict[str, Any]]:
+    classification_rank = {
+        "used_now": 0,
+        "partially_used": 1,
+        "optional_future": 2,
+        "reference_only": 3,
+    }
+    path_rank = {
+        "mandatory": 0,
+        "supporting": 1,
+        "optional": 2,
+        "reference": 3,
+    }
+    prioritized = sorted(
+        components,
+        key=lambda component: (
+            classification_rank.get(str(component.get("classification", "reference_only")), 9),
+            path_rank.get(str(component.get("runtime_path_status", "reference")), 9),
+            0 if bool(component.get("dashboard_visible")) else 1,
+            str(component.get("component_name", "")),
+        ),
+    )
+    return prioritized[:limit]
+
+
+def _focus_artifacts(inventory: list[dict[str, str]], limit: int = 5) -> list[dict[str, str]]:
+    ranked = sorted(
+        inventory,
+        key=lambda artifact: (
+            0 if artifact.get("status") == "critical" else 1 if artifact.get("status") == "warning" else 2,
+            0 if artifact.get("label") in {"Governed request feed", "Reviewer evidence bundle", "Launch readiness report"} else 1,
+            artifact.get("label", ""),
+        ),
+    )
+    return ranked[:limit]
 
 
 def _governed_request_feed(
@@ -721,13 +785,13 @@ def _upstream_audit_cards(inventory: dict[str, Any]) -> list[dict[str, str]]:
 
     return [
         _card("Used now", str(counts.get("used_now", 0)), "healthy", "Components that currently strengthen the repo's real runtime or evidence path.", "#upstream-posture"),
-        _card("Partially used", str(counts.get("partially_used", 0)), "warning", "Components present through containers, policy, adapters, or bridge configs without full mandatory-path proof.", "#upstream-posture"),
+        _card("Partially used", str(counts.get("partially_used", 0)), "neutral", "Components present through containers, policy, adapters, or bridge configs without full mandatory-path proof.", "#upstream-posture"),
         _card("Optional / future", str(counts.get("optional_future", 0)), "neutral", "Components intentionally kept out of active architecture claims until they produce reviewer-visible outcomes.", "#upstream-posture"),
         _card("Reference only", str(counts.get("reference_only", 0)), "neutral", "Vendored snapshots retained for compatibility or implementation reference only.", "#upstream-posture"),
         _card("Inventory coverage", f"{covered} / {total_paths or len(components)}", coverage_status, "Every vendored upstream path should be classified exactly once.", "#upstream-posture"),
         _card("Dashboard-visible signals", str(dashboard_visible_count), "healthy" if dashboard_visible_count else "warning", "Components with a reviewer-visible posture, evidence, or activity signal on the homepage.", "#upstream-posture"),
         _card("Mandatory path components", str(runtime_path_counts.get("mandatory", 0)), "healthy", "Components the repo currently treats as part of the proved runtime or evidence path.", "#upstream-posture"),
-        _card("Supporting path components", str(runtime_path_counts.get("supporting", 0)), "warning" if runtime_path_counts.get("supporting", 0) else "neutral", "Components that strengthen the platform but are not yet proven as mandatory request-path dependencies.", "#upstream-posture"),
+        _card("Supporting path components", str(runtime_path_counts.get("supporting", 0)), "neutral", "Components that strengthen the platform but are not yet proven as mandatory request-path dependencies.", "#upstream-posture"),
     ]
 
 
@@ -1011,7 +1075,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         policy_source=policy_source,
         denied_flow=denied_flow,
     )
-    governed_request_rows = _governed_request_rows(governed_request_feed)
+    governed_request_rows = _take_rows(_governed_request_rows(governed_request_feed), 5)
     governed_request_records = _governed_request_records(governed_request_feed[:5])
     live_request_count = sum(1 for item in governed_request_feed if str(item.get("evidence_mode", "")).lower() == "live")
     denied_request_count = sum(1 for item in governed_request_feed if not bool(item.get("handoff_allowed")))
@@ -1139,6 +1203,123 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             _link("Prod-sim launch result", _raw(PROD_SIM_LAUNCH_GATE), "Machine-readable governed launch result captured from the prod-sim flow.", "healthy"),
         ],
     }
+    latest_request = governed_request_feed[0] if governed_request_feed else {}
+    latest_request_reason = ", ".join(_string_list(latest_request.get("reason_codes", []))[:2] or ["policy.allow"])
+    latest_request_href = ""
+    if isinstance(latest_request.get("artifact_refs"), dict) and latest_request["artifact_refs"].get("governed_flow_summary"):
+        latest_request_href = _raw(str(latest_request["artifact_refs"]["governed_flow_summary"]))
+    top_failing_control = failing_controls[0] if failing_controls else {}
+    mode_banner = {
+        "label": "LIVE GOVERNED MODE" if live_evidence_mode else "DEMO / FALLBACK MODE",
+        "status": "healthy" if live_evidence_mode else "warning",
+        "summary": (
+            "Strict live dependency participation is expected. Missing identity, policy, retrieval, secret, trace, or launch-gate evidence should fail closed."
+            if live_evidence_mode
+            else "This view is using sample/demo or locally generated governed evidence. Treat it as portfolio proof, not strict live dependency proof."
+        ),
+        "detail": (
+            f"Current evidence source: {event_feed_path}. Latest handoff is {_allow_deny_label(latest_handoff_allowed)} with readiness {launch_summary['status'].upper()}."
+        ),
+        "chips": [
+            {"label": "Evidence mode", "value": "LIVE" if live_evidence_mode else "DEMO / FALLBACK"},
+            {"label": "Dependency posture", "value": "fail-closed" if live_evidence_mode else "local/demo proof"},
+            {"label": "Latest trace", "value": latest_trace_id or "missing"},
+        ],
+        "consequences": [
+            (
+                "Live mode means Keycloak-compatible identity, OPA, retrieval, conditional secrets, trace continuity, and launch-gate evidence should participate under one trace or the handoff fails closed."
+                if live_evidence_mode
+                else "Demo / fallback mode means the homepage is showing sample, local, or portfolio-oriented proof rather than strict live dependency participation."
+            ),
+            (
+                "Treat live launch claims as credible only when the same trace shows complete evidence and a governed Onyx handoff outcome."
+                if live_evidence_mode
+                else "Use this mode to inspect UX and proof shape, but not to claim the full fail-closed live path was exercised."
+            ),
+        ],
+    }
+    evidence_freshness_value = f"{artifact_counts['fresh']} fresh"
+    if artifact_counts["aging"]:
+        evidence_freshness_value += f" / {artifact_counts['aging']} aging"
+    if artifact_counts["stale"] or artifact_counts["missing"]:
+        evidence_freshness_value += f" / {artifact_counts['stale']} stale / {artifact_counts['missing']} missing"
+    latest_request_status = "healthy" if latest_request and bool(latest_request.get("handoff_allowed")) else ("critical" if latest_request else "warning")
+    latest_request_fields = [
+        {"label": "Result", "value": _allow_deny_label(bool(latest_request.get("handoff_allowed", False))) if latest_request else "No request"},
+        {"label": "Evidence mode", "value": str(latest_request.get("evidence_mode", "")) or "unavailable"},
+        {"label": "Tenant", "value": str(latest_request.get("tenant_id", "")) or "unavailable"},
+        {"label": "Trace ID", "value": str(latest_request.get("trace_id", "")) or "unavailable"},
+        {"label": "Timestamp", "value": str(latest_request.get("timestamp", "")) or "unavailable"},
+    ]
+    flagship_proof = _spotlight(
+        eyebrow="Flagship proof",
+        title="Denied /launch/onyx handoff",
+        detail=(
+            f"{flagship_denied['reason']}. "
+            f"Surface {flagship_denied['surface']} stayed blocked with policy {flagship_denied['policy_source']} / {flagship_denied['policy_path']}."
+        ),
+        status="critical",
+        href=flagship_denied["bundle_href"],
+        fields=[
+            {"label": "Reason code", "value": flagship_denied["reason_code"]},
+            {"label": "Tenant", "value": flagship_denied["tenant"]},
+            {"label": "Actor", "value": flagship_denied["actor"]},
+            {"label": "Trace ID", "value": flagship_denied["trace_id"]},
+        ],
+    )
+    command_center = {
+        "cards": [
+            _card("Readiness", launch_summary["status"].upper(), _status_from_launch(launch_summary["status"]), "Launch posture for the governed runtime right now.", "#launch-gate"),
+            _card("Readiness score", str(launch_summary["readiness_score"]), _status_from_launch(launch_summary["status"]), f"{launch_summary['control_coverage']} controls passing in the current launch report.", "#launch-gate"),
+            _card("Latest handoff", _allow_deny_label(latest_handoff_allowed), "healthy" if latest_handoff_allowed else "critical", f"Most recent governed handoff reason: {latest_handoff_reason}.", "#entry-points"),
+            _card("Top failing control", str(top_failing_control.get("control", "none")).replace("_", " "), "critical" if top_failing_control else "healthy", str(top_failing_control.get("summary", "No failing controls are currently listed.")), "#launch-gate"),
+            _card("Evidence freshness", evidence_freshness_value, "healthy" if artifact_counts["stale"] == 0 and artifact_counts["missing"] == 0 else "warning", f"Stale: {artifact_counts['stale']}. Missing: {artifact_counts['missing']}.", "#evidence-integrity"),
+        ],
+        "latest_request": _spotlight(
+            eyebrow="Newest governed request",
+            title=str(latest_request.get("question_preview", "No governed request recorded yet")),
+            detail=(
+                f"Reasons: {latest_request_reason}. "
+                f"Redacted: {_bool_label(bool(latest_request.get('question_redacted')))}. "
+                f"Sensitive patterns: {_bool_label(bool(latest_request.get('contains_sensitive_patterns')))}."
+                if latest_request
+                else "Run a governed flow to surface a sanitized request preview, decision state, and trace-linked evidence."
+            ),
+            status=latest_request_status,
+            href=latest_request_href,
+            fields=latest_request_fields,
+        ),
+        "flagship_proof": flagship_proof,
+        "actions": [
+            _link("Inspect pass flow", _raw(INSPECTABLE_ALLOWED_FLOW), "Reviewer-ready allowed governed handoff proof.", "healthy"),
+            _link("Inspect deny flow", _raw(INSPECTABLE_DENIED_FLOW), "Reviewer-ready denied governed handoff proof.", "critical"),
+            _link("Generate fresh governed flow", _dashboard_url("/api/control-plane/governed-flow"), "Refresh runtime-generated governed artifacts through the control-plane API.", "neutral"),
+        ],
+    }
+    audience_paths = [
+        {
+            "title": "Reviewer View",
+            "status": "healthy",
+            "detail": "Start here for launch readiness, flagship pass or deny proof, governed request visibility, evidence freshness, and upstream classification.",
+            "links": [
+                _link("Operations snapshot", "#overview", "Command summary context and flagship proof posture.", "neutral"),
+                _link("Recent governed requests", "#governed-requests", "Newest sanitized request previews with trace-linked evidence.", "neutral"),
+                _link("Launch gate", "#launch-gate", "Go / no-go detail, failing controls, and launch evidence.", "neutral"),
+                _link("Evidence integrity", "#evidence-integrity", "Freshness, missing artifacts, and reviewer evidence links.", "neutral"),
+            ],
+        },
+        {
+            "title": "Operator Drilldown",
+            "status": "neutral",
+            "detail": "Use these sections for identity, policy, retrieval, secret, audit, trace, and deeper operational inventories after the reviewer proof pass.",
+            "links": [
+                _link("Identity & session", "#identity-session", "Surface, role, and session boundary detail.", "neutral"),
+                _link("Policy enforcement", "#policy-enforcement", "Reason codes, engines, and deny posture.", "neutral"),
+                _link("Audit & replay", "#audit-replay", "Audit coverage, traces, and replay evidence.", "neutral"),
+                _link("Recent activity", "#live-log-title", "Runtime events and operational alerts.", "neutral"),
+            ],
+        },
+    ]
 
     quick_answers = [
         {
@@ -1195,74 +1376,69 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
 
     overview_blocks = [
         {
-            "type": "cards",
-            "title": "Operating posture",
-            "items": [
-                _card("Dashboard mode", "Governance-first", "healthy", "This homepage leads with governance outcomes and readiness, not raw runtime usage.", "#overview"),
-                _card("Data source", event_feed_label, "healthy" if has_live_governed_flow_artifacts(resolved_root) else "warning", f"Primary feed: {event_feed_path}.", _raw(event_feed_path)),
-                _card("Runtime position", "Onyx as governed runtime plane", "healthy", "This dashboard is the trust/security control plane that decides whether, how, and with what evidence access to Onyx is allowed.", "#entry-points"),
-                _card(
-                    "Upstream discipline",
-                    f"{upstream_counts['used_now']} active / {len(upstream_audit.get('component_paths_in_repo', upstream_components))} vendored",
-                    "healthy" if upstream_audit.get("inventory_covers_all_upstreams") else "warning",
-                    "Vendored upstreams are classified by real runtime use, not by mere presence under `upstream/`.",
-                    "#upstream-posture",
-                ),
-                _card("Portfolio framing", "Trust/Security control plane over governed runtime", "healthy", "The homepage is tuned for evaluator review of enforcement, evidence, denied handoffs, and launch readiness.", _raw("docs/control-plane-dashboard-homepage.md")),
-            ],
-        },
-        {
             "type": "records",
-            "title": "Flagship denied Onyx proof",
+            "title": "Reviewer fast path",
             "items": [
                 _record(
                     title=flagship_denied["title"],
                     meta=" | ".join(
-                        (
+                        value
+                        for value in (
                             flagship_denied["surface"],
                             flagship_denied["tenant"],
                             flagship_denied["trace_id"],
                             flagship_denied["timestamp"],
                         )
+                        if value
                     ),
                     detail=(
                         f"Reason code: {flagship_denied['reason_code']}. "
                         f"Actor: {flagship_denied['actor']}. "
                         f"Request: {flagship_denied['request_id']}. "
-                        f"Policy: {flagship_denied['policy_source']} / {flagship_denied['policy_path']}. "
-                        f"Evidence bundle: {INSPECTABLE_DENIED_FLOW}."
+                        f"Policy: {flagship_denied['policy_source']} / {flagship_denied['policy_path']}."
                     ),
                     status="critical",
                     href=flagship_denied["bundle_href"],
-                )
+                ),
+                _record(
+                    title="Allowed governed flow proof",
+                    meta=str(allowed_flow.get("captured_at", "reviewer evidence")),
+                    detail=str(allowed_flow.get("summary", "Live governed-flow execution and governed Onyx handoff evidence is available.")),
+                    status="healthy",
+                    href=_raw(INSPECTABLE_ALLOWED_FLOW),
+                ),
+                _record(
+                    title="Launch-gate no-go proof",
+                    meta=_raw(INSPECTABLE_TRACE_DOWNGRADE),
+                    detail="Trace continuity or missing live evidence can still downgrade readiness and block the governed handoff.",
+                    status="warning",
+                    href=_raw(INSPECTABLE_TRACE_DOWNGRADE),
+                ),
             ],
         },
         {
-            "type": "records",
-            "title": "Portfolio note",
+            "type": "cards",
+            "title": "What this homepage proves",
             "items": [
-                _record(
-                    title="Suggested repository description",
-                    meta="README and portfolio positioning",
-                    detail=str(contract.get("repo_description_suggestion", "")),
-                    status="neutral",
-                    href=_raw("README.md"),
-                )
+                _card("Protected now", f"{len(surfaces)} surfaces / {len(tenants)} tenants / {len(all_tools)} tools", "healthy", "The repo shows what is under governance without pretending every vendored component is equally active.", "#asset-coverage"),
+                _card("Blocked now", str(len(blocked_actions)), "critical" if blocked_actions else "healthy", f"Recent governed interventions stay visible with a top deny reason of {_top_reason(policy_reason_counts)}.", "#blocked-actions"),
+                _card("Evidence posture", f"{len(artifact_inventory) - artifact_counts['missing']} present", "healthy" if artifact_counts["missing"] == 0 else "warning", f"Primary feed: {event_feed_path}.", "#evidence-integrity"),
+                _card("Classification discipline", f"{upstream_counts['used_now']} active / {upstream_counts['partially_used']} supporting", "healthy" if upstream_audit.get("inventory_covers_all_upstreams") else "critical", "Mandatory, supporting, optional, and reference-only upstream claims stay explicit.", "#upstream-posture"),
             ],
         },
         {
             "type": "links",
-            "title": "Primary evidence links",
+            "title": "Proof and guidance",
             "items": [
                 _link("Reviewer evidence bundle", reviewer_href, "Reviewer-ready proof pack for blocked actions, auditability, and launch posture.", "healthy"),
+                _link("Reviewer fast path", _raw("docs/reviewer-fast-path.md"), "Shortest proof path through pass, deny, and launch-gate no-go evidence.", "neutral"),
+                _link("Dashboard visual proof", _raw("docs/dashboard-visual-proof.md"), "Fast reviewer cues for the top command summary and flagship evidence.", "neutral"),
                 _link("Launch readiness report", launch_report_href, "Raw control findings and residual risk guidance.", "warning"),
-                _link("Governed telemetry feed", _raw(event_feed_path), "The event feed used to power the blocked-actions and domain sections.", "healthy"),
-                _link("Homepage structure note", _raw("docs/control-plane-dashboard-homepage.md"), "What changed, how the homepage is structured, and what is demo-derived.", "neutral"),
             ],
         },
     ]
 
-    blocked_rows = [
+    blocked_rows = _take_rows([
         {
             "kind": action["kind"],
             "reason": action["reason_code"],
@@ -1274,9 +1450,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "timestamp": action["timestamp"] or "timestamp unavailable",
         }
         for action in blocked_actions
-    ]
+    ], 5)
 
-    identity_rows = [
+    identity_rows = _take_rows([
         {
             "surface": str(rule.get("surface", "")),
             "path": str(rule.get("path", "")),
@@ -1284,9 +1460,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "allowed_roles": ", ".join(_string_list(rule.get("allowed_roles"))),
         }
         for rule in surfaces
-    ]
+    ], 5)
 
-    retrieval_rows = [
+    retrieval_rows = _take_rows([
         {
             "tenant": tenant_id,
             "source": source,
@@ -1295,7 +1471,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         }
         for tenant_id, sources in policy.get("retrieval", {}).get("tenant_allowed_sources", {}).items()
         for source in sources
-    ]
+    ], 5)
 
     tool_rows = [
         {"control": "Allowed tools", "value": str(len(allowed_tools)), "notes": ", ".join(allowed_tools) or "none"},
@@ -1305,7 +1481,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         {"control": "Governed runtime", "value": "1", "notes": "Onyx is reached through governed surfaces."},
     ]
 
-    audit_rows = [
+    audit_rows = _take_rows([
         {
             "event": str(event.get("action") or event.get("event_type", "audit.event")),
             "trace_id": str(event.get("trace_id", "")),
@@ -1322,9 +1498,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             or str(event.get("event_payload", {}).get("action", "captured")),
         }
         for event in audit_dataset[:6]
-    ]
+    ], 5)
 
-    asset_rows = [
+    asset_rows = _take_rows([
         {"asset_class": "Surfaces", "count": str(len(surfaces)), "governed_by": "surface path policy", "evidence": policy_path},
         {"asset_class": "Tenants", "count": str(len(tenants)), "governed_by": "identity tenant roles", "evidence": policy_path},
         {"asset_class": "Roles", "count": str(len(roles)), "governed_by": "identity role allowlists", "evidence": policy_path},
@@ -1333,7 +1509,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         {"asset_class": "Tools", "count": str(len(all_tools)), "governed_by": "tool policy", "evidence": policy_path},
         {"asset_class": "MCP servers", "count": str(len(mcp_servers)), "governed_by": "integration inventory", "evidence": policy_path},
         {"asset_class": "Governed runtimes", "count": "1", "governed_by": "launch gate + onyx surface policy", "evidence": INSPECTABLE_ALLOWED_FLOW},
-    ]
+    ], 5)
 
     evidence_rows = [
         {
@@ -1343,7 +1519,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "integrity": artifact["integrity"],
             "updated": artifact["last_updated"],
         }
-        for artifact in artifact_inventory
+        for artifact in _focus_artifacts(artifact_inventory, 5)
     ]
 
     onyx_handoffs = [
@@ -1415,7 +1591,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 },
                 {
                     "type": "table",
-                    "title": "Governed request feed",
+                    "title": "Latest request slice",
+                    "collapsed": True,
+                    "summary": "Open latest request slice (top 5 rows)",
                     "columns": [
                         {"key": "timestamp", "label": "Timestamp"},
                         {"key": "question", "label": "Sanitized preview"},
@@ -1477,14 +1655,16 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "title": "Recent governed interventions",
                     "items": [
                         _record(action["title"], action["meta"], action["detail"], action["status"], action["href"])
-                        for action in blocked_actions
+                        for action in blocked_actions[:4]
                     ] or [
                         _record("No recent blocked actions", "Governance posture", "No denies or confirmation-required actions are visible in the current dataset.", "healthy")
                     ],
                 },
                 {
                     "type": "table",
-                    "title": "Blocked action timeline",
+                    "title": "Latest blocked timeline",
+                    "collapsed": True,
+                    "summary": "Open blocked timeline sample (top 5 rows)",
                     "columns": [
                         {"key": "kind", "label": "Kind"},
                         {"key": "reason", "label": "Reason code"},
@@ -1514,11 +1694,22 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 {
                     "type": "cards",
                     "title": "Upstream usage classification",
-                    "items": _upstream_audit_cards(upstream_inventory),
+                    "items": [
+                        item
+                        for item in _upstream_audit_cards(upstream_inventory)
+                        if item["label"] in {"Used now", "Partially used", "Inventory coverage", "Mandatory path components", "Supporting path components"}
+                    ],
+                },
+                {
+                    "type": "records",
+                    "title": "Priority component notes",
+                    "items": _upstream_record_items(_important_upstream_components(upstream_components, 4)),
                 },
                 {
                     "type": "table",
-                    "title": "Component-by-component posture",
+                    "title": "Top homepage components",
+                    "collapsed": True,
+                    "summary": "Open upstream component slice (top 5 rows)",
                     "columns": [
                         {"key": "component", "label": "Component"},
                         {"key": "classification", "label": "Classification"},
@@ -1529,44 +1720,13 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         {"key": "dev", "label": "Dev"},
                         {"key": "prod_sim", "label": "Prod-sim"},
                     ],
-                    "rows": _upstream_table_rows(upstream_components),
-                },
-                {
-                    "type": "records",
-                    "title": "Why each component stays or shrinks",
-                    "items": _upstream_record_items(upstream_components),
-                },
-                {
-                    "type": "records",
-                    "title": "Inventory audit",
-                    "items": [
-                        _record(
-                            "Inventory coverage",
-                            f"{len(upstream_audit.get('classified_paths', []))} classified / {len(upstream_audit.get('component_paths_in_repo', []))} vendored paths",
-                            "Every top-level vendored upstream path is expected to have one classification entry and no duplicates.",
-                            "healthy" if upstream_audit.get("inventory_covers_all_upstreams") else "critical",
-                            _dashboard_url("/api/control-plane/upstream-usage"),
-                        ),
-                        _record(
-                            "Dashboard-visible components",
-                            ", ".join(upstream_audit.get("dashboard_visible_components", [])[:6]) or "none recorded",
-                            "Only components with reviewer-visible outcomes should feel active on the homepage.",
-                            "healthy" if upstream_audit.get("dashboard_visible_count", 0) else "warning",
-                            "#upstream-posture",
-                        ),
-                        _record(
-                            "Source snapshot required",
-                            ", ".join(upstream_audit.get("source_snapshot_required_components", [])[:6]) or "none required",
-                            "These are the few components whose vendored source snapshot is currently part of a real repo-owned workflow, test target, or launch path.",
-                            "neutral",
-                            _raw("docs/upstream-usage-matrix.md"),
-                        ),
-                    ],
+                    "rows": _upstream_table_rows(_important_upstream_components(upstream_components, 5)),
                 },
                 {
                     "type": "links",
                     "title": "Upstream inventory evidence",
                     "items": [
+                        _link("Full upstream inventory", _dashboard_url("/api/control-plane/upstream-usage"), "Full machine-readable component inventory beyond the homepage slice.", "healthy"),
                         _link("Upstream usage API", _dashboard_url("/api/control-plane/upstream-usage"), "Machine-readable upstream inventory exposed by the control plane.", "healthy"),
                         _link("Upstream usage inventory", _raw("evidence/upstream_usage.inventory.json"), "Repo-owned component inventory with classification, signals, evidence, and removal impact.", "healthy"),
                         _link("Upstream usage matrix", _raw("docs/upstream-usage-matrix.md"), "Reviewer-facing explanation of what is active, partial, optional, or reference-only.", "neutral"),
@@ -1675,7 +1835,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                             status="healthy" if _payload(event).get("allow") else "critical",
                             href=_raw(event_feed_path),
                         )
-                        for event in policy_events[:6]
+                        for event in policy_events[:4]
                     ],
                 },
                 {
@@ -1719,6 +1879,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 {
                     "type": "table",
                     "title": "Retrieval source coverage",
+                    "collapsed": True,
+                    "summary": "Open retrieval boundary slice (top 5 rows)",
                     "columns": [
                         {"key": "tenant", "label": "Tenant"},
                         {"key": "source", "label": "Source"},
@@ -1746,7 +1908,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                             status="critical" if str(_payload(event).get("decision", "")).lower() in {"deny", "blocked"} else "healthy",
                             href=_raw(event_feed_path),
                         )
-                        for event in retrieval_events[:6]
+                        for event in retrieval_events[:4]
                     ],
                 },
                 {
@@ -1824,6 +1986,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 {
                     "type": "table",
                     "title": "Tool / MCP inventory",
+                    "collapsed": True,
+                    "summary": "Open tool and MCP inventory slice",
                     "columns": [
                         {"key": "control", "label": "Control"},
                         {"key": "value", "label": "Value"},
@@ -1887,6 +2051,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 {
                     "type": "table",
                     "title": "Audit event sample",
+                    "collapsed": True,
+                    "summary": "Open audit event sample",
                     "columns": [
                         {"key": "event", "label": "Audit event"},
                         {"key": "trace_id", "label": "Trace ID"},
@@ -1907,7 +2073,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                                 status="healthy",
                                 href=reviewer_href,
                             )
-                            for attack in blocked_attacks
+                            for attack in blocked_attacks[:3]
                         ],
                         _record(
                             title="Inspectable allowed flow",
@@ -2019,14 +2185,14 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 {
                     "type": "records",
                     "title": "Top failing controls",
-                    "items": readiness_panel["top_failing_controls"] or [
+                    "items": (readiness_panel["top_failing_controls"][:3]) or [
                         _record("No failing controls", "Launch gate", "All controls are in a pass state.", "healthy", launch_report_href)
                     ],
                 },
                 {
                     "type": "records",
                     "title": "Residual risks",
-                    "items": readiness_panel["residual_risks"] or [
+                    "items": (readiness_panel["residual_risks"][:3]) or [
                         _record("No residual risks", "Launch gate", "No residual launch risks are listed in the current report.", "healthy", launch_report_href)
                     ],
                 },
@@ -2055,7 +2221,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 },
                 {
                     "type": "table",
-                    "title": "Protection inventory",
+                    "title": "Homepage protection slice",
+                    "collapsed": True,
+                    "summary": "Open homepage protection slice (top 5 rows)",
                     "columns": [
                         {"key": "asset_class", "label": "Asset class"},
                         {"key": "count", "label": "Count"},
@@ -2068,6 +2236,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "type": "links",
                     "title": "Coverage references",
                     "items": [
+                        _link("Full policy inventory", policy_href, "Complete governed surface, retrieval, and tool inventory beyond the homepage slice.", "healthy"),
                         _link("Asset inventory note", _raw("docs/asset-inventory.md"), "Repository note describing protected assets and control-plane ownership.", "neutral"),
                         _link("Repo map", _raw("docs/repo-map.md"), "High-level repository layout that anchors the dashboard-first architecture.", "neutral"),
                         _link("Runtime policy bundle", policy_href, "Source of truth for governed surfaces, roles, retrieval sources, and tools.", "healthy"),
@@ -2083,7 +2252,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "title": "Freshness and integrity summary",
                     "items": [
                         _card("Fresh artifacts", str(artifact_counts["fresh"]), "healthy", "Artifacts updated recently enough for evaluator trust.", "#evidence-integrity"),
-                        _card("Aging artifacts", str(artifact_counts["aging"]), "warning" if artifact_counts["aging"] else "healthy", "Artifacts that exist but are no longer same-day fresh.", "#evidence-integrity"),
+                        _card("Aging artifacts", str(artifact_counts["aging"]), "neutral", "Artifacts that exist but are no longer same-day fresh.", "#evidence-integrity"),
                         _card("Stale artifacts", str(artifact_counts["stale"]), "critical" if artifact_counts["stale"] else "healthy", "Artifacts present but old enough to warrant attention.", "#evidence-integrity"),
                         _card("Missing artifacts", str(artifact_counts["missing"]), "critical" if artifact_counts["missing"] else "healthy", "Expected evidence that is missing from the checkout.", "#evidence-integrity"),
                         _card("Verified artifacts", str(artifact_counts["verified"]), "healthy", "Artifacts whose structure or bundle references were checked.", "#evidence-integrity"),
@@ -2091,7 +2260,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 },
                 {
                     "type": "table",
-                    "title": "Artifact inventory",
+                    "title": "Priority artifact slice",
+                    "collapsed": True,
+                    "summary": "Open priority artifact slice (top 5 rows)",
                     "columns": [
                         {"key": "artifact", "label": "Artifact"},
                         {"key": "category", "label": "Category"},
@@ -2112,10 +2283,19 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                             status=artifact["status"],
                             href=artifact["href"],
                         )
-                        for artifact in artifact_inventory
+                        for artifact in artifact_inventory[:]
                         if artifact["status"] in {"warning", "critical"}
-                    ] or [
+                    ][:4] or [
                         _record("No integrity warnings", "Evidence integrity", "All tracked artifacts are present and structurally readable.", "healthy")
+                    ],
+                },
+                {
+                    "type": "links",
+                    "title": "Evidence drill-through",
+                    "items": [
+                        _link("Reviewer evidence bundle", reviewer_href, "Reviewer-ready bundle for pass, deny, and launch-gate evidence.", "healthy"),
+                        _link("Dashboard ingestion feed", ingestion_href, "Export used for dashboard-level ingestion and replay references.", "neutral"),
+                        _link("Evidence model note", _raw("docs/evidence-model.md"), "Explains artifact types, request previews, and trace-linked evidence expectations.", "neutral"),
                     ],
                 },
             ],
@@ -2128,8 +2308,6 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "title": "Governed runtime posture",
                     "items": [
                         _card("Onyx visibility", "Governed runtime plane", "healthy" if onyx_available else "warning", "Onyx remains behind dashboard-controlled handoffs; this control plane decides whether access is allowed and what evidence must exist.", _raw("docs/onyx-integration.md")),
-                        _card("Allowed handoff evidence", "Visible", "healthy", "Inspectable evidence bundle for an allowed runtime handoff is present.", _raw(INSPECTABLE_ALLOWED_FLOW)),
-                        _card("Denied handoff evidence", "Visible", "critical", "Inspectable evidence bundle for a denied runtime handoff is present.", _raw(INSPECTABLE_DENIED_FLOW)),
                         _card("Recent handoff outcomes", str(len(onyx_handoffs)), "healthy", "Recent governed handoff outcomes are visible to reviewers.", "#entry-points"),
                         _card("Latest handoff", "ALLOW" if latest_handoff_allowed else "DENY", "healthy" if latest_handoff_allowed else "critical", f"Latest governed handoff reason: {latest_handoff_reason}.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json")),
                         _card("Latest evidence mode", _freshness_label(timestamp=str(governed_flow_summary.get("generated_at", "")), evidence_mode=str(governed_flow_summary.get("evidence_mode", "")), provenance="runtime-generated" if governed_flow_summary else "sample/demo"), "healthy" if live_evidence_mode else "warning", "Current governed handoff evidence mode and freshness for the runtime plane proof.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json")),
@@ -2168,6 +2346,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
     ]
+    section_order = {str(section.get("id", "")): index for index, section in enumerate(contract.get("sections", []))}
+    sections.sort(key=lambda section: section_order.get(str(section.get("id", "")), len(section_order)))
 
     sources = [
         _link("Governed event feed", _raw(event_feed_path), "Event feed used by the dashboard overview and blocked-actions views.", "healthy"),
@@ -2194,6 +2374,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "detail": f"Primary event feed: {event_feed_path}",
         },
         "repo_description_suggestion": str(contract.get("repo_description_suggestion", "")),
+        "mode_banner": mode_banner,
+        "command_center": command_center,
+        "audience_paths": audience_paths,
         "operator_briefing": quick_answers,
         "kpis": kpis,
         "readiness_panel": readiness_panel,

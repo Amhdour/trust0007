@@ -15,7 +15,10 @@ These are lightweight proof previews, not literal runtime screenshots. They high
 
 Open [dashboard-live-pass.svg](/workspaces/beta011/docs/images/dashboard-live-pass.svg) and look for:
 
-- `Evidence mode`: `LIVE`
+- mode banner: `LIVE GOVERNED MODE`
+- top command summary showing readiness, score, latest handoff, top failing control, and evidence freshness
+- newest governed request spotlight with a trace-linked record
+- primary pass / deny / generate actions near the top
 - `Identity result`: `ALLOW`
 - `Decision engine`: `OPA`
 - `Latest retrieval result`: `ALLOW`
@@ -30,7 +33,9 @@ These indicators correspond to the strict live pass artifact in [allowed-flow.js
 
 Open [dashboard-live-deny.svg](/workspaces/beta011/docs/images/dashboard-live-deny.svg) and look for:
 
-- `Evidence mode`: `LIVE`
+- mode banner: `LIVE GOVERNED MODE`
+- top command summary showing `DENY` or `NO-GO`
+- flagship denied `/launch/onyx` proof spotlight near the top
 - one dependency card showing a fail state
 - `Trace complete`: `no` or a dependency result showing `DENY`
 - `Missing evidence`: non-zero when launch-gate blocked the flow
@@ -64,3 +69,14 @@ The visuals are documentation aids. The real proof remains:
 - the reviewer evidence bundle
 
 Do not treat the visuals as stronger evidence than the underlying artifacts and tests.
+
+## Viewer Lanes
+
+The current dashboard hierarchy is intentionally split into:
+
+- Reviewer View:
+  - mode banner, command summary, flagship proof, launch posture, governed requests, evidence freshness, upstream posture
+- Operator Drilldown:
+  - identity, policy, retrieval, secret, audit, trace, and deeper inventories
+
+Reviewers should not need the operator drilldown to understand the top-level state.
