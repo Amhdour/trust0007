@@ -12,7 +12,7 @@ const sourcesRoot = document.getElementById("sources");
 const liveLogRoot = document.getElementById("live-log-root");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
 
-const LIVE_LOG_LIMIT = 12;
+const LIVE_LOG_LIMIT = 6;
 const DEFAULT_LIVE_LOG_POLL_MS = 5000;
 let liveLogTimer = 0;
 
@@ -36,6 +36,15 @@ function statusLabel(status) {
     critical: "Serious issue",
     neutral: "For context",
   }[status || "neutral"] || String(status || "neutral");
+}
+
+function renderStatusPill(status, options = {}) {
+  const normalized = status || "neutral";
+  if ((options.hideHealthy && normalized === "healthy") || (options.hideNeutral && normalized === "neutral")) {
+    return "";
+  }
+
+  return `<div class="${statusClass(normalized)}" title="${escapeHtml(normalized)}">${escapeHtml(options.label || statusLabel(normalized))}</div>`;
 }
 
 function isInternalHref(href) {
@@ -201,22 +210,34 @@ function renderBriefing(commandCenter) {
       <section class="command-primary-panel">
         <div class="command-primary-head">
           <p class="eyebrow">Safety summary</p>
-          <p class="record-detail">Read this first for whether the system looks safe to use, what happened most recently, and what proof supports that view.</p>
+          <p class="record-detail">Read this first for the current decision, the latest access outcome, and the smallest set of proof links you need.</p>
         </div>
         ${renderCards(cards, "cards-grid command-cards-grid")}
+        <div class="command-primary-footer">
+          <p class="eyebrow">Primary proof links</p>
+          ${renderActionPills(actions)}
+        </div>
       </section>
       <div class="command-focus-grid">
         ${renderSpotlight(latestRequest, "command-focus-panel spotlight-card")}
         ${renderSpotlight(flagshipProof, "command-focus-panel spotlight-card")}
-        <section class="command-focus-panel action-panel">
-          <div class="card-topline">
-            <p class="eyebrow">Helpful next steps</p>
-          </div>
-          <h3>Open examples or create fresh proof</h3>
-          <p class="record-detail">Use these links to see approved and blocked examples, or run a fresh checked flow for updated proof.</p>
-          ${renderLinks(actions, "command-link-grid")}
-        </section>
       </div>
+    </div>
+  `;
+}
+
+function renderActionPills(items) {
+  return `
+    <div class="command-action-row">
+      ${(Array.isArray(items) ? items : [])
+        .map(
+          (item) => `
+            <a class="action-pill action-pill-${escapeHtml(item.status || "neutral")}"${linkAttributes(item.href)}>
+              ${escapeHtml(item.display_label || item.label || "")}
+            </a>
+          `,
+        )
+        .join("")}
     </div>
   `;
 }
@@ -256,10 +277,20 @@ function renderKpis(paths) {
               <p class="eyebrow">${escapeHtml(String(path.title || "").toLowerCase().includes("technical") ? "Then drill deeper" : "Start here")}</p>
               <h3>${escapeHtml(path.title || "")}</h3>
             </div>
-            <div class="${statusClass(path.status || "neutral")}" title="${escapeHtml(path.status || "neutral")}">${escapeHtml(statusLabel(path.status || "neutral"))}</div>
+            ${renderStatusPill(path.status || "neutral", { hideHealthy: true, hideNeutral: true })}
           </div>
           <p class="record-detail">${escapeHtml(path.detail || "")}</p>
-          ${renderLinks(path.links || [], "audience-link-grid")}
+          <div class="audience-link-pill-row">
+            ${(Array.isArray(path.links) ? path.links : [])
+              .map(
+                (item) => `
+                  <a class="audience-link-pill"${linkAttributes(item.href)}>
+                    ${escapeHtml(item.display_label || item.label || "")}
+                  </a>
+                `,
+              )
+              .join("")}
+          </div>
         </section>
       `,
     )
@@ -275,7 +306,7 @@ function renderRecords(items) {
             <${item.href ? "a" : "article"} class="record-card"${linkAttributes(item.href)}>
               <div class="card-topline">
                 <div class="record-meta-label">${escapeHtml(item.display_meta || item.meta || "")}</div>
-                <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(statusLabel(item.status || "neutral"))}</div>
+                ${renderStatusPill(item.status || "neutral", { hideNeutral: true })}
               </div>
               <h3>${escapeHtml(item.display_title || item.title || "")}</h3>
               <p class="record-detail">${escapeHtml(item.display_detail || item.detail || "")}</p>
@@ -331,8 +362,7 @@ function renderLinks(items, className = "link-grid") {
           (item) => `
             <a class="link-card"${linkAttributes(item.href)}>
               <div class="card-topline">
-                <span class="metric-label">More detail</span>
-                <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(statusLabel(item.status || "neutral"))}</div>
+                ${renderStatusPill(item.status || "neutral", { hideHealthy: true, hideNeutral: true })}
               </div>
               <h3>${escapeHtml(item.display_label || item.label || "")}</h3>
               <p class="link-description">${escapeHtml(item.display_description || item.description || "")}</p>
@@ -542,7 +572,7 @@ function renderSources(sources) {
         <a class="source-card"${linkAttributes(source.href)}>
           <div class="card-topline">
             <span class="metric-label">Source</span>
-            <div class="${statusClass(source.status || "neutral")}">${escapeHtml(source.status || "neutral")}</div>
+            ${renderStatusPill(source.status || "neutral", { hideHealthy: true, hideNeutral: true })}
           </div>
           <h3>${escapeHtml(source.label || "")}</h3>
           <p class="source-description">${escapeHtml(source.description || "")}</p>

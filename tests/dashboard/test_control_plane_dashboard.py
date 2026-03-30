@@ -82,7 +82,7 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     payload = build_control_plane_dashboard()
 
     assert payload["mode_banner"]["label"] in {"LIVE GOVERNED MODE", "DEMO / FALLBACK MODE"}
-    assert len(payload["command_center"]["cards"]) >= 5
+    assert len(payload["command_center"]["cards"]) >= 4
     assert payload["command_center"]["latest_request"]["title"]
     assert payload["command_center"]["flagship_proof"]["title"] == "Denied /launch/onyx handoff"
     assert payload["mode_banner"]["consequences"]
@@ -207,12 +207,12 @@ def test_blocked_actions_section_includes_reason_codes() -> None:
 def test_dashboard_surfaces_flagship_denied_onyx_proof_and_audit_source() -> None:
     payload = build_control_plane_dashboard()
 
-    overview = next(section for section in payload["sections"] if section["id"] == "overview")
+    blocked = next(section for section in payload["sections"] if section["id"] == "blocked-actions")
     audit = next(section for section in payload["sections"] if section["id"] == "audit-replay")
 
-    overview_record_titles = {
+    blocked_record_titles = {
         item["title"]
-        for block in overview["blocks"]
+        for block in blocked["blocks"]
         if block["type"] == "records"
         for item in block["items"]
     }
@@ -223,7 +223,8 @@ def test_dashboard_surfaces_flagship_denied_onyx_proof_and_audit_source() -> Non
         for item in block["items"]
     }
 
-    assert "Flagship denied Onyx handoff proof" in overview_record_titles
+    assert payload["command_center"]["flagship_proof"]["title"] == "Denied /launch/onyx handoff"
+    assert "Flagship denied Onyx handoff proof" in blocked_record_titles
     assert "Audit record source" in audit_card_labels
 
 

@@ -17,9 +17,9 @@ Open [dashboard-live-pass.svg](/workspaces/beta011/docs/images/dashboard-live-pa
 
 - mode banner: `LIVE GOVERNED MODE`
 - short “How to read this dashboard” help block
-- top command summary showing readiness, score, latest handoff, top failing control, and evidence freshness
+- top command summary showing combined readiness-and-score, latest handoff, top failing control, and evidence freshness
 - newest governed request spotlight with a trace-linked record
-- primary pass / deny / generate actions near the top
+- primary pass / deny / generate proof links in a lighter inline strip near the top
 - `Identity result`: `ALLOW`
 - `Decision engine`: `OPA`
 - `Latest retrieval result`: `ALLOW`

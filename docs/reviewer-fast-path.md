@@ -153,7 +153,7 @@ Use this order when you want the fastest high-confidence review:
 1. Mode banner:
    - decide whether the page is claiming strict live proof or demo/fallback proof
 2. Command summary:
-   - read readiness, score, latest handoff, top failing control, and evidence freshness
+   - read combined readiness-and-score, latest handoff, top failing control, and evidence freshness
 3. Newest governed request spotlight:
    - confirm a sanitized preview, result, trace, tenant, evidence mode, and timestamp are visible
 4. Flagship denied handoff spotlight:

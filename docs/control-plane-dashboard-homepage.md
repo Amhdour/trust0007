@@ -14,11 +14,12 @@ The page now leads with:
 - a prominent live-vs-demo mode banner with consequence text
 - the newest governed request preview near the top
 - one flagship denied `/launch/onyx` proof callout instead of repeated near-identical summaries
-- direct pass / deny / generate actions
+- direct pass / deny / generate actions in a lighter inline strip
 - reviewer and operator navigation lanes
 - lighter homepage summaries for heavy inventories and tables
 - collapsed sample tables for secondary depth
 - reviewer-first proof sections before deeper operator diagnostics
+- a smaller quick-jump navigation row instead of a full always-open section list
 
 ## Homepage structure
 
@@ -30,18 +31,15 @@ The page now leads with:
    - the main questions the page answers
    - where the technical detail lives
 4. Command summary:
-   - readiness verdict
-   - readiness score
+   - combined readiness verdict and score
    - latest handoff allow / deny
    - top failing control
    - evidence freshness summary
    - newest governed request spotlight
    - flagship denied `/launch/onyx` proof spotlight
-   - primary actions
+   - primary proof links
 5. Plain-language review / technical-details lanes: clear split between simple safety meaning and deeper engineering proof.
-6. Sticky tab groups:
-   - Plain-Language Review
-   - Technical Details
+6. Compact quick-jump row with expandable full section list.
 7. Drill-down sections grouped into:
    - Plain-Language Review
    - Big Picture
