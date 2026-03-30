@@ -595,12 +595,12 @@ h3 {
 }
 
 .tab-strip {
-  position: sticky;
-  top: 12px;
-  z-index: 5;
-  display: grid;
-  gap: 14px;
   margin: 18px 0;
+}
+
+.tab-strip-shell {
+  display: grid;
+  gap: 12px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -609,9 +609,58 @@ h3 {
   backdrop-filter: blur(12px);
 }
 
+.tab-strip-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
 .tab-group-row {
   display: flex;
   flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tab-primary-row {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding-bottom: 4px;
+}
+
+.tab-primary-row .tab-button {
+  flex: 0 0 auto;
+}
+
+.tab-disclosure {
+  border-top: 1px solid rgba(16, 33, 45, 0.08);
+  padding-top: 12px;
+}
+
+.tab-disclosure summary {
+  cursor: pointer;
+  list-style: none;
+  width: fit-content;
+  border: 1px solid rgba(16, 33, 45, 0.08);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.68);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.tab-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.tab-disclosure-body {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.tab-group {
+  display: grid;
   gap: 10px;
 }
 
@@ -883,7 +932,7 @@ tbody tr:last-child td {
   }
 
   .tab-strip {
-    top: 8px;
+    margin: 16px 0;
   }
 }
 

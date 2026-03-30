@@ -462,7 +462,8 @@ function renderSections(sections) {
 
 function renderTabs(tabs) {
   const groups = new Map();
-  for (const tab of Array.isArray(tabs) ? tabs : []) {
+  const allTabs = Array.isArray(tabs) ? tabs : [];
+  for (const tab of allTabs) {
     const groupLabel = tab.group_label || "Sections";
     if (!groups.has(groupLabel)) {
       groups.set(groupLabel, []);
@@ -470,32 +471,65 @@ function renderTabs(tabs) {
     groups.get(groupLabel).push(tab);
   }
 
-  tabStrip.innerHTML = Array.from(groups.entries())
-    .map(
-      ([groupLabel, groupTabs]) => `
-        <section class="tab-group">
-          <p class="eyebrow">${escapeHtml(groupLabel)}</p>
-          <div class="tab-group-row">
-            ${groupTabs
-              .map(
-                (tab) => `
-                  <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}">
-                    ${escapeHtml(tab.label || "")}
-                  </button>
-                `,
-              )
-              .join("")}
-          </div>
-        </section>
-      `,
-    )
-    .join("");
+  const primaryTabs = allTabs.filter((tab) => tab.group === "reviewer").slice(0, 5);
+
+  tabStrip.innerHTML = `
+    <section class="tab-strip-shell">
+      <div class="tab-strip-head">
+        <div>
+          <p class="eyebrow">Quick jump</p>
+          <p class="section-description">Use the short jump row for the main story. Open the full section list only when you need deeper navigation.</p>
+        </div>
+      </div>
+      <div class="tab-group-row tab-primary-row">
+        ${primaryTabs
+          .map(
+            (tab) => `
+              <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}">
+                ${escapeHtml(tab.label || "")}
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+      <details class="tab-disclosure">
+        <summary>Show all sections</summary>
+        <div class="tab-disclosure-body">
+          ${Array.from(groups.entries())
+            .map(
+              ([groupLabel, groupTabs]) => `
+                <section class="tab-group">
+                  <p class="eyebrow">${escapeHtml(groupLabel)}</p>
+                  <div class="tab-group-row">
+                    ${groupTabs
+                      .map(
+                        (tab) => `
+                          <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}">
+                            ${escapeHtml(tab.label || "")}
+                          </button>
+                        `,
+                      )
+                      .join("")}
+                  </div>
+                </section>
+              `,
+            )
+            .join("")}
+        </div>
+      </details>
+    </section>
+  `;
 
   for (const button of tabStrip.querySelectorAll("button")) {
     button.addEventListener("click", () => {
       const target = document.getElementById(button.dataset.target);
       if (target) {
         target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      const disclosure = button.closest(".tab-strip-shell")?.querySelector(".tab-disclosure");
+      if (disclosure?.open) {
+        disclosure.open = false;
       }
     });
   }
