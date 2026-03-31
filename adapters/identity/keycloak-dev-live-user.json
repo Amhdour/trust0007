@@ -1,0 +1,20 @@
+{
+  "username": "live-tenant-admin",
+  "enabled": true,
+  "emailVerified": true,
+  "firstName": "Live",
+  "lastName": "Tenant Admin",
+  "email": "live-tenant-admin@example.local",
+  "credentials": [
+    {
+      "type": "password",
+      "value": "change-me",
+      "temporary": false
+    }
+  ],
+  "attributes": {
+    "tenant_id": [
+      "tenant-dashboard"
+    ]
+  }
+}

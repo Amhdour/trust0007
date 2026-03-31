@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -14,6 +15,38 @@ def _extract_bearer_token(authorization_header: str, cookies: dict[str, str]) ->
     if header.lower().startswith("bearer "):
         return header.split(" ", 1)[1].strip()
     return str(cookies.get("kc_access_token", "")).strip()
+
+
+def _decode_token_claims(token: str) -> dict[str, Any]:
+    parts = token.split(".")
+    if len(parts) != 3:
+        return {}
+    payload = parts[1].strip()
+    if not payload:
+        return {}
+    padding = "=" * ((4 - len(payload) % 4) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode(f"{payload}{padding}".encode("ascii"))
+        claims = json.loads(decoded.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+    return claims if isinstance(claims, dict) else {}
+
+
+def _claim_is_blank(value: Any) -> bool:
+    return value in ("", None, [], {})
+
+
+def _merge_verified_claims(userinfo_claims: dict[str, Any], token: str) -> dict[str, Any]:
+    token_claims = _decode_token_claims(token)
+    if not token_claims:
+        return dict(userinfo_claims)
+
+    merged = dict(token_claims)
+    for key, value in userinfo_claims.items():
+        if not _claim_is_blank(value):
+            merged[key] = value
+    return merged
 
 
 def _roles_from_claims(claims: dict[str, Any]) -> list[str]:
@@ -122,10 +155,12 @@ class KeycloakIdentityProvider(IdentityProvider):
                 metadata={"requested_path": request.requested_path},
             )
 
-        user_id = str(claims.get("sub") or claims.get("preferred_username") or claims.get("email") or "")
-        tenant_id = _tenant_from_claims(claims)
-        roles = _roles_from_claims(claims)
-        session_id = str(claims.get("sid") or claims.get("session_state") or "")
+        merged_claims = _merge_verified_claims(claims, token)
+
+        user_id = str(merged_claims.get("sub") or merged_claims.get("preferred_username") or merged_claims.get("email") or "")
+        tenant_id = _tenant_from_claims(merged_claims)
+        roles = _roles_from_claims(merged_claims)
+        session_id = str(merged_claims.get("sid") or merged_claims.get("session_state") or "")
 
         if not user_id:
             return IdentityResolutionResult(
@@ -170,7 +205,7 @@ class KeycloakIdentityProvider(IdentityProvider):
             reason="identity.keycloak_validated",
             metadata={
                 "requested_path": request.requested_path,
-                "issuer": str(claims.get("iss", "")),
-                "preferred_username": str(claims.get("preferred_username", "")),
+                "issuer": str(merged_claims.get("iss", "")),
+                "preferred_username": str(merged_claims.get("preferred_username", "")),
             },
         )

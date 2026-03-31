@@ -13,7 +13,7 @@ services:
       - trust_stack
 
   opa:
-    image: openpolicyagent/opa:0.70.0
+    image: openpolicyagent/opa:1.0.0
     command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies/policy.rego"]
     volumes:
       - ./compose/opa/policy.rego:/policies/policy.rego:ro

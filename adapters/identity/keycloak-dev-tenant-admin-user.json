@@ -1,0 +1,13 @@
+{
+  "username": "tenant-admin-1",
+  "enabled": true,
+  "emailVerified": true,
+  "firstName": "Tenant",
+  "lastName": "Admin",
+  "email": "tenant-admin-1@example.local",
+  "attributes": {
+    "tenant_id": [
+      "tenant-dashboard"
+    ]
+  }
+}

@@ -88,7 +88,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${KEYCLOAK_HOST_PORT:-18080}:8080"
     volumes:
       - keycloak_data:/opt/keycloak/data
     networks:
@@ -216,7 +216,7 @@ services:
       - no-new-privileges:true
 
   opa:
-    image: openpolicyagent/opa:0.70.0
+    image: openpolicyagent/opa:1.0.0
     command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies/runtime.rego", "/policies/retrieval.rego"]
     volumes:
       - ../policies/rego/policy.rego:/policies/runtime.rego:ro
