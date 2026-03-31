@@ -898,7 +898,16 @@ def _governed_request_records(feed: list[dict[str, Any]]) -> list[dict[str, str]
     return records
 
 
-def _upstream_table_rows(components: list[dict[str, Any]]) -> list[dict[str, str]]:
+def _is_onyx_component(component: dict[str, Any]) -> bool:
+    return str(component.get("component_name", "")).strip().lower() == "onyx" or str(component.get("upstream_path", "")).strip() == "upstream/onyx"
+
+
+def _upstream_table_rows(
+    components: list[dict[str, Any]],
+    *,
+    onyx_governed_entry_url: str = "",
+    onyx_runtime_public_url: str = "",
+) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for component in components:
         signals = _string_list(component.get("governance_signals"))
@@ -926,6 +935,11 @@ def _upstream_table_rows(components: list[dict[str, Any]]) -> list[dict[str, str
                 "location": str(component.get("runtime_location", "Runtime location not documented.")),
                 "signal": signals[0] if signals else "No dedicated governance signal yet.",
                 "evidence": evidence[0] if evidence else "No evidence artifact listed.",
+                "live_surface": (
+                    onyx_runtime_public_url or onyx_governed_entry_url or "Not published yet."
+                    if _is_onyx_component(component)
+                    else "Not exposed from this section."
+                ),
                 "dev": _bool_label(bool(component.get("enabled_in_dev"))),
                 "prod_sim": _bool_label(bool(component.get("enabled_in_prod_sim"))),
             }
@@ -933,49 +947,64 @@ def _upstream_table_rows(components: list[dict[str, Any]]) -> list[dict[str, str
     return rows
 
 
-def _upstream_record_items(components: list[dict[str, Any]]) -> list[dict[str, str]]:
-    return [
-        _record(
-            title=str(component.get("component_name", "Component")),
-            meta=" | ".join(
-                (
-                    str(component.get("classification", "reference_only")),
-                    str(component.get("runtime_path_status", "reference")),
-                    str(component.get("integration_decision", "reference_only")).replace("_", " "),
-                    str(component.get("recommended_action", "review classification")),
+def _upstream_record_items(
+    components: list[dict[str, Any]],
+    *,
+    onyx_governed_entry_url: str = "",
+    onyx_runtime_public_url: str = "",
+    onyx_runtime_local_url: str = "",
+) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    for component in components:
+        detail_parts = [
+            f"Checkout: {str(component.get('checkout_policy', 'opt_in')).replace('_', '-')}.",
+            f"Last validated: {str(component.get('last_validated', '') or 'Not recorded')}.",
+            (
+                f"Source pin: {str(component.get('source_ref', '')).strip()} @ "
+                f"{str(component.get('source_commit', '')).strip()[:8]}."
+                if str(component.get("source_ref", "")).strip() and str(component.get("source_commit", "")).strip()
+                else (
+                    f"Snapshot digest: {str(component.get('snapshot_fingerprint', '')).strip()[:16]}."
+                    if str(component.get("snapshot_fingerprint", "")).strip()
+                    else "Source pin: not recorded yet."
                 )
             ),
-            detail=" ".join(
-                part
-                for part in (
-                    f"Checkout: {str(component.get('checkout_policy', 'opt_in')).replace('_', '-')}.",
-                    f"Last validated: {str(component.get('last_validated', '') or 'Not recorded')}.",
+            f"Provenance mode: {str(component.get('provenance_mode', 'content_fingerprint')).replace('_', ' ')}.",
+            f"Why it stays: {str(component.get('necessity_rationale', '')).strip()}",
+            f"Current gap: {str(component.get('missing_integration_depth', '')).strip()}",
+            f"Removal impact: {str(component.get('removal_impact', '')).strip()}",
+        ]
+        href = ""
+        if _is_onyx_component(component):
+            if onyx_governed_entry_url:
+                detail_parts.append(f"Governed entry: {onyx_governed_entry_url}.")
+                href = onyx_governed_entry_url
+            if onyx_runtime_public_url:
+                detail_parts.append(f"Live runtime URL: {onyx_runtime_public_url}.")
+            if onyx_runtime_local_url:
+                detail_parts.append(f"Local runtime URL: {onyx_runtime_local_url}.")
+        items.append(
+            _record(
+                title=str(component.get("component_name", "Component")),
+                meta=" | ".join(
                     (
-                        f"Source pin: {str(component.get('source_ref', '')).strip()} @ "
-                        f"{str(component.get('source_commit', '')).strip()[:8]}."
-                        if str(component.get("source_ref", "")).strip() and str(component.get("source_commit", "")).strip()
-                        else (
-                            f"Snapshot digest: {str(component.get('snapshot_fingerprint', '')).strip()[:16]}."
-                            if str(component.get("snapshot_fingerprint", "")).strip()
-                            else "Source pin: not recorded yet."
-                        )
-                    ),
-                    f"Provenance mode: {str(component.get('provenance_mode', 'content_fingerprint')).replace('_', ' ')}.",
-                    f"Why it stays: {str(component.get('necessity_rationale', '')).strip()}",
-                    f"Current gap: {str(component.get('missing_integration_depth', '')).strip()}",
-                    f"Removal impact: {str(component.get('removal_impact', '')).strip()}",
-                )
-                if part
-            ),
-            status={
-                "used_now": "healthy",
-                "partially_used": "warning",
-                "optional_future": "neutral",
-                "reference_only": "neutral",
-            }.get(str(component.get("classification", "")), "neutral"),
+                        str(component.get("classification", "reference_only")),
+                        str(component.get("runtime_path_status", "reference")),
+                        str(component.get("integration_decision", "reference_only")).replace("_", " "),
+                        str(component.get("recommended_action", "review classification")),
+                    )
+                ),
+                detail=" ".join(part for part in detail_parts if part),
+                status={
+                    "used_now": "healthy",
+                    "partially_used": "warning",
+                    "optional_future": "neutral",
+                    "reference_only": "neutral",
+                }.get(str(component.get("classification", "")), "neutral"),
+                href=href,
+            )
         )
-        for component in components
-    ]
+    return items
 
 
 def _upstream_audit_cards(inventory: dict[str, Any]) -> list[dict[str, str]]:
@@ -1515,6 +1544,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     runtime_continuity_status = _onyx_runtime_continuity_status(onyx_runtime_proof)
     runtime_readiness_status = _onyx_runtime_readiness_status(onyx_runtime_proof)
     runtime_proof_status = _combine_statuses(runtime_continuity_status, runtime_readiness_status)
+    onyx_governed_entry_url = _launch_handoff_url(latest_requested_path)
+    onyx_runtime_public_url = str(runtime_readiness.get("public_url", "")).strip() or _public_service_url(3010, latest_requested_path)
+    onyx_runtime_local_url = str(runtime_readiness.get("local_url", "")).strip() or f"http://127.0.0.1:3010{latest_requested_path}"
     top_failing_control = failing_controls[0] if failing_controls else {}
     governed_flow_generated_at = str(governed_flow_summary.get("generated_at", ""))
     latest_request_timestamp = str(latest_request.get("timestamp") or governed_flow_generated_at or "")
@@ -2758,7 +2790,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 {
                     "type": "records",
                     "title": "Most important connected parts",
-                    "items": _upstream_record_items(_important_upstream_components(upstream_components, 4)),
+                    "items": _upstream_record_items(
+                        _important_upstream_components(upstream_components, 4),
+                        onyx_governed_entry_url=onyx_governed_entry_url,
+                        onyx_runtime_public_url=onyx_runtime_public_url,
+                        onyx_runtime_local_url=onyx_runtime_local_url,
+                    ),
                 },
                 {
                     "type": "table",
@@ -2776,15 +2813,22 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         {"key": "location", "label": "Where it sits"},
                         {"key": "signal", "label": "Governance signal"},
                         {"key": "evidence", "label": "Evidence artifact"},
+                        {"key": "live_surface", "label": "Live runtime"},
                         {"key": "dev", "label": "Dev"},
                         {"key": "prod_sim", "label": "Prod-sim"},
                     ],
-                    "rows": _upstream_table_rows(_important_upstream_components(upstream_components, 5)),
+                    "rows": _upstream_table_rows(
+                        _important_upstream_components(upstream_components, 5),
+                        onyx_governed_entry_url=onyx_governed_entry_url,
+                        onyx_runtime_public_url=onyx_runtime_public_url,
+                    ),
                 },
                 {
                     "type": "links",
                     "title": "Connected-system links",
                     "items": [
+                        _link("Onyx governed entry", onyx_governed_entry_url, "Open the checked dashboard handoff into the current Onyx path.", "healthy" if latest_handoff_allowed else "warning", display_label="Open governed Onyx", display_description="Use the dashboard-controlled handoff into the current Onyx path."),
+                        _link("Onyx live runtime", onyx_runtime_public_url, "Open the current public Onyx runtime target for the latest requested path.", runtime_readiness_status, display_label="Open live runtime", display_description="Open the current public Onyx runtime target from the upstream section."),
                         _link("Full upstream inventory", _dashboard_url("/api/control-plane/upstream-usage"), "Full machine-readable component inventory beyond the homepage slice.", "healthy", display_label="Full connected-system inventory", display_description="Open the complete machine-readable inventory."),
                         _link("Upstream usage API", _dashboard_url("/api/control-plane/upstream-usage"), "Machine-readable upstream inventory exposed by the control plane.", "healthy", display_label="Connected-system API", display_description="Open the technical API view of the component inventory."),
                         _link("Upstream usage inventory", _raw("evidence/upstream_usage.inventory.json"), "Repo-owned component inventory with classification, signals, evidence, and removal impact.", "healthy", display_label="Inventory file", display_description="Open the raw inventory file behind this section."),

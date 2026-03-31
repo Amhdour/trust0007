@@ -170,18 +170,28 @@ def test_dashboard_includes_upstream_integration_posture_section() -> None:
 
     upstream_section = next(section for section in payload["sections"] if section["id"] == "upstream-posture")
     cards_block = next(block for block in upstream_section["blocks"] if block["type"] == "cards")
+    records_block = next(block for block in upstream_section["blocks"] if block["type"] == "records")
     table_block = next(block for block in upstream_section["blocks"] if block["type"] == "table")
     links_block = next(block for block in upstream_section["blocks"] if block["type"] == "links")
 
     labels = {item["label"] for item in cards_block["items"]}
     assert {"Used now", "Partially used", "Inventory coverage", "Snapshot provenance", "Mandatory path components"} <= labels
     assert any(row["component"] == "Onyx" and row["classification"] == "used_now" for row in table_block["rows"])
+    onyx_row = next(row for row in table_block["rows"] if row["component"] == "Onyx")
+    assert onyx_row["live_surface"]
     assert len(table_block["rows"]) <= 5
     assert table_block["collapsed"] is True
     assert any(column["key"] == "path_status" for column in table_block["columns"])
     assert any(column["key"] == "checkout" for column in table_block["columns"])
     assert any(column["key"] == "validated" for column in table_block["columns"])
     assert any(column["key"] == "source_pin" for column in table_block["columns"])
+    assert any(column["key"] == "live_surface" for column in table_block["columns"])
+    onyx_record = next(item for item in records_block["items"] if item["title"] == "Onyx")
+    assert "/launch/onyx?path=" in onyx_record["href"]
+    assert "Live runtime URL:" in onyx_record["detail"]
+    link_labels = {item["label"] for item in links_block["items"]}
+    assert "Onyx governed entry" in link_labels
+    assert "Onyx live runtime" in link_labels
     assert any(item["label"] == "Upstream usage API" for item in links_block["items"])
     assert any(item["label"] == "Upstream source lock" for item in links_block["items"])
 
