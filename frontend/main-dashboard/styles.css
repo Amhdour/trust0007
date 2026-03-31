@@ -173,6 +173,8 @@ h3 {
 .hero-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .chip,
@@ -554,6 +556,87 @@ h3 {
 .trend-summary-critical {
   border-color: rgba(157, 45, 45, 0.18);
   background: rgba(157, 45, 45, 0.08);
+}
+
+.next-action-card {
+  margin-top: 16px;
+  padding: 20px 22px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.97), rgba(245, 239, 229, 0.88));
+  box-shadow: 0 18px 42px rgba(16, 33, 45, 0.08);
+}
+
+.next-action-healthy {
+  border-color: rgba(15, 108, 94, 0.18);
+  box-shadow: 0 18px 42px rgba(15, 108, 94, 0.12), inset 0 0 0 1px rgba(15, 108, 94, 0.08);
+}
+
+.next-action-warning {
+  border-color: rgba(173, 93, 22, 0.2);
+  box-shadow: 0 18px 42px rgba(173, 93, 22, 0.1), inset 0 0 0 1px rgba(173, 93, 22, 0.08);
+}
+
+.next-action-critical {
+  border-color: rgba(157, 45, 45, 0.2);
+  box-shadow: 0 18px 42px rgba(157, 45, 45, 0.1), inset 0 0 0 1px rgba(157, 45, 45, 0.08);
+}
+
+.next-action-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.next-action-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.next-action-summary {
+  margin: 0;
+  max-width: 58ch;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.next-action-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.next-action-primary {
+  background: linear-gradient(135deg, rgba(15, 108, 94, 0.18), rgba(255, 255, 255, 0.94));
+}
+
+.next-action-steps-panel {
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(16, 33, 45, 0.08);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.next-action-steps-panel .eyebrow {
+  margin-bottom: 10px;
+}
+
+.next-action-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 10px;
+}
+
+.next-action-steps li {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.next-action-steps li::marker {
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .incident-fact-card {
@@ -1241,14 +1324,57 @@ h3 {
 }
 
 .block {
+  position: relative;
+  overflow: hidden;
   padding: 20px;
   border-radius: 22px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 239, 229, 0.82));
 }
 
-.block-title {
+.block::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(48, 84, 111, 0.35), transparent 72%);
+}
+
+.block-head {
+  display: grid;
+  gap: 6px;
   margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(16, 33, 45, 0.08);
+}
+
+.block-kicker {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.block-type-cards::before {
+  background: linear-gradient(90deg, rgba(15, 108, 94, 0.54), rgba(15, 108, 94, 0.08));
+}
+
+.block-type-records::before {
+  background: linear-gradient(90deg, rgba(48, 84, 111, 0.54), rgba(48, 84, 111, 0.08));
+}
+
+.block-type-table::before {
+  background: linear-gradient(90deg, rgba(173, 93, 22, 0.56), rgba(173, 93, 22, 0.08));
+}
+
+.block-type-links::before {
+  background: linear-gradient(90deg, rgba(157, 45, 45, 0.46), rgba(157, 45, 45, 0.08));
+}
+
+.block-title {
+  margin: 0;
 }
 
 .records-grid,
@@ -1445,6 +1571,23 @@ tbody tr:last-child td {
   margin-bottom: 8px;
 }
 
+.presentation-mode .section-group-banner[data-group="operator"],
+.presentation-mode .dashboard-section[data-group="operator"],
+.presentation-mode .tab-group[data-tab-group="operator"],
+.presentation-mode .audience-path-card[data-audience="technical"],
+.presentation-mode .live-log-panel,
+.presentation-mode .footer {
+  display: none;
+}
+
+.presentation-mode .tab-strip-shell {
+  background: rgba(252, 248, 242, 0.94);
+}
+
+.presentation-mode .briefing-panel {
+  box-shadow: 0 22px 54px rgba(16, 33, 45, 0.08);
+}
+
 .loading-panel {
   padding: 22px;
   border: 1px dashed var(--line-strong);
@@ -1492,6 +1635,10 @@ tbody tr:last-child td {
     grid-template-columns: 1fr;
   }
 
+  .next-action-layout {
+    grid-template-columns: 1fr;
+  }
+
   .command-focus-grid {
     grid-template-columns: 1fr;
   }
@@ -1506,6 +1653,14 @@ tbody tr:last-child td {
     overflow: visible;
     border: 0;
     background: transparent;
+  }
+
+  .next-action-card {
+    padding: 18px;
+  }
+
+  .next-action-actions {
+    display: grid;
   }
 
   .table-wrap table,

@@ -1695,6 +1695,74 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             _link("Open safety check", "#launch-gate", "Jump straight to the launch and readiness evidence.", "warning"),
             _link("Open approved example", _raw(INSPECTABLE_ALLOWED_FLOW), "Open the latest approved governed handoff proof path.", "healthy"),
         ]
+    if not latest_handoff_allowed:
+        next_action = {
+            "eyebrow": "Recommended next action",
+            "title": "Review the blocker",
+            "summary": "Start with the latest governed-flow summary, confirm the main reason for the deny, and decide whether the block should remain in place.",
+            "status": "critical",
+            "primary_action": _link("Open blocker summary", latest_governed_flow_href, "Open the latest governed-flow summary behind the blocked handoff.", "critical"),
+            "secondary_actions": [
+                _link("Open blocked example", flagship_denied["bundle_href"], "Open the strongest blocked-access proof path.", "critical"),
+                _link("Open safety check", "#launch-gate", "Jump straight to the launch and readiness evidence.", "warning"),
+            ],
+            "steps": [
+                f"Confirm the main signal: {incident_signal_value}.",
+                "Check whether the deny matches the expected policy outcome.",
+                "Decide whether the missing proof needs remediation or the user should stay blocked.",
+            ],
+        }
+    elif artifact_counts["stale"] or artifact_counts["missing"]:
+        next_action = {
+            "eyebrow": "Recommended next action",
+            "title": "Refresh the proof",
+            "summary": "The current posture has stale or missing evidence. Generate a fresh governed flow before you rely on this state.",
+            "status": "warning",
+            "primary_action": _link("Create fresh technical proof", _dashboard_url("/api/control-plane/governed-flow"), "Run a new governed flow to refresh runtime artifacts.", "warning"),
+            "secondary_actions": [
+                _link("Open proof quality", "#evidence-integrity", "Jump straight to the evidence freshness section.", "warning"),
+                _link("Open latest summary", latest_governed_flow_href, "Open the latest technical request summary.", "neutral"),
+            ],
+            "steps": [
+                f"Current stale / missing count: {artifact_counts['stale']} / {artifact_counts['missing']}.",
+                "Run a fresh governed flow to regenerate runtime proof.",
+                "Re-check the proof-quality section after the refresh completes.",
+            ],
+        }
+    elif incident_status == "warning":
+        next_action = {
+            "eyebrow": "Recommended next action",
+            "title": "Harden the remaining config gap",
+            "summary": "The latest handoff passed, but one remaining config or readiness issue still keeps the page out of a fully healthy state.",
+            "status": "warning",
+            "primary_action": _link("Open safety check", "#launch-gate", "Jump straight to the launch and readiness evidence.", "warning"),
+            "secondary_actions": [
+                _link("Open latest summary", latest_governed_flow_href, "Open the latest technical request summary.", "neutral"),
+                _link("Open approved example", _raw(INSPECTABLE_ALLOWED_FLOW), "Open the strongest approved governed handoff proof path.", "healthy"),
+            ],
+            "steps": [
+                f"Focus on the main signal: {incident_signal_value}.",
+                "Use the launch-gate section to confirm what still prevents a green state.",
+                "After hardening the gap, rerun the governed flow and check whether the banner turns green.",
+            ],
+        }
+    else:
+        next_action = {
+            "eyebrow": "Recommended next action",
+            "title": "Inspect the approved flow",
+            "summary": "The posture is healthy enough to walk through the approved example and confirm the proof story from top to bottom.",
+            "status": "healthy",
+            "primary_action": _link("Open approved example", _raw(INSPECTABLE_ALLOWED_FLOW), "Open the strongest approved governed handoff proof path.", "healthy"),
+            "secondary_actions": [
+                _link("Open latest summary", latest_governed_flow_href, "Open the latest technical request summary.", "neutral"),
+                _link("Open safety check", "#launch-gate", "Jump straight to the launch and readiness evidence.", "healthy"),
+            ],
+            "steps": [
+                "Use the posture banner, risk strip, and governed path to explain why the current state is healthy.",
+                "Walk through the approved example to confirm the same story in raw proof.",
+                "Switch on presentation mode when you want a lighter external-facing walkthrough.",
+            ],
+        }
     flagship_proof = _spotlight(
         eyebrow="Flagship proof",
         title="Denied /launch/onyx handoff",
@@ -1913,6 +1981,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
             "actions": incident_actions,
         },
+        "next_action": next_action,
         "proof_pipeline": {
             "title": "Latest governed path",
             "detail": "Follow the latest request through the checks that must line up before AI access is allowed.",

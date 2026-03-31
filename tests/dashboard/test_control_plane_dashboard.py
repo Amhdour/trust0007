@@ -39,7 +39,9 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="mode-banner-root"' in html
     assert 'id="incident-banner-root"' in html
     assert 'id="risk-strip-root"' in html
+    assert 'id="next-action-root"' in html
     assert 'id="proof-pipeline-root"' in html
+    assert 'id="presentation-mode-button"' in html
     assert 'id="reading-guide-root"' in html
     assert "payload.title" in js
     assert "payload.landing_steps" in js
@@ -47,7 +49,9 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "payload.command_center" in js
     assert "incident_banner" in js
     assert "risk_strip" in js
+    assert "next_action" in js
     assert "proof_pipeline" in js
+    assert "presentation-mode" in js
     assert "payload.reading_guide" in js
     assert "payload.audience_paths" in js
     assert "block.collapsed" in js
@@ -108,6 +112,9 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     assert payload["command_center"]["risk_strip"]["items"][1]["trend"]["label"]
     assert any(item["label"] == "Last good run" for item in payload["command_center"]["risk_strip"]["items"])
     assert payload["command_center"]["cards"][0]["meta_badges"]
+    assert payload["command_center"]["next_action"]["title"]
+    assert payload["command_center"]["next_action"]["primary_action"]["label"]
+    assert payload["command_center"]["next_action"]["steps"]
     assert len(payload["command_center"]["proof_pipeline"]["steps"]) == 6
     assert payload["command_center"]["proof_pipeline"]["meta_badges"]
     assert payload["command_center"]["proof_pipeline"]["steps"][0]["meta_badges"]

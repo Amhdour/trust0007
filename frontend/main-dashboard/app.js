@@ -7,21 +7,25 @@ const heroSteps = document.getElementById("hero-steps");
 const modeBannerRoot = document.getElementById("mode-banner-root");
 const incidentBannerRoot = document.getElementById("incident-banner-root");
 const riskStripRoot = document.getElementById("risk-strip-root");
+const nextActionRoot = document.getElementById("next-action-root");
 const briefingRoot = document.getElementById("briefing-root");
 const proofPipelineRoot = document.getElementById("proof-pipeline-root");
 const readingGuideRoot = document.getElementById("reading-guide-root");
 const kpiRoot = document.getElementById("kpi-root");
 const sourcesRoot = document.getElementById("sources");
 const liveLogRoot = document.getElementById("live-log-root");
+const presentationModeButton = document.getElementById("presentation-mode-button");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
 
 const LIVE_LOG_LIMIT = 6;
 const DEFAULT_LIVE_LOG_POLL_MS = 5000;
 const SECTION_SCROLL_OFFSET_PX = 152;
+const PRESENTATION_MODE_STORAGE_KEY = "controlPlanePresentationMode";
 let liveLogTimer = 0;
 let activeTabTarget = "";
 let activeTabSyncFrame = 0;
 let tabStripScrollBound = false;
+let presentationModeEnabled = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -133,6 +137,46 @@ function renderTrendSummary(trend) {
       ${trend.detail ? `<p>${escapeHtml(trend.detail)}</p>` : ""}
     </div>
   `;
+}
+
+function resolveInitialPresentationMode() {
+  const params = new URLSearchParams(window.location.search);
+  const view = params.get("view");
+  if (view === "presentation") {
+    return true;
+  }
+  if (view === "full") {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(PRESENTATION_MODE_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function updatePresentationModeButton() {
+  if (!presentationModeButton) {
+    return;
+  }
+
+  presentationModeButton.textContent = presentationModeEnabled ? "Show full technical view" : "Presentation mode";
+  presentationModeButton.setAttribute("aria-pressed", presentationModeEnabled ? "true" : "false");
+}
+
+function setPresentationMode(enabled) {
+  presentationModeEnabled = Boolean(enabled);
+  document.body.classList.toggle("presentation-mode", presentationModeEnabled);
+  updatePresentationModeButton();
+
+  try {
+    window.localStorage.setItem(PRESENTATION_MODE_STORAGE_KEY, presentationModeEnabled ? "1" : "0");
+  } catch {
+    // Ignore storage failures and keep the in-memory toggle working.
+  }
+
+  scheduleActiveTabSync();
 }
 
 function renderHero(payload) {
@@ -373,6 +417,71 @@ function renderIncidentBanner(banner) {
   `;
 }
 
+function renderNextAction(nextAction) {
+  if (!nextActionRoot) {
+    return;
+  }
+
+  if (!nextAction?.title) {
+    nextActionRoot.innerHTML = "";
+    return;
+  }
+
+  const status = nextAction.status || "neutral";
+  const primaryAction = nextAction.primary_action || null;
+  const secondaryActions = Array.isArray(nextAction.secondary_actions) ? nextAction.secondary_actions : [];
+  const steps = Array.isArray(nextAction.steps) ? nextAction.steps : [];
+
+  nextActionRoot.innerHTML = `
+    <section class="next-action-card next-action-${escapeHtml(status)}">
+      <div class="next-action-layout">
+        <div class="next-action-copy">
+          <div class="card-topline">
+            <div>
+              <p class="eyebrow">${escapeHtml(nextAction.eyebrow || "Recommended next action")}</p>
+              <h3>${escapeHtml(nextAction.title || "Take the next review step")}</h3>
+            </div>
+            ${renderStatusPill(status)}
+          </div>
+          <p class="next-action-summary">${escapeHtml(nextAction.summary || "")}</p>
+          <div class="next-action-actions">
+            ${
+              primaryAction
+                ? `
+                  <a class="action-pill action-pill-${escapeHtml(primaryAction.status || status)} next-action-primary"${linkAttributes(primaryAction.href)}>
+                    ${escapeHtml(primaryAction.display_label || primaryAction.label || "Open action")}
+                  </a>
+                `
+                : ""
+            }
+            ${secondaryActions
+              .map(
+                (action) => `
+                  <a class="audience-link-pill"${linkAttributes(action.href)}>
+                    ${escapeHtml(action.display_label || action.label || "")}
+                  </a>
+                `,
+              )
+              .join("")}
+          </div>
+        </div>
+        ${
+          steps.length
+            ? `
+              <aside class="next-action-steps-panel">
+                <p class="eyebrow">Suggested path</p>
+                <ol class="next-action-steps">
+                  ${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}
+                </ol>
+              </aside>
+            `
+            : ""
+        }
+      </div>
+    </section>
+  `;
+}
+
 function pipelineStatusLabel(step) {
   return (
     step.badge_label
@@ -492,8 +601,10 @@ function renderKpis(paths) {
       <div class="audience-path-grid">
         ${(Array.isArray(paths) ? paths : [])
           .map(
-            (path) => `
-              <section class="audience-path-card">
+            (path) => {
+              const audienceType = String(path.title || "").toLowerCase().includes("technical") ? "technical" : "reviewer";
+              return `
+              <section class="audience-path-card audience-path-${escapeHtml(audienceType)}" data-audience="${escapeHtml(audienceType)}">
                 <div class="audience-lane-head">
                   <div>
                     <p class="eyebrow">${escapeHtml(String(path.title || "").toLowerCase().includes("technical") ? "Then drill deeper" : "Start here")}</p>
@@ -514,7 +625,8 @@ function renderKpis(paths) {
                     .join("")}
                 </div>
               </section>
-            `,
+            `;
+            },
           )
           .join("")}
       </div>
@@ -665,6 +777,15 @@ function renderReadingGuide(guide) {
   `;
 }
 
+function blockTypeLabel(type) {
+  return {
+    cards: "Snapshot",
+    records: "Evidence log",
+    table: "Reference table",
+    links: "Source links",
+  }[type] || "Section";
+}
+
 function renderBlocks(blocks) {
   return (Array.isArray(blocks) ? blocks : [])
     .map((block) => {
@@ -680,8 +801,9 @@ function renderBlocks(blocks) {
       }
 
       return `
-        <section class="block">
+        <section class="block block-type-${escapeHtml(block.type || "default")}" data-block-type="${escapeHtml(block.type || "default")}">
           <div class="block-head">
+            <p class="block-kicker">${escapeHtml(blockTypeLabel(block.type))}</p>
             <h3 class="block-title">${escapeHtml(block.title || "")}</h3>
           </div>
           ${content}
@@ -699,7 +821,7 @@ function renderSections(sections) {
       const groupBanner =
         nextGroup && nextGroup !== activeGroup
           ? `
-            <section class="section-group-banner section-group-${escapeHtml(nextGroup)}">
+            <section class="section-group-banner section-group-${escapeHtml(nextGroup)}" data-group="${escapeHtml(nextGroup)}">
               <p class="eyebrow">${escapeHtml(section.group_label || nextGroup)}</p>
               <h2>${escapeHtml(section.group_label || nextGroup)}</h2>
               <p class="section-description">${
@@ -714,7 +836,7 @@ function renderSections(sections) {
 
       return `
         ${groupBanner}
-        <section class="dashboard-section section-${escapeHtml(section.id || "")}" data-section="${escapeHtml(section.id || "")}" id="${escapeHtml(section.id || "")}">
+        <section class="dashboard-section section-${escapeHtml(section.id || "")}" data-section="${escapeHtml(section.id || "")}" data-group="${escapeHtml(section.group || "")}" id="${escapeHtml(section.id || "")}">
           <div class="section-head">
             <p class="eyebrow">${escapeHtml(section.id || "")}</p>
             <h2>${escapeHtml(section.title || "")}</h2>
@@ -741,7 +863,7 @@ function setActiveTab(targetId) {
 }
 
 function syncActiveTabFromScroll() {
-  const sections = Array.from(root.querySelectorAll(".dashboard-section[id]"));
+  const sections = Array.from(root.querySelectorAll(".dashboard-section[id]")).filter((section) => section.offsetParent !== null);
   if (!sections.length) {
     return;
   }
@@ -810,7 +932,7 @@ function renderTabs(tabs) {
         ${primaryTabs
           .map(
             (tab) => `
-              <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" aria-pressed="false">
+              <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" data-tab-group="${escapeHtml(tab.group || "")}" aria-pressed="false">
                 ${escapeHtml(tab.label || "")}
               </button>
             `,
@@ -823,13 +945,13 @@ function renderTabs(tabs) {
           ${Array.from(groups.entries())
             .map(
               ([groupLabel, groupTabs]) => `
-                <section class="tab-group">
+                <section class="tab-group" data-tab-group="${escapeHtml(groupTabs[0]?.group || "")}">
                   <p class="eyebrow">${escapeHtml(groupLabel)}</p>
                   <div class="tab-group-row">
                     ${groupTabs
                       .map(
                         (tab) => `
-                          <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" aria-pressed="false">
+                          <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" data-tab-group="${escapeHtml(tab.group || "")}" aria-pressed="false">
                             ${escapeHtml(tab.label || "")}
                           </button>
                         `,
@@ -986,6 +1108,7 @@ async function boot() {
     renderModeBanner(payload.mode_banner || {});
     renderIncidentBanner(payload.command_center?.incident_banner || {});
     renderRiskStrip(payload.command_center?.risk_strip || {});
+    renderNextAction(payload.command_center?.next_action || {});
     renderBriefing(payload.command_center || {});
     renderProofPipeline(payload.command_center?.proof_pipeline || {});
     renderReadingGuide(payload.reading_guide || {});
@@ -1010,6 +1133,9 @@ async function boot() {
     }
     if (riskStripRoot) {
       riskStripRoot.innerHTML = "";
+    }
+    if (nextActionRoot) {
+      nextActionRoot.innerHTML = "";
     }
     if (proofPipelineRoot) {
       proofPipelineRoot.innerHTML = "";
@@ -1041,6 +1167,16 @@ async function refreshDashboard() {
     refreshDashboardButton.disabled = false;
     refreshDashboardButton.textContent = "Refresh evidence";
   }
+}
+
+presentationModeEnabled = resolveInitialPresentationMode();
+updatePresentationModeButton();
+document.body.classList.toggle("presentation-mode", presentationModeEnabled);
+
+if (presentationModeButton) {
+  presentationModeButton.addEventListener("click", () => {
+    setPresentationMode(!presentationModeEnabled);
+  });
 }
 
 if (refreshDashboardButton) {
