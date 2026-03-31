@@ -1,4 +1,4 @@
-.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins
+.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream
 
 demo:
 	bash scripts/run-demo.sh
@@ -39,3 +39,6 @@ list-upstream-opt-in:
 
 sync-upstream-pins:
 	python scripts/sync-upstream-pins-from-checkout.py
+
+stage-default-upstream:
+	python scripts/stage-default-upstream-checkout.py /tmp/beta011-default-upstream

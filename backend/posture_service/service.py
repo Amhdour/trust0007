@@ -854,7 +854,11 @@ def _upstream_table_rows(components: list[dict[str, Any]]) -> list[dict[str, str
         source_pin = (
             f"{source_ref} @ {source_commit[:8]}"
             if source_ref and source_commit
-            else "Pin not recorded"
+            else (
+                f"digest:{str(component.get('snapshot_fingerprint', '')).strip()[:12]}"
+                if str(component.get("snapshot_fingerprint", "")).strip()
+                else "Provenance not recorded"
+            )
         )
         rows.append(
             {
@@ -896,8 +900,13 @@ def _upstream_record_items(components: list[dict[str, Any]]) -> list[dict[str, s
                         f"Source pin: {str(component.get('source_ref', '')).strip()} @ "
                         f"{str(component.get('source_commit', '')).strip()[:8]}."
                         if str(component.get("source_ref", "")).strip() and str(component.get("source_commit", "")).strip()
-                        else "Source pin: not recorded yet."
+                        else (
+                            f"Snapshot digest: {str(component.get('snapshot_fingerprint', '')).strip()[:16]}."
+                            if str(component.get("snapshot_fingerprint", "")).strip()
+                            else "Source pin: not recorded yet."
+                        )
                     ),
+                    f"Provenance mode: {str(component.get('provenance_mode', 'content_fingerprint')).replace('_', ' ')}.",
                     f"Why it stays: {str(component.get('necessity_rationale', '')).strip()}",
                     f"Current gap: {str(component.get('missing_integration_depth', '')).strip()}",
                     f"Removal impact: {str(component.get('removal_impact', '')).strip()}",
@@ -926,6 +935,7 @@ def _upstream_audit_cards(inventory: dict[str, Any]) -> list[dict[str, str]]:
     dashboard_visible_count = int(audit.get("dashboard_visible_count", 0))
     pinned_source_count = int(audit.get("pinned_source_count", 0))
     total_source_count = len(components)
+    fingerprinted_source_count = int(audit.get("fingerprinted_source_count", 0))
     default_checkout_count = len(audit.get("default_checkout_paths", []))
     opt_in_checkout_count = len(audit.get("opt_in_checkout_paths", []))
     platform_only_count = len(audit.get("platform_only_components", []))
@@ -937,6 +947,7 @@ def _upstream_audit_cards(inventory: dict[str, Any]) -> list[dict[str, str]]:
         _card("Reference only", str(counts.get("reference_only", 0)), "neutral", "Vendored snapshots retained for compatibility or implementation reference only.", "#upstream-posture"),
         _card("Inventory coverage", f"{covered} / {total_paths or len(components)}", coverage_status, "Every vendored upstream path should be classified exactly once.", "#upstream-posture"),
         _card("Pinned sources", f"{pinned_source_count} / {total_source_count}", "healthy" if audit.get("source_pins_complete") else "warning", "Pinned upstream refs and commits recorded in the lock manifest.", "#upstream-posture"),
+        _card("Snapshot provenance", f"{fingerprinted_source_count} / {total_source_count}", "healthy" if audit.get("fingerprints_complete") else "warning", "Content fingerprints recorded for vendored upstream snapshots even when upstream git pins are unavailable.", "#upstream-posture"),
         _card("Default checkout", str(default_checkout_count), "healthy", "Vendored upstreams expected to stay in the default checkout group.", "#upstream-posture"),
         _card("Opt-in checkout", str(opt_in_checkout_count), "neutral", "Optional and reference-only upstreams explicitly treated as opt-in.", "#upstream-posture"),
         _card("Platform-only", str(platform_only_count), "neutral", "Components intentionally kept off the mandatory governed path until deeper proof exists.", "#upstream-posture"),
@@ -2553,7 +2564,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "items": [
                         item
                         for item in _upstream_audit_cards(upstream_inventory)
-                        if item["label"] in {"Used now", "Partially used", "Inventory coverage", "Pinned sources", "Mandatory path components"}
+                        if item["label"] in {"Used now", "Partially used", "Inventory coverage", "Snapshot provenance", "Mandatory path components"}
                     ],
                 },
                 {

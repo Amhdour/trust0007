@@ -42,6 +42,8 @@ def main() -> int:
         errors.append("upstream lock manifest integration decisions do not match the component classifications")
     if not lock_manifest.get("audit", {}).get("envoy_platform_only_locked"):
         errors.append("Envoy is no longer explicitly locked as a platform-only dependency")
+    if not lock_manifest.get("audit", {}).get("fingerprints_complete"):
+        errors.append("upstream lock manifest is missing snapshot fingerprints for one or more vendored components")
 
     if errors:
         print("Upstream state validation failed:", file=sys.stderr)
@@ -64,6 +66,11 @@ def main() -> int:
     print(
         "Pinned source snapshots: "
         f"{lock_manifest.get('audit', {}).get('pinned_source_count', 0)} / "
+        f"{lock_manifest.get('component_count', 0)}"
+    )
+    print(
+        "Snapshot fingerprints: "
+        f"{lock_manifest.get('audit', {}).get('fingerprinted_source_count', 0)} / "
         f"{lock_manifest.get('component_count', 0)}"
     )
     unpinned = list(lock_manifest.get("audit", {}).get("unpinned_source_components", []))

@@ -32,8 +32,18 @@ def test_upstream_inventory_components_include_required_reviewer_fields() -> Non
         assert component["removal_impact"]
         assert component["checkout_policy"] in {"default", "opt_in"}
         assert component["integration_decision"] in {"active_now", "platform_only", "opt_in_only", "reference_only"}
+        assert component["provenance_mode"] in {
+            "content_fingerprint",
+            "manual_pin",
+            "standalone_git_pin",
+            "manual_pin+content_fingerprint",
+            "standalone_git_pin+content_fingerprint",
+        }
         assert "source_ref" in component
         assert "source_commit" in component
+        assert component["snapshot_fingerprint"]
+        assert component["snapshot_file_count"] > 0
+        assert component["snapshot_bytes"] > 0
 
 
 def test_upstream_source_lock_covers_every_vendored_component_once() -> None:
@@ -50,6 +60,8 @@ def test_upstream_source_lock_covers_every_vendored_component_once() -> None:
     assert lock_manifest["audit"]["envoy_platform_only_locked"] is True
     assert lock_manifest["pin_coverage"]["total_count"] == len(repo_paths)
     assert isinstance(lock_manifest["pin_coverage"]["pinned_count"], int)
+    assert lock_manifest["audit"]["fingerprints_complete"] is True
+    assert lock_manifest["provenance_coverage"]["fingerprinted_count"] == len(repo_paths)
 
 
 def test_upstream_inventory_and_lock_manifest_stay_aligned() -> None:
@@ -61,7 +73,9 @@ def test_upstream_inventory_and_lock_manifest_stay_aligned() -> None:
     assert "Envoy" in inventory["tracking_model"]["platform_only_components"]
     assert isinstance(inventory["tracking_model"]["pinned_source_count"], int)
     assert inventory["tracking_model"]["total_source_count"] == len(list_upstream_component_paths())
+    assert inventory["tracking_model"]["fingerprinted_source_count"] == len(list_upstream_component_paths())
     assert inventory["audit"]["lock_consistent"] is True
     assert inventory["audit"]["checkout_policies_consistent"] is True
     assert inventory["audit"]["integration_decisions_consistent"] is True
     assert inventory["audit"]["envoy_platform_only_locked"] is True
+    assert inventory["audit"]["fingerprints_complete"] is True

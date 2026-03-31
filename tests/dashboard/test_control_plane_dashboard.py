@@ -163,7 +163,7 @@ def test_dashboard_includes_upstream_integration_posture_section() -> None:
     links_block = next(block for block in upstream_section["blocks"] if block["type"] == "links")
 
     labels = {item["label"] for item in cards_block["items"]}
-    assert {"Used now", "Partially used", "Inventory coverage", "Pinned sources", "Mandatory path components"} <= labels
+    assert {"Used now", "Partially used", "Inventory coverage", "Snapshot provenance", "Mandatory path components"} <= labels
     assert any(row["component"] == "Onyx" and row["classification"] == "used_now" for row in table_block["rows"])
     assert len(table_block["rows"]) <= 5
     assert table_block["collapsed"] is True
@@ -183,10 +183,12 @@ def test_upstream_usage_inventory_is_machine_readable() -> None:
     assert inventory["audit"]["inventory_covers_all_upstreams"] is True
     assert inventory["audit"]["lock_consistent"] is True
     assert inventory["audit"]["envoy_platform_only_locked"] is True
+    assert inventory["audit"]["fingerprints_complete"] is True
     assert set(inventory["upstream_paths"]) == set(list_upstream_component_paths())
     assert inventory["tracking_model"]["lock_path"] == "evidence/upstream.lock.json"
     assert "upstream/superset" in inventory["tracking_model"]["opt_in_checkout_paths"]
     assert inventory["tracking_model"]["total_source_count"] == len(list_upstream_component_paths())
+    assert inventory["tracking_model"]["fingerprinted_source_count"] == len(list_upstream_component_paths())
     assert any(component["component_name"] == "Onyx" for component in inventory["components"])
     assert any(component["classification"] == "reference_only" for component in inventory["components"])
     assert any(component["runtime_path_status"] == "mandatory" for component in inventory["components"])

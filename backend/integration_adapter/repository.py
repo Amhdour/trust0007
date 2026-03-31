@@ -35,6 +35,7 @@ UPSTREAM_RUNTIME_PATH_STATUSES = {"mandatory", "supporting", "optional", "refere
 UPSTREAM_SOURCE_TRACKING_MODES = {"vendored_snapshot"}
 UPSTREAM_SOURCE_CHECKOUT_POLICIES = {"default", "opt_in"}
 UPSTREAM_INTEGRATION_DECISIONS = {"active_now", "platform_only", "opt_in_only", "reference_only"}
+UPSTREAM_PROVENANCE_MODES = {"content_fingerprint", "manual_pin", "standalone_git_pin", "manual_pin+content_fingerprint", "standalone_git_pin+content_fingerprint"}
 
 
 @dataclass(frozen=True)
@@ -167,6 +168,7 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
         tracked_as = str(component.get("tracked_as", "")).strip()
         checkout_policy = str(component.get("checkout_policy", "")).strip()
         integration_decision = str(component.get("integration_decision", "")).strip()
+        provenance_mode = str(component.get("provenance_mode", "")).strip()
         if component_path:
             path_to_components.setdefault(component_path, []).append(component)
         required_fields = (
@@ -180,6 +182,7 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
             tracked_as,
             checkout_policy,
             integration_decision,
+            provenance_mode,
             str(component.get("refresh_policy", "")).strip(),
             str(component.get("last_validated", "")).strip(),
         )
@@ -190,9 +193,13 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
             or tracked_as not in UPSTREAM_SOURCE_TRACKING_MODES
             or checkout_policy not in UPSTREAM_SOURCE_CHECKOUT_POLICIES
             or integration_decision not in UPSTREAM_INTEGRATION_DECISIONS
+            or provenance_mode not in UPSTREAM_PROVENANCE_MODES
             or "source_ref" not in component
             or "source_commit" not in component
             or "refresh_notes" not in component
+            or "snapshot_fingerprint" not in component
+            or "snapshot_file_count" not in component
+            or "snapshot_bytes" not in component
         ):
             invalid_components.append(component_name or component_path or "unknown-component")
 
@@ -223,6 +230,16 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
         str(component.get("component_name", "")).strip()
         for component in components
         if not str(component.get("source_ref", "")).strip() or not str(component.get("source_commit", "")).strip()
+    )
+    fingerprinted_paths = sorted(
+        str(component.get("upstream_path", "")).strip()
+        for component in components
+        if str(component.get("snapshot_fingerprint", "")).strip()
+    )
+    unfingerprinted_components = sorted(
+        str(component.get("component_name", "")).strip()
+        for component in components
+        if not str(component.get("snapshot_fingerprint", "")).strip()
     )
     checkout_policy_mismatches = []
     integration_decision_mismatches = []
@@ -288,6 +305,12 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
         "pinned_count": len(pinned_source_paths),
         "total_count": len(components),
     }
+    enriched_lock["provenance_coverage"] = {
+        "fingerprinted_paths": fingerprinted_paths,
+        "unfingerprinted_components": unfingerprinted_components,
+        "fingerprinted_count": len(fingerprinted_paths),
+        "total_count": len(components),
+    }
     enriched_lock["audit"] = {
         "lock_path": UPSTREAM_SOURCE_LOCK_PATH,
         "component_paths_in_repo": component_paths,
@@ -305,6 +328,10 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
         "unpinned_source_components": unpinned_source_components,
         "pinned_source_count": len(pinned_source_paths),
         "source_pins_complete": len(pinned_source_paths) == len(components),
+        "fingerprinted_paths": fingerprinted_paths,
+        "unfingerprinted_components": unfingerprinted_components,
+        "fingerprinted_source_count": len(fingerprinted_paths),
+        "fingerprints_complete": len(fingerprinted_paths) == len(components),
         "checkout_policy_mismatches": checkout_policy_mismatches,
         "checkout_policies_consistent": not checkout_policy_mismatches,
         "integration_decision_mismatches": integration_decision_mismatches,
@@ -335,8 +362,12 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
             "tracked_as",
             "checkout_policy",
             "integration_decision",
+            "provenance_mode",
             "source_ref",
             "source_commit",
+            "snapshot_fingerprint",
+            "snapshot_file_count",
+            "snapshot_bytes",
             "refresh_policy",
             "refresh_notes",
             "last_validated",
@@ -428,6 +459,8 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
         "pinned_source_count": int(lock_manifest.get("pin_coverage", {}).get("pinned_count", 0)),
         "total_source_count": int(lock_manifest.get("pin_coverage", {}).get("total_count", 0)),
         "unpinned_source_components": list(lock_manifest.get("pin_coverage", {}).get("unpinned_components", [])),
+        "fingerprinted_source_count": int(lock_manifest.get("provenance_coverage", {}).get("fingerprinted_count", 0)),
+        "unfingerprinted_source_components": list(lock_manifest.get("provenance_coverage", {}).get("unfingerprinted_components", [])),
     }
     enriched_inventory["audit"] = {
         "inventory_path": UPSTREAM_USAGE_INVENTORY_PATH,
@@ -459,6 +492,9 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
         "pinned_source_count": int(lock_manifest.get("audit", {}).get("pinned_source_count", 0)),
         "source_pins_complete": bool(lock_manifest.get("audit", {}).get("source_pins_complete")),
         "unpinned_source_components": list(lock_manifest.get("audit", {}).get("unpinned_source_components", [])),
+        "fingerprinted_source_count": int(lock_manifest.get("audit", {}).get("fingerprinted_source_count", 0)),
+        "fingerprints_complete": bool(lock_manifest.get("audit", {}).get("fingerprints_complete")),
+        "unfingerprinted_source_components": list(lock_manifest.get("audit", {}).get("unfingerprinted_components", [])),
         "checkout_policies_consistent": bool(lock_manifest.get("audit", {}).get("checkout_policies_consistent")),
         "integration_decisions_consistent": bool(lock_manifest.get("audit", {}).get("integration_decisions_consistent")),
         "envoy_platform_only_locked": bool(lock_manifest.get("audit", {}).get("envoy_platform_only_locked")),

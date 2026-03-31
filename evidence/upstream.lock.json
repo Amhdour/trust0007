@@ -1,6 +1,6 @@
 {
   "lock_version": 1,
-  "generated_at": "2026-03-31T00:00:00Z",
+  "generated_at": "2026-03-31T17:57:11Z",
   "tracking_model": "vendored_snapshots_tracked_in_repo",
   "managed_submodules": [
     "overlays/myStarterKit"
@@ -22,7 +22,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only with governed runtime revalidation and Onyx handoff tests.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "feeaaf6fe54adde85f5d3c61d059405a04dd1bf4f776582fba41a4efc50d3460",
+      "snapshot_file_count": 4503,
+      "snapshot_bytes": 46988123,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "Keycloak",
@@ -39,7 +43,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only with identity adapter, live handoff, and realm-template validation.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "ee9e7b37bb5df611e8d53b4f6fc4c939c661c456fa3650e39f6b1c3c2988e44c",
+      "snapshot_file_count": 11884,
+      "snapshot_bytes": 102689829,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "Envoy",
@@ -56,7 +64,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only when ingress policy wiring or route-level governance work is being advanced.",
       "refresh_notes": "Envoy stays platform-only until the governed request path actually traverses it.",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "39bc0108eeb4ecff5f76fe2119b97cfcff2b08faee50c33e440115eb5d96d95b",
+      "snapshot_file_count": 13212,
+      "snapshot_bytes": 145186619,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "OPA",
@@ -73,7 +85,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only with policy bundle validation and strict live governed-path checks.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "0d0332f9ad9b5715904259db7353009c3cad49ee0cb8feabc8c32077fe7c8cdf",
+      "snapshot_file_count": 7305,
+      "snapshot_bytes": 47518303,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "Vault",
@@ -90,7 +106,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only with secret-path validation and fail-closed secret retrieval tests.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "8fcfe831d49a1fc2ddb121a271486e702c7f0b62cc89d4d6e92e76c488eac9ab",
+      "snapshot_file_count": 8581,
+      "snapshot_bytes": 37117323,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "Qdrant",
@@ -107,7 +127,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only with governed retrieval validation and tenant-filter checks.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "bf1e62671d944eeebe36a841c455d86fba3d7cbbd830258e66b9412e72874a89",
+      "snapshot_file_count": 1485,
+      "snapshot_bytes": 26392210,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "Langfuse",
@@ -124,7 +148,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only with evidence-plane export or live activity feed validation.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "54b747d77a2ecb29c5e3f181ddbbb3d8efc7f360ac2bf71f92efdc3836e58143",
+      "snapshot_file_count": 3100,
+      "snapshot_bytes": 24902916,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "Grafana",
@@ -141,7 +169,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only when operator drill-down dashboards or provisioning change materially.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "fa0284d814b47229df326217d13d5bbb1f788c6355ae74b28e8b3a1280db7087",
+      "snapshot_file_count": 21463,
+      "snapshot_bytes": 178295502,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "Superset",
@@ -158,7 +190,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only when historical trust analytics becomes an active reviewer workflow.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "2d23f3bc98080739579f94c088e07354d35e7f1541dea9334ec08f64a85bb288",
+      "snapshot_file_count": 7405,
+      "snapshot_bytes": 248365484,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "gVisor",
@@ -175,7 +211,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only when sandbox isolation work becomes part of the proven runtime path.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "f7ad2569c0c715d8b0bf90f555b4f143c8eef852c4cf6ef5892c6881371120be",
+      "snapshot_file_count": 3801,
+      "snapshot_bytes": 46821071,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "Keycloak Quickstarts",
@@ -192,7 +232,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only when identity integration work needs example scaffolding.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "f497adb541dc42b6ac79751b1cbd96c7f47d96374a90e568e71c60b3a2414a08",
+      "snapshot_file_count": 310,
+      "snapshot_bytes": 2011027,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "OPA Envoy Plugin",
@@ -209,7 +253,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only when Envoy ext_authz work moves from reference into the live path.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "9111f04f54d037edad1b189a6bcb9a50cbc9c0da68ddbef992f39cac32263805",
+      "snapshot_file_count": 91,
+      "snapshot_bytes": 1045364,
+      "provenance_mode": "content_fingerprint"
     },
     {
       "component_name": "Langfuse Python SDK",
@@ -226,7 +274,11 @@
       "source_commit": "",
       "refresh_policy": "Refresh only when direct SDK instrumentation replaces or supplements repo-owned exporters.",
       "refresh_notes": "",
-      "last_validated": "2026-03-31"
+      "last_validated": "2026-03-31",
+      "snapshot_fingerprint": "218ff90842e41eacb65a208312e681d306f73a5c93ffb4ace2cc47dedd387efd",
+      "snapshot_file_count": 443,
+      "snapshot_bytes": 4433304,
+      "provenance_mode": "content_fingerprint"
     }
   ]
 }

@@ -80,8 +80,18 @@ python scripts/sync-upstream-pins-from-checkout.py
 ```
 
 Behavior:
+- Computes content fingerprints for vendored upstream directories so each snapshot has local provenance even without upstream git metadata.
 - Attempts to fill `source_ref` and `source_commit` from local upstream git metadata when a vendored path is a standalone git checkout.
 - Skips plain vendored directories that do not carry standalone upstream git metadata in this repo.
+
+### 7) Stage a default-only upstream checkout
+```bash
+python scripts/stage-default-upstream-checkout.py /tmp/beta011-default-upstream
+```
+
+Behavior:
+- Creates a non-destructive staged directory containing only the default upstream group from `evidence/upstream.lock.json`.
+- Omits opt-in upstreams physically from the staged tree while writing a manifest and README that explain what was left out.
 
 ## Recommended workflow
 1. Run bootstrap script after cloning if the overlay submodule is missing.
@@ -89,8 +99,9 @@ Behavior:
 3. Run update script whenever you need to refresh managed overlay working trees.
 4. Use `list-upstream-groups.py` to keep optional and reference upstreams explicitly opt-in in workflow decisions.
 5. Use `record-upstream-refresh.py` whenever a vendored snapshot is intentionally updated.
-6. Run `sync-upstream-pins-from-checkout.py` when vendored paths are refreshed from standalone upstream repos.
-7. Run the upstream validator whenever the vendored source set or classification model changes.
+6. Run `sync-upstream-pins-from-checkout.py` when vendored paths are refreshed so the lock captures current snapshot provenance.
+7. Use `stage-default-upstream-checkout.py` when you need a physically smaller upstream tree for review or packaging.
+8. Run the upstream validator whenever the vendored source set or classification model changes.
 
 ## Notes
 - `upstream/*` is treated as third-party code.

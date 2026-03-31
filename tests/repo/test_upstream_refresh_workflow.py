@@ -67,6 +67,8 @@ def test_sync_upstream_pins_script_handles_plain_vendored_directories() -> None:
             [
                 sys.executable,
                 "scripts/sync-upstream-pins-from-checkout.py",
+                "--component",
+                "envoy",
                 "--lock-path",
                 str(lock_copy),
             ],
@@ -76,6 +78,35 @@ def test_sync_upstream_pins_script_handles_plain_vendored_directories() -> None:
             text=True,
         )
 
-    assert completed.returncode == 0, completed.stdout + completed.stderr
-    assert "Updated source pins for" in completed.stdout
-    assert "Skipped components without standalone git metadata:" in completed.stdout
+        assert completed.returncode == 0, completed.stdout + completed.stderr
+        assert "Updated source pins for" in completed.stdout
+        assert "Skipped components without standalone git metadata:" in completed.stdout
+        payload = json.loads(lock_copy.read_text(encoding="utf-8"))
+        envoy = next(component for component in payload["components"] if component["component_name"] == "Envoy")
+
+    assert envoy["snapshot_fingerprint"]
+    assert envoy["snapshot_file_count"] > 0
+    assert envoy["snapshot_bytes"] > 0
+
+
+def test_stage_default_upstream_checkout_script_creates_default_only_tree() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_dir = Path(tmpdir) / "default-upstreams"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/stage-default-upstream-checkout.py",
+                str(output_dir),
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert completed.returncode == 0, completed.stdout + completed.stderr
+        manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert any(item["upstream_path"] == "upstream/envoy" for item in manifest["default_components"])
+        assert any(item["upstream_path"] == "upstream/superset" for item in manifest["opt_in_components"])
+        assert (output_dir / "upstream" / "envoy").exists()
+        assert not (output_dir / "upstream" / "superset").exists()

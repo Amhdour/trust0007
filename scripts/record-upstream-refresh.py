@@ -71,6 +71,10 @@ def main() -> int:
     target["source_commit"] = args.commit.strip()
     target["last_validated"] = args.validated_on.strip()
     target["refresh_notes"] = args.notes.strip()
+    if str(target.get("snapshot_fingerprint", "")).strip():
+        target["provenance_mode"] = "manual_pin+content_fingerprint"
+    else:
+        target["provenance_mode"] = "manual_pin"
     payload["generated_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     _write_lock(lock_path, payload)

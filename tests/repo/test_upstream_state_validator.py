@@ -18,3 +18,4 @@ def test_upstream_state_validator_script_passes() -> None:
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "Upstream state validation passed." in completed.stdout
     assert "Pinned source snapshots:" in completed.stdout
+    assert "Snapshot fingerprints:" in completed.stdout
