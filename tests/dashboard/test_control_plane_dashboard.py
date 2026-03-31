@@ -40,6 +40,7 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="briefing-root"' in html
     assert 'id="mode-banner-root"' in html
     assert 'id="live-runtime-link"' in html
+    assert "/auth/live-session/start?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded" in html
     assert 'id="incident-banner-root"' in html
     assert 'id="risk-strip-root"' in html
     assert 'id="next-action-root"' in html
@@ -256,7 +257,8 @@ def test_dashboard_prefers_overlay_policy_bundle_when_present() -> None:
             link_items.extend(block["items"])
 
     links = {item["label"]: item for item in link_items}
-    assert links["Live Workspace"]["href"].endswith("/launch/onyx?path=/app&mode=live&view=embedded")
+    assert "/auth/live-session/start?next=" in links["Live Workspace"]["href"]
+    assert "%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded" in links["Live Workspace"]["href"]
     assert links["Open Chat"]["href"].endswith("/launch/onyx?path=/app")
     assert links["Open Agents"]["href"].endswith("/launch/onyx?path=/app/agents")
     assert links["Search Knowledge"]["href"].endswith("/launch/onyx?path=/app?chatMode=search")

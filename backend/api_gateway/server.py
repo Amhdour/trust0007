@@ -9,9 +9,9 @@ from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.error import URLError
-from urllib.parse import parse_qs, quote, unquote, urlparse
-from urllib.request import urlopen
+from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
+from urllib.request import Request, urlopen
 
 from adapters.identity.keycloak import KeycloakIdentityProvider
 from backend.activity_service.service import build_onyx_runtime_proof
@@ -113,6 +113,81 @@ def _keycloak_userinfo_url() -> str:
     base_url = os.environ.get("CONTROL_PLANE_KEYCLOAK_BASE_URL", "http://keycloak:8080").strip().rstrip("/")
     realm = os.environ.get("CONTROL_PLANE_KEYCLOAK_REALM", "umbrella-dev").strip()
     return f"{base_url}/realms/{realm}/protocol/openid-connect/userinfo"
+
+
+def _keycloak_token_url() -> str:
+    explicit = os.environ.get("CONTROL_PLANE_KEYCLOAK_TOKEN_URL", "").strip()
+    if explicit:
+        return explicit
+    base_url = os.environ.get("CONTROL_PLANE_KEYCLOAK_BASE_URL", "http://keycloak:8080").strip().rstrip("/")
+    realm = os.environ.get("CONTROL_PLANE_KEYCLOAK_REALM", "umbrella-dev").strip()
+    return f"{base_url}/realms/{realm}/protocol/openid-connect/token"
+
+
+def _dev_live_session_allowed() -> bool:
+    if os.environ.get("CONTROL_PLANE_DISABLE_DEV_LIVE_SESSION", "").strip().lower() in {"1", "true", "yes"}:
+        return False
+    return _control_plane_environment_mode() in {"dev", "prod-sim"}
+
+
+def _dev_live_session_default_next_path() -> str:
+    return "/launch/onyx?path=/app&mode=live&view=embedded"
+
+
+def _dev_live_session_start_path(next_path: str = "") -> str:
+    target = next_path or _dev_live_session_default_next_path()
+    return f"/auth/live-session/start?{urlencode({'next': target})}"
+
+
+def _safe_internal_redirect_target(raw_target: str) -> str:
+    candidate = unquote(raw_target or "").strip()
+    if not candidate:
+        return _dev_live_session_default_next_path()
+    parsed = urlparse(candidate)
+    if parsed.scheme or parsed.netloc:
+        return _dev_live_session_default_next_path()
+    if not candidate.startswith("/") or candidate.startswith("//"):
+        return _dev_live_session_default_next_path()
+    if candidate.startswith("/auth/live-session/start"):
+        return _dev_live_session_default_next_path()
+    return candidate
+
+
+def _mint_dev_live_session_token() -> str:
+    username = os.environ.get("CONTROL_PLANE_DEV_LIVE_USERNAME", "live-tenant-admin").strip() or "live-tenant-admin"
+    password = os.environ.get("CONTROL_PLANE_DEV_LIVE_PASSWORD", "change-me").strip() or "change-me"
+    client_id = os.environ.get("CONTROL_PLANE_DEV_LIVE_CLIENT_ID", "dev-web-app").strip() or "dev-web-app"
+    scope = os.environ.get("CONTROL_PLANE_DEV_LIVE_SCOPE", "openid email profile").strip() or "openid email profile"
+
+    request = Request(
+        _keycloak_token_url(),
+        data=urlencode(
+            {
+                "client_id": client_id,
+                "grant_type": "password",
+                "username": username,
+                "password": password,
+                "scope": scope,
+            }
+        ).encode("utf-8"),
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        raise RuntimeError(f"keycloak_token_http_error:{exc.code}") from exc
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise RuntimeError("keycloak_token_unreachable") from exc
+
+    access_token = str(payload.get("access_token", "")).strip()
+    if not access_token:
+        raise RuntimeError("keycloak_token_missing")
+    return access_token
 
 
 def _cookie_map(raw_cookie: str) -> dict[str, str]:
@@ -640,6 +715,10 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             self._handle_governed_flow()
             return
 
+        if path == "/auth/live-session/start":
+            self._handle_dev_live_session_start(parsed)
+            return
+
         if path.startswith("/raw/"):
             self._serve_repo_file(path.removeprefix("/raw/"))
             return
@@ -662,6 +741,26 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(encoded)
 
+    def _send_html(self, body: str, status: HTTPStatus = HTTPStatus.OK, *, cookies: list[str] | None = None) -> None:
+        encoded = body.encode("utf-8")
+        self.send_response(status.value)
+        if cookies:
+            for cookie in cookies:
+                self.send_header("Set-Cookie", cookie)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _redirect(self, location: str, *, cookies: list[str] | None = None, status: HTTPStatus = HTTPStatus.SEE_OTHER) -> None:
+        self.send_response(status.value)
+        if cookies:
+            for cookie in cookies:
+                self.send_header("Set-Cookie", cookie)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def _parse_int_query(self, raw_value: str, default: int, minimum: int, maximum: int) -> int:
         try:
             parsed = int(raw_value)
@@ -675,6 +774,67 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
     def _request_cookies(self) -> dict[str, str]:
         return _cookie_map(self.headers.get("Cookie", ""))
+
+    def _handle_dev_live_session_start(self, parsed) -> None:
+        next_path = _safe_internal_redirect_target(self._query_value(parse_qs(parsed.query), "next", ""))
+        if not _dev_live_session_allowed():
+            self._send_html(
+                """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Live Session Unavailable</title>
+  </head>
+  <body>
+    <main>
+      <h1>Live session bootstrap is disabled</h1>
+      <p>This dev-only helper is not available in the current environment.</p>
+      <p><a href="/">Return to dashboard</a></p>
+    </main>
+  </body>
+</html>
+""",
+                status=HTTPStatus.FORBIDDEN,
+            )
+            return
+
+        try:
+            access_token = _mint_dev_live_session_token()
+        except RuntimeError as exc:
+            reason = escape(str(exc))
+            self._send_html(
+                f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Live Session Start Failed</title>
+  </head>
+  <body>
+    <main>
+      <h1>Live session start failed</h1>
+      <p>The control plane could not mint a dev live session token from Keycloak.</p>
+      <p>Reason: <code>{reason}</code></p>
+      <p><a href="/">Return to dashboard</a></p>
+      <p><a href="{escape(next_path)}">Retry the governed route</a></p>
+    </main>
+  </body>
+</html>
+""",
+                status=HTTPStatus.BAD_GATEWAY,
+            )
+            return
+
+        cookie = SimpleCookie()
+        cookie["kc_access_token"] = access_token
+        cookie["kc_access_token"]["path"] = "/"
+        cookie["kc_access_token"]["httponly"] = True
+        cookie["kc_access_token"]["samesite"] = "Lax"
+        cookie["kc_access_token"]["max-age"] = str(
+            int(os.environ.get("CONTROL_PLANE_DEV_LIVE_SESSION_MAX_AGE", "3600") or "3600")
+        )
+        self._redirect(next_path, cookies=[morsel.OutputString() for morsel in cookie.values()])
 
     def _handle_governed_flow(self) -> None:
         """Execute a governed flow with runtime policy enforcement and emit artifacts."""
@@ -762,6 +922,13 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 href = f"{href}&view={quote(view, safe='')}"
             return href
 
+        current_handoff_href = launch_view_href(
+            safe_path,
+            mode=flow_mode,
+            view=view_mode if dashboard_workspace_view else "",
+        )
+        live_session_start_href = _dev_live_session_start_path(current_handoff_href)
+
         # Run governance check for Onyx handoff
         try:
             policy_context = _runtime_policy_context()
@@ -828,6 +995,13 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             artifact_markup = _artifact_list_markup(flow_result.artifacts if flow_result else {})
             dependency_markup = _dependency_summary_markup(flow_result)
             runtime_proof_section = _runtime_proof_markup(runtime_proof)
+            live_session_help_markup = ""
+            if live_mode and _dev_live_session_allowed() and any(
+                reason.startswith("identity.") for reason in (flow_result.reasons if flow_result else [])
+            ):
+                live_session_help_markup = f"""
+      <p><a href="{live_session_start_href}">Start dev live session and retry</a></p>
+"""
             # Governance denied the handoff
             body = f"""<!doctype html>
 <html lang="en">
@@ -890,6 +1064,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     <main>
       <h1>⛔ Access Denied</h1>
       <p>The governance layer has blocked your access to <code>{safe_path_html}</code>.</p>
+      {live_session_help_markup}
       <p><a href="/">Return to dashboard</a></p>
       <div class="status">
         <strong>Handoff to Onyx was denied by control-plane policy.</strong>

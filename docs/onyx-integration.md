@@ -48,6 +48,7 @@ Any failed check results in deny with aggregated reasons.
 
 ## Runtime proof after handoff
 - `/launch/onyx` is the governed entry point into the runtime plane.
+- `/auth/live-session/start` is a dev-only control-plane helper that mints a local `kc_access_token` cookie and redirects back into a governed live handoff.
 - `/launch/onyx?path=/app&mode=live&view=embedded` is the dashboard-owned live workspace view for that same governed entry point.
 - A successful or denied handoff now writes `overlays/myStarterKit/artifacts/onyx-runtime-proof.json`.
 - That artifact summarizes:

@@ -9,5 +9,5 @@ This frontend is the dashboard-first homepage for the repository.
 - It now foregrounds a plain-language first layer, a compact command summary, a dominant live-vs-demo mode banner, a short reading guide, lighter summary-first reviewer sections, and deeper technical drilldowns.
 - The homepage consumes `/api/control-plane/overview` for posture and evidence panels and `/api/control-plane/live-log` for recent activity.
 - The client overview page reuses the same overview payload and the reviewer allow/deny artifacts, but presents them as simple visuals for non-technical audiences.
-- The hero now includes a direct link into a dashboard-owned live runtime workspace at `/launch/onyx?path=/app&mode=live&view=embedded`.
+- The hero now includes a dev-only live-session bootstrap link that mints a local `kc_access_token` cookie and then redirects into `/launch/onyx?path=/app&mode=live&view=embedded`.
 - Drill-through links are expected to point at raw repo artifacts exposed by the API gateway under `/raw/...`.
