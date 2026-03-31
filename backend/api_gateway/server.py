@@ -695,7 +695,10 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 retrieval_source="qdrant",
                 retrieval_needed=True,
                 roles=["tenant_user"],
-                request_metadata={"surface": "control-plane.governed-flow"},
+                request_metadata={
+                    "surface": "control-plane.governed-flow",
+                    "requested_path": "/app?chatMode=search",
+                },
                 tool_arguments={
                     "search": {"query": question},
                     "summarize": {"query": question},

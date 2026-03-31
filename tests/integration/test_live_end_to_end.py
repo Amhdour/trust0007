@@ -170,14 +170,20 @@ def test_live_onyx_search_handoff_allowed() -> None:
 
     try:
         response = http_get(server.url("/launch/onyx?path=/app?chatMode=search"), timeout=10)
+        runtime_proof_path = repo_root / "overlays" / "myStarterKit" / "artifacts" / "onyx-runtime-proof.json"
 
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         assert "Governance Status:</strong> ✓ Approved" in response.text
         assert "Policy Source" in response.text
+        assert "Runtime proof after handoff" in response.text
         assert (
             "Local Onyx is not responding yet." in response.text
             or "Local Onyx is running." in response.text
         )
+        runtime_proof = json.loads(runtime_proof_path.read_text(encoding="utf-8"))
+        assert runtime_proof["requested_path"] == "/app?chatMode=search"
+        assert "reachability" in runtime_proof
+        assert "continuity" in runtime_proof
     finally:
         server.stop()
 

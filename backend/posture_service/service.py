@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from backend.activity_service.service import build_activity_snapshot
+from backend.activity_service.service import build_activity_snapshot, build_onyx_runtime_proof
 from backend.evidence_service.service import build_evidence_pack_summary
 from backend.integration_adapter.repository import (
     AUDIT_RECORDS_PATH,
@@ -23,6 +23,7 @@ from backend.integration_adapter.repository import (
     load_latest_governed_flow_events,
     load_latest_governed_flow_summary,
     load_latest_identity_evidence,
+    load_latest_onyx_runtime_proof,
     load_latest_policy_evidence,
     load_latest_retrieval_evidence,
     load_latest_secret_evidence,
@@ -700,6 +701,37 @@ def _allow_deny_label(value: bool) -> str:
     return "ALLOW" if value else "DENY"
 
 
+def _status_priority(status: str) -> int:
+    return {"critical": 0, "warning": 1, "healthy": 2, "neutral": 3}.get(status, 4)
+
+
+def _combine_statuses(*statuses: str) -> str:
+    valid = [status for status in statuses if status]
+    if not valid:
+        return "neutral"
+    return min(valid, key=_status_priority)
+
+
+def _onyx_runtime_readiness_status(runtime_proof: dict[str, Any]) -> str:
+    status = str(runtime_proof.get("reachability", {}).get("status", ""))
+    return {
+        "local_and_public_ready": "healthy",
+        "local_ready_public_pending": "warning",
+        "blocked_before_runtime": "warning",
+        "public_visible_local_unhealthy": "critical",
+        "runtime_unreachable": "critical",
+    }.get(status, "warning")
+
+
+def _onyx_runtime_continuity_status(runtime_proof: dict[str, Any]) -> str:
+    status = str(runtime_proof.get("continuity", {}).get("status", ""))
+    return {
+        "path_activity_observed": "healthy",
+        "runtime_activity_observed": "warning",
+        "no_runtime_activity": "warning",
+    }.get(status, "warning")
+
+
 def _take_rows(rows: list[dict[str, str]], limit: int = 5) -> list[dict[str, str]]:
     return rows[:limit]
 
@@ -768,7 +800,14 @@ def _governed_request_feed(
     fallback.setdefault("secret_satisfied", bool(summary.get("secret", {}).get("fetched")) or not bool(summary.get("secret", {}).get("required")))
     fallback.setdefault("handoff_allowed", bool(summary.get("handoff_allowed", summary.get("decision", False))))
     fallback.setdefault("reason_codes", _string_list(summary.get("reasons", [])))
-    fallback.setdefault("artifact_refs", {"governed_flow_summary": "overlays/myStarterKit/artifacts/governed-flow-summary.json"})
+    runtime_proof = dict(summary.get("runtime_proof", {}))
+    runtime_proof_ref = str(runtime_proof.get("history_artifact") or runtime_proof.get("artifact") or "")
+    artifact_refs = {"governed_flow_summary": "overlays/myStarterKit/artifacts/governed-flow-summary.json"}
+    if runtime_proof_ref:
+        artifact_refs["onyx_runtime_proof"] = runtime_proof_ref
+    fallback.setdefault("artifact_refs", artifact_refs)
+    if runtime_proof:
+        fallback.setdefault("runtime_proof", runtime_proof)
     return [fallback]
 
 
@@ -1172,6 +1211,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         load_latest_governed_request_feed(resolved_root),
         governed_flow_summary,
     )
+    onyx_runtime_proof = load_latest_onyx_runtime_proof(resolved_root)
     identity_evidence = load_latest_identity_evidence(resolved_root)
     policy_evidence = load_latest_policy_evidence(resolved_root)
     retrieval_evidence = load_latest_retrieval_evidence(resolved_root)
@@ -1387,6 +1427,31 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     latest_request_href = ""
     if isinstance(latest_request.get("artifact_refs"), dict) and latest_request["artifact_refs"].get("governed_flow_summary"):
         latest_request_href = _raw(str(latest_request["artifact_refs"]["governed_flow_summary"]))
+    latest_requested_path = str(latest_request.get("requested_path") or governed_flow_summary.get("requested_path") or "/app")
+    summary_runtime_proof = governed_flow_summary.get("runtime_proof", {})
+    summary_runtime_proof = dict(summary_runtime_proof) if isinstance(summary_runtime_proof, dict) else {}
+    if not onyx_runtime_proof:
+        onyx_runtime_proof = dict(summary_runtime_proof)
+    if not onyx_runtime_proof:
+        onyx_runtime_proof = build_onyx_runtime_proof(
+            resolved_root,
+            requested_path=latest_requested_path,
+            trace_id=latest_trace_id,
+            session_id=latest_session_id,
+            activity_snapshot=activity_snapshot,
+        )
+    onyx_runtime_proof.setdefault("artifact", "overlays/myStarterKit/artifacts/onyx-runtime-proof.json")
+    onyx_runtime_proof.setdefault("requested_path", latest_requested_path)
+    runtime_proof_href = _raw(str(onyx_runtime_proof.get("history_artifact") or onyx_runtime_proof.get("artifact") or "overlays/myStarterKit/artifacts/onyx-runtime-proof.json"))
+    runtime_continuity = dict(onyx_runtime_proof.get("continuity", {}))
+    runtime_readiness = dict(onyx_runtime_proof.get("reachability", {}))
+    runtime_latest_activity = dict(onyx_runtime_proof.get("matched_activity") or onyx_runtime_proof.get("latest_activity") or {})
+    runtime_continuity_label = str(runtime_continuity.get("label", "No runtime proof yet"))
+    runtime_readiness_label = str(runtime_readiness.get("label", "Not checked yet"))
+    runtime_latest_activity_summary = str(runtime_latest_activity.get("summary", "")) or "No recent Onyx runtime activity captured yet."
+    runtime_continuity_status = _onyx_runtime_continuity_status(onyx_runtime_proof)
+    runtime_readiness_status = _onyx_runtime_readiness_status(onyx_runtime_proof)
+    runtime_proof_status = _combine_statuses(runtime_continuity_status, runtime_readiness_status)
     top_failing_control = failing_controls[0] if failing_controls else {}
     governed_flow_generated_at = str(governed_flow_summary.get("generated_at", ""))
     latest_request_timestamp = str(latest_request.get("timestamp") or governed_flow_generated_at or "")
@@ -2404,6 +2469,13 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             status="critical",
             href=_raw(INSPECTABLE_DENIED_FLOW),
         ),
+        _record(
+            title="Latest Onyx runtime proof",
+            meta=" | ".join(value for value in (runtime_readiness_label, runtime_continuity_label, latest_requested_path) if value),
+            detail=f"{str(runtime_readiness.get('detail', 'Runtime reachability check unavailable.'))} Latest activity: {runtime_latest_activity_summary}",
+            status=runtime_proof_status,
+            href=runtime_proof_href,
+        ),
     ]
     for event in events:
         payload = _payload(event)
@@ -3051,7 +3123,17 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                             display_label="Proof used for this decision",
                             display_detail="Shows whether the safety decision came from live proof or from demo/sample material.",
                         ),
-                    ][:3],
+                        _card(
+                            "Missing evidence",
+                            ", ".join(latest_missing_evidence) or "none",
+                            "healthy" if not latest_missing_evidence else "critical",
+                            "Latest launch-gate evidence still missing from the governed flow.",
+                            latest_governed_flow_href,
+                            display_label="Missing proof for safety decision",
+                            display_value=", ".join(latest_missing_evidence) or "none",
+                            display_detail="Missing proof here keeps the launch decision from being fully supported by current governed evidence.",
+                        ),
+                    ],
                 },
                 {
                     "type": "records",
@@ -3176,10 +3258,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "type": "cards",
                     "title": "AI-access summary",
                     "items": [
-                        _card("Onyx visibility", "Governed runtime plane", "healthy" if onyx_available else "warning", "Onyx remains behind dashboard-controlled handoffs; this control plane decides whether access is allowed and what evidence must exist.", _raw("docs/onyx-integration.md"), display_label="AI system being protected", display_value="Onyx", display_detail="This dashboard decides when access to the AI system is allowed and what proof is required."),
-                        _card("Latest handoff", "ALLOW" if latest_handoff_allowed else "DENY", "healthy" if latest_handoff_allowed else "critical", f"Latest governed handoff reason: {latest_handoff_reason}.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), display_label="Latest access decision", display_value=_allow_deny_display(latest_handoff_allowed), display_detail="Shows whether the latest checked access into the AI system was allowed or blocked."),
-                        _card("Missing handoff evidence", ", ".join(latest_missing_evidence) or "none", "healthy" if not latest_missing_evidence else "critical", "Live-mode missing evidence that affected the latest handoff or launch-gate result.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), display_label="Missing proof for access decision", display_value=", ".join(latest_missing_evidence) or "none", display_detail="Missing proof can cause AI access to be blocked or downgraded."),
-                    ][:3],
+                        _card("Onyx visibility", "Governed runtime plane", "healthy" if onyx_available else "warning", "Onyx remains behind dashboard-controlled handoffs; this control plane decides whether access is allowed and what evidence must exist.", _raw("docs/onyx-integration.md"), id="onyx_visibility", display_label="AI system being protected", display_value="Onyx", display_detail="This dashboard decides when access to the AI system is allowed and what proof is required."),
+                        _card("Latest handoff", "ALLOW" if latest_handoff_allowed else "DENY", "healthy" if latest_handoff_allowed else "critical", f"Latest governed handoff reason: {latest_handoff_reason}.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), id="latest_handoff", display_label="Latest access decision", display_value=_allow_deny_display(latest_handoff_allowed), display_detail="Shows whether the latest checked access into the AI system was allowed or blocked."),
+                        _card("Missing handoff evidence", ", ".join(latest_missing_evidence) or "none", "healthy" if not latest_missing_evidence else "critical", "Live-mode missing evidence that affected the latest handoff or launch-gate result.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), id="missing_handoff_evidence", display_label="Missing proof for access decision", display_value=", ".join(latest_missing_evidence) or "none", display_detail="Missing proof can cause AI access to be blocked or downgraded."),
+                        _card("Runtime continuity", runtime_continuity_label, runtime_continuity_status, f"{str(runtime_continuity.get('detail', 'Post-handoff continuity is not available yet.'))} Latest activity: {runtime_latest_activity_summary}", runtime_proof_href, id="onyx_runtime_continuity", display_label="Runtime continuity after access", display_value=runtime_continuity_label, display_detail="Shows whether recent Onyx runtime activity lines up with the governed handoff path."),
+                        _card("Runtime readiness", runtime_readiness_label, runtime_readiness_status, f"{str(runtime_readiness.get('detail', 'Runtime reachability is not available yet.'))} Target path: {latest_requested_path}.", runtime_proof_href, id="onyx_runtime_readiness", display_label="Runtime readiness after access", display_value=runtime_readiness_label, display_detail="Shows whether the Onyx runtime and public handoff target were reachable after approval."),
+                    ],
                 },
                 {
                     "type": "records",
@@ -3194,6 +3278,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _link("Search Knowledge", _launch_handoff_url("/app?chatMode=search"), "Launch the governed search-oriented Onyx surface.", "healthy", display_label="Open search", display_description="Open the checked search entry point for the AI system."),
                         _link("Open Agents", _launch_handoff_url("/app/agents"), "Governed agents surface; non-admin roles should be denied.", "warning", display_label="Open agents", display_description="Open the agents entry point. Non-admin roles should still be blocked here."),
                         _link("Governed flow API", _dashboard_url("/api/control-plane/governed-flow"), "Trigger a governed flow run to generate fresh runtime artifacts.", "neutral", display_label="Create fresh technical proof", display_description="Run a new checked flow to create fresh AI-access evidence."),
+                        _link("Latest runtime proof", runtime_proof_href, "Post-handoff Onyx runtime reachability and continuity summary for the latest governed request.", runtime_proof_status, display_label="Open runtime proof", display_description="Open the latest post-handoff runtime proof for the AI system."),
                         _link("Onyx integration note", _raw("docs/onyx-integration.md"), "Architecture note for Onyx as the governed runtime plane behind the dashboard control plane.", "neutral", display_label="How AI access works", display_description="Open the technical note explaining the AI-access architecture."),
                     ],
                 },
@@ -3209,6 +3294,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         _link("Governed audit records", _raw(AUDIT_RECORDS_PATH), "Audit-stage records tied to the same trace/request/session model when a governed flow has run.", "healthy" if audit_provenance == "runtime-generated" else "warning", id="governed_audit_records"),
         _link("Policy bundle", policy_href, "Runtime surface, retrieval, and tool governance policy.", "healthy" if policy_source == "overlay" else "warning", id="policy_bundle"),
         _link("Governed flow summary", latest_governed_flow_href, "Latest governed-flow summary including identity, policy, retrieval, secret, trace, and launch-gate evidence.", "healthy" if governed_flow_summary else "warning", id="governed_flow_summary"),
+        _link("Onyx runtime proof", runtime_proof_href, "Latest post-handoff Onyx runtime readiness and continuity summary.", runtime_proof_status, id="onyx_runtime_proof"),
         _link("Upstream usage inventory", _raw("evidence/upstream_usage.inventory.json"), "Classification of active, partial, optional, and reference-only upstream components.", "healthy", id="upstream_usage_inventory"),
         _link("Reviewer evidence bundle", reviewer_href, "Consolidated reviewer-facing evidence pack.", "healthy", id="reviewer_evidence_bundle"),
         _link("Launch report", launch_report_href, "Launch-gate findings and residual risk guidance.", "warning", id="launch_report"),

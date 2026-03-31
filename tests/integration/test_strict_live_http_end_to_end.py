@@ -50,6 +50,7 @@ def test_strict_live_handoff_passes_through_http_dependency_chain() -> None:
         trace = harness.read_artifact("trace-correlation.json")
         launch = harness.read_artifact("launch-gate-result.json")
         summary = harness.read_artifact("governed-flow-summary.json")
+        runtime_proof = harness.read_artifact("onyx-runtime-proof.json")
 
         _assert_strict_live_acceptance(summary)
         assert identity["source"] == "keycloak_userinfo"
@@ -65,6 +66,10 @@ def test_strict_live_handoff_passes_through_http_dependency_chain() -> None:
         assert trace["audit_linkage"]["complete"] is True
         assert launch["machine"]["decision"] == "pass"
         assert launch["flow_metadata"]["handoff_allowed"] is True
+        assert runtime_proof["trace_id"] == summary["trace_id"]
+        assert runtime_proof["requested_path"] == "/app"
+        assert summary["runtime_proof"]["artifact"].endswith("onyx-runtime-proof.json")
+        assert summary["runtime_proof"]["continuity"]["label"]
 
         overview = harness.overview().json()
         assert overview["data_mode"]["label"] == "Live current evidence"

@@ -46,6 +46,28 @@ Any failed check results in deny with aggregated reasons.
 - No import or coupling to upstream `upstream/onyx` modules.
 - Integration point can be attached by a thin runtime wrapper.
 
+## Runtime proof after handoff
+- `/launch/onyx` is the governed entry point into the runtime plane.
+- A successful or denied handoff now writes `overlays/myStarterKit/artifacts/onyx-runtime-proof.json`.
+- That artifact summarizes:
+  - the requested Onyx path,
+  - the governed trace and session identifiers,
+  - runtime reachability after the handoff decision,
+  - the latest visible Onyx runtime activity, and
+  - whether current runtime activity can be tied back to the governed path.
+
+This keeps the proof model honest: the control plane proves the launch decision first, then records what was visible at the runtime edge afterward.
+
+## Readiness contract
+- `scripts/start-onyx-lite.sh` remains the supported way to start the local runtime quickly.
+- Runtime readiness is treated separately from governance approval.
+- A handoff can be approved while readiness is still degraded, and the runtime proof artifact should show that difference clearly.
+
+## Guardrails for future changes
+- Keep governance logic in repo-owned adapters and evaluators, not inside upstream Onyx modules.
+- Prefer new proof artifacts, traces, and dashboard signals over invasive upstream customization.
+- If deeper Onyx integration is needed later, keep the contract at the normalized request/decision boundary.
+
 ## Test coverage
 `tests/adapter/test_onyx_gateway_adapter.py` includes:
 - happy path allow scenario,

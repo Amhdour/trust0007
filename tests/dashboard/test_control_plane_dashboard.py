@@ -225,6 +225,7 @@ def test_dashboard_prefers_overlay_policy_bundle_when_present() -> None:
     source_hrefs = {source["label"]: source["href"] for source in payload["sources"]}
     assert source_hrefs["Policy bundle"] == "/raw/overlays/myStarterKit/policies/bundles/default/policy.json"
     assert source_hrefs["Reviewer evidence bundle"] == "/raw/evidence/reviewer_evidence_bundle.json"
+    assert "onyx-runtime-proof.json" in source_hrefs["Onyx runtime proof"]
 
     onyx_runtime = next(section for section in payload["sections"] if section["id"] == "entry-points")
     link_items = []
@@ -236,7 +237,23 @@ def test_dashboard_prefers_overlay_policy_bundle_when_present() -> None:
     assert links["Open Chat"]["href"].endswith("/launch/onyx?path=/app")
     assert links["Open Agents"]["href"].endswith("/launch/onyx?path=/app/agents")
     assert links["Search Knowledge"]["href"].endswith("/launch/onyx?path=/app?chatMode=search")
+    assert "onyx-runtime-proof.json" in links["Latest runtime proof"]["href"]
     assert links["Onyx integration note"]["href"].endswith("/raw/docs/onyx-integration.md")
+
+
+def test_dashboard_entry_points_include_runtime_proof_signals() -> None:
+    payload = build_control_plane_dashboard()
+    onyx_runtime = next(section for section in payload["sections"] if section["id"] == "entry-points")
+    cards_block = next(block for block in onyx_runtime["blocks"] if block["type"] == "cards")
+
+    cards = {item["label"]: item for item in cards_block["items"]}
+
+    assert cards["Runtime continuity"]["id"] == "onyx_runtime_continuity"
+    assert cards["Runtime continuity"]["value"]
+    assert "onyx-runtime-proof.json" in cards["Runtime continuity"]["href"]
+    assert cards["Runtime readiness"]["id"] == "onyx_runtime_readiness"
+    assert cards["Runtime readiness"]["value"]
+    assert "onyx-runtime-proof.json" in cards["Runtime readiness"]["href"]
 
 
 def test_runtime_policy_bundle_falls_back_when_overlay_is_missing() -> None:
