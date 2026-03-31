@@ -1,0 +1,15 @@
+{
+  "expected_health_urls": [
+    "http://127.0.0.1:3010/",
+    "http://127.0.0.1:3010/api/health"
+  ],
+  "governed_entrypoint": "/launch/onyx",
+  "launch_paths": [
+    "/app",
+    "/app?chatMode=search",
+    "/app/agents"
+  ],
+  "post_handoff_runtime_proof_required": true,
+  "runtime_name": "{{PRIMARY_RUNTIME}}",
+  "runtime_slug": "{{PRIMARY_RUNTIME_SLUG}}"
+}

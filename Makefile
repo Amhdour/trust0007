@@ -1,4 +1,9 @@
-.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream
+.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template
+
+CLIENT_NAME ?= Example Client
+CLIENT_SLUG ?= example-client
+ENGAGEMENT_TRACK ?= secure-starter-kit
+PRIMARY_RUNTIME ?= Onyx
 
 demo:
 	bash scripts/run-demo.sh
@@ -42,3 +47,6 @@ sync-upstream-pins:
 
 stage-default-upstream:
 	python scripts/stage-default-upstream-checkout.py /tmp/beta011-default-upstream
+
+init-client-template:
+	python scripts/init-client-template.py --client-name "$(CLIENT_NAME)" --client-slug "$(CLIENT_SLUG)" --engagement-track "$(ENGAGEMENT_TRACK)" --primary-runtime "$(PRIMARY_RUNTIME)"

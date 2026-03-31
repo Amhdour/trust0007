@@ -1,0 +1,10 @@
+{
+  "client_name": "{{CLIENT_NAME}}",
+  "client_slug": "{{CLIENT_SLUG}}",
+  "dashboard_brand": "{{DASHBOARD_BRAND}}",
+  "engagement_track": "{{ENGAGEMENT_TRACK}}",
+  "output_overlay": "{{OUTPUT_OVERLAY}}",
+  "primary_runtime": "{{PRIMARY_RUNTIME}}",
+  "template_version": "{{TEMPLATE_VERSION}}",
+  "tenant_id": "{{TENANT_ID}}"
+}

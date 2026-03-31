@@ -1,0 +1,13 @@
+{
+  "admin_roles": [
+    "tenant_admin"
+  ],
+  "realm": "{{KEYCLOAK_REALM}}",
+  "required_roles": [
+    "tenant_user"
+  ],
+  "role_claim_path": "realm_access.roles",
+  "session_expectation": "live_mode_requires_session",
+  "tenant_id": "{{TENANT_ID}}",
+  "tenant_id_claim": "tenant_id"
+}

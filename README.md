@@ -40,6 +40,23 @@ If you need the simplest presentation layer first:
 
 The client overview is intentionally lighter than the technical dashboard. It explains what the system checks, what it blocks, why that matters, and whether it looks safe to use now, while linking back to the technical proof.
 
+## Client Template Mode
+
+This repository can now act as a reusable client template, not just a single working project.
+
+- template guide: [docs/client-template-kit.md](/workspaces/beta011/docs/client-template-kit.md)
+- engagement tracks: [docs/client-engagement-tracks.md](/workspaces/beta011/docs/client-engagement-tracks.md)
+- tokenized scaffold: [overlays/client-template/README.md](/workspaces/beta011/overlays/client-template/README.md)
+- stripped template readme: [README.template.md](/workspaces/beta011/README.template.md)
+
+Materialize a client-ready overlay scaffold:
+
+```bash
+make init-client-template CLIENT_NAME="Acme Health" CLIENT_SLUG=acme-health ENGAGEMENT_TRACK=layer-retrofit PRIMARY_RUNTIME=Onyx
+```
+
+That generates `overlays/client-acme-health/` with tokenized client profile, policy, retrieval, secrets, readiness, runtime, and observability scaffolds. It does not overwrite the current `myStarterKit` baseline or pretend demo artifacts are client proof.
+
 ## Passing Strict Live Flow
 
 The strongest “see a pass” path is:

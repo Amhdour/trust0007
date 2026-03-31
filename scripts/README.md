@@ -13,3 +13,4 @@ Helper scripts for demo, vendored upstream source management, and local control-
 - `record-upstream-refresh.py`: records a vendored upstream ref/commit refresh into `evidence/upstream.lock.json`.
 - `sync-upstream-pins-from-checkout.py`: attempts to fill `source_ref` and `source_commit` from local standalone upstream git checkouts when that metadata is available.
 - `stage-default-upstream-checkout.py`: creates a non-destructive staged checkout containing only the default upstream group, leaving opt-in upstreams out.
+- `init-client-template.py`: materializes a tokenized client overlay from `overlays/client-template/` into `overlays/client-<slug>/` for client delivery work.

@@ -1,0 +1,9 @@
+{
+  "client_overview_enabled": true,
+  "dashboard_brand": "{{DASHBOARD_BRAND}}",
+  "governed_flow_summary": "overlays/myStarterKit/artifacts/governed-flow-summary.json",
+  "governed_request_feed": "overlays/myStarterKit/artifacts/governed-request-feed.json",
+  "launch_gate_result": "overlays/myStarterKit/artifacts/launch-gate-result.json",
+  "reviewer_bundle": "evidence/reviewer_evidence_bundle.json",
+  "runtime_proof": "overlays/myStarterKit/artifacts/onyx-runtime-proof.json"
+}

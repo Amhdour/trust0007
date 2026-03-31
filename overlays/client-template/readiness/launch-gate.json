@@ -1,0 +1,12 @@
+{
+  "engagement_track": "{{ENGAGEMENT_TRACK}}",
+  "launch_question": "Should {{CLIENT_NAME}} allow governed runtime access for {{PRIMARY_RUNTIME}}?",
+  "mandatory_live_controls": [
+    "identity.live",
+    "policy.live_opa",
+    "retrieval.live_backend",
+    "trace.correlation",
+    "handoff.decision"
+  ],
+  "owner": "{{CLIENT_NAME}} readiness review"
+}

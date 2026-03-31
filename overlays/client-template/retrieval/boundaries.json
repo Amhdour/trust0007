@@ -1,0 +1,13 @@
+{
+  "allowed_sources": [
+    "qdrant",
+    "knowledge-base"
+  ],
+  "collection": "{{QDRANT_COLLECTION}}",
+  "cross_tenant_retrieval": "deny",
+  "provenance_required": true,
+  "required_trust_labels": [
+    "trusted"
+  ],
+  "tenant_id": "{{TENANT_ID}}"
+}

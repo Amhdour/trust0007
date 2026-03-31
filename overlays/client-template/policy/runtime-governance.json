@@ -1,0 +1,31 @@
+{
+  "bundle_path": "{{POLICY_BUNDLE_PATH}}",
+  "engagement_track": "{{ENGAGEMENT_TRACK}}",
+  "primary_runtime": "{{PRIMARY_RUNTIME}}",
+  "registered_surfaces": [
+    {
+      "allowed_roles": [
+        "tenant_user",
+        "tenant_admin"
+      ],
+      "path": "/app",
+      "surface": "{{PRIMARY_RUNTIME_SLUG}}.chat"
+    },
+    {
+      "allowed_roles": [
+        "tenant_user",
+        "tenant_admin"
+      ],
+      "path": "/app?chatMode=search",
+      "surface": "{{PRIMARY_RUNTIME_SLUG}}.search"
+    },
+    {
+      "allowed_roles": [
+        "tenant_admin"
+      ],
+      "path": "/app/agents",
+      "surface": "{{PRIMARY_RUNTIME_SLUG}}.agents"
+    }
+  ],
+  "tenant_id": "{{TENANT_ID}}"
+}
