@@ -57,13 +57,13 @@ async function fetchJson(url) {
   return response.json();
 }
 
-function findCommandCard(payload, label) {
+function findCommandCard(payload, id, label = "") {
   const cards = payload.command_center?.cards || [];
-  return cards.find((item) => item.display_label === label || item.label === label) || null;
+  return cards.find((item) => item.id === id || item.display_label === label || item.label === label) || null;
 }
 
-function findSource(payload, label) {
-  return (payload.sources || []).find((item) => item.label === label) || null;
+function findSource(payload, id, label = "") {
+  return (payload.sources || []).find((item) => item.id === id || item.label === label) || null;
 }
 
 function familyStatus(payload, keyword) {
@@ -96,8 +96,8 @@ function renderHero(payload) {
 
 function renderTrafficSummary(payload) {
   const readiness = payload.readiness_panel || {};
-  const evidenceCard = findCommandCard(payload, "How up to date the proof is");
-  const latestDecision = findCommandCard(payload, "Latest access decision");
+  const evidenceCard = findCommandCard(payload, "evidence_freshness", "How up to date the proof is");
+  const latestDecision = findCommandCard(payload, "latest_handoff", "Latest access decision");
   const families = readiness.control_families || [];
   const healthyCount = families.filter((item) => item.status === "healthy").length;
   const failingCount = families.filter((item) => item.status === "critical").length;
@@ -148,7 +148,7 @@ function renderTrafficSummary(payload) {
 }
 
 function renderProcess(payload) {
-  const latestDecision = findCommandCard(payload, "Latest access decision");
+  const latestDecision = findCommandCard(payload, "latest_handoff", "Latest access decision");
   const steps = [
     {
       title: "User asks a question",
@@ -353,9 +353,9 @@ function renderReadiness(payload) {
 }
 
 function renderLinks(payload) {
-  const reviewerBundle = findSource(payload, "Reviewer evidence bundle");
-  const launchReport = findSource(payload, "Launch report");
-  const eventFeed = findSource(payload, "Governed event feed");
+  const reviewerBundle = findSource(payload, "reviewer_evidence_bundle", "Reviewer evidence bundle");
+  const launchReport = findSource(payload, "launch_report", "Launch report");
+  const eventFeed = findSource(payload, "governed_event_feed", "Governed event feed");
 
   const links = [
     {

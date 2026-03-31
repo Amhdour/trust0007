@@ -6,6 +6,7 @@ const heroMeta = document.getElementById("hero-meta");
 const heroSteps = document.getElementById("hero-steps");
 const modeBannerRoot = document.getElementById("mode-banner-root");
 const briefingRoot = document.getElementById("briefing-root");
+const proofPipelineRoot = document.getElementById("proof-pipeline-root");
 const readingGuideRoot = document.getElementById("reading-guide-root");
 const kpiRoot = document.getElementById("kpi-root");
 const sourcesRoot = document.getElementById("sources");
@@ -229,6 +230,68 @@ function renderBriefing(commandCenter) {
   `;
 }
 
+function pipelineStatusLabel(step) {
+  return (
+    step.badge_label
+    || {
+      healthy: "Passed",
+      warning: "Needs review",
+      critical: "Failed",
+      neutral: "Not needed",
+    }[step.status || "neutral"]
+    || statusLabel(step.status || "neutral")
+  );
+}
+
+function renderProofPipeline(pipeline) {
+  if (!proofPipelineRoot) {
+    return;
+  }
+
+  const steps = Array.isArray(pipeline.steps) ? pipeline.steps : [];
+  proofPipelineRoot.innerHTML = `
+    <section class="command-secondary-card pipeline-panel">
+      <div class="support-card-head">
+        <div>
+          <p class="eyebrow">Latest governed path</p>
+          <h3>${escapeHtml(pipeline.title || "Latest governed path")}</h3>
+        </div>
+        ${renderStatusPill(pipeline.status || "neutral")}
+      </div>
+      <p class="record-detail">${escapeHtml(pipeline.detail || "")}</p>
+      <div class="pipeline-step-grid">
+        ${steps
+          .map(
+            (step, index) => `
+              <${step.href ? "a" : "article"} class="pipeline-step-card pipeline-step-${escapeHtml(step.status || "neutral")}"${linkAttributes(step.href)}>
+                <div class="pipeline-step-head">
+                  <span class="pipeline-step-index">${index + 1}</span>
+                  ${renderStatusPill(step.status || "neutral", { label: pipelineStatusLabel(step) })}
+                </div>
+                <p class="pipeline-step-label">${escapeHtml(step.label || "")}</p>
+                <strong class="pipeline-step-value">${escapeHtml(step.value || "")}</strong>
+                <p class="pipeline-step-detail">${escapeHtml(step.detail || "")}</p>
+              </${step.href ? "a" : "article"}>
+            `,
+          )
+          .join("")}
+      </div>
+      <div class="pipeline-summary">
+        <div class="hero-meta">
+          ${pipeline.mode_label ? `<span class="chip">${escapeHtml(pipeline.mode_label)}</span>` : ""}
+          ${pipeline.trace_id ? `<span class="chip">Trace ${escapeHtml(pipeline.trace_id)}</span>` : ""}
+        </div>
+        <p class="record-detail">${escapeHtml(pipeline.summary || "")}</p>
+        ${
+          pipeline.summary_href
+            ? `<a class="audience-link-pill"${linkAttributes(pipeline.summary_href)}>Open latest technical summary</a>`
+            : ""
+        }
+      </div>
+    </section>
+  `;
+}
+
 function renderActionPills(items) {
   return `
     <div class="command-action-row">
@@ -271,33 +334,46 @@ function renderKpis(paths) {
     return;
   }
 
-  kpiRoot.innerHTML = (Array.isArray(paths) ? paths : [])
-    .map(
-      (path) => `
-        <section class="audience-lane">
-          <div class="audience-lane-head">
-            <div>
-              <p class="eyebrow">${escapeHtml(String(path.title || "").toLowerCase().includes("technical") ? "Then drill deeper" : "Start here")}</p>
-              <h3>${escapeHtml(path.title || "")}</h3>
-            </div>
-            ${renderStatusPill(path.status || "neutral", { hideHealthy: true, hideNeutral: true })}
-          </div>
-          <p class="record-detail">${escapeHtml(path.detail || "")}</p>
-          <div class="audience-link-pill-row">
-            ${(Array.isArray(path.links) ? path.links : [])
-              .map(
-                (item) => `
-                  <a class="audience-link-pill"${linkAttributes(item.href)}>
-                    ${escapeHtml(item.display_label || item.label || "")}
-                  </a>
-                `,
-              )
-              .join("")}
-          </div>
-        </section>
-      `,
-    )
-    .join("");
+  kpiRoot.innerHTML = `
+    <section class="command-secondary-card support-panel">
+      <div class="support-card-head">
+        <div>
+          <p class="eyebrow">Reading lanes</p>
+          <h3 id="kpi-title">Reviewer View And Operator Drilldown</h3>
+        </div>
+      </div>
+      <p class="record-detail">Use the first lane for the plain-language safety story. Use the second lane when you need raw reasons, traces, and deeper technical proof.</p>
+      <div class="audience-path-grid">
+        ${(Array.isArray(paths) ? paths : [])
+          .map(
+            (path) => `
+              <section class="audience-path-card">
+                <div class="audience-lane-head">
+                  <div>
+                    <p class="eyebrow">${escapeHtml(String(path.title || "").toLowerCase().includes("technical") ? "Then drill deeper" : "Start here")}</p>
+                    <h3>${escapeHtml(path.title || "")}</h3>
+                  </div>
+                  ${renderStatusPill(path.status || "neutral", { hideHealthy: true, hideNeutral: true })}
+                </div>
+                <p class="record-detail">${escapeHtml(path.detail || "")}</p>
+                <div class="audience-link-pill-row">
+                  ${(Array.isArray(path.links) ? path.links : [])
+                    .map(
+                      (item) => `
+                        <a class="audience-link-pill"${linkAttributes(item.href)}>
+                          ${escapeHtml(item.display_label || item.label || "")}
+                        </a>
+                      `,
+                    )
+                    .join("")}
+                </div>
+              </section>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
 }
 
 function renderRecords(items) {
@@ -386,48 +462,52 @@ function renderReadingGuide(guide) {
   const questions = Array.isArray(guide.questions) ? guide.questions : [];
 
   readingGuideRoot.innerHTML = `
-    <div class="section-head">
-      <p class="eyebrow">Quick help</p>
-      <h2 id="guide-title">${escapeHtml(guide.title || "How to read this dashboard")}</h2>
-      <p class="section-description">${escapeHtml(guide.intro || "")}</p>
-    </div>
-    <div class="guide-status-summary">
-      ${statuses
-        .map(
-          (item) => `
-            <article class="guide-status-chip-card">
-              <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(item.label || statusLabel(item.status || "neutral"))}</div>
-              <p>${escapeHtml(item.detail || "")}</p>
-            </article>
-          `,
-        )
-        .join("")}
-    </div>
-    <details class="guide-disclosure">
-      <summary>Show the main questions and technical note</summary>
-      <div class="reading-guide-grid">
-        <section class="guide-card">
-          <h3>Main questions this page answers</h3>
-          <div class="guide-question-grid">
-            ${questions
-              .map(
-                (item) => `
-                  <a class="guide-question-card"${linkAttributes(item.href)}>
-                    <div class="card-topline">
-                      <span class="metric-label">${escapeHtml(item.question || "")}</span>
-                      ${renderStatusPill(item.status || "neutral", { hideHealthy: true, hideNeutral: true })}
-                    </div>
-                    <strong>${escapeHtml(item.answer || "")}</strong>
-                    <p>${escapeHtml(item.detail || "")}</p>
-                  </a>
-                `,
-              )
-              .join("")}
-          </div>
-          <p class="guide-note">${escapeHtml(guide.technical_note || "")}</p>
-        </section>
+    <section class="command-secondary-card support-panel">
+      <div class="support-card-head">
+        <div>
+          <p class="eyebrow">Quick help</p>
+          <h3 id="guide-title">${escapeHtml(guide.title || "How to read this dashboard")}</h3>
+        </div>
       </div>
-    </details>
+      <p class="record-detail">${escapeHtml(guide.intro || "")}</p>
+      <div class="guide-status-summary">
+        ${statuses
+          .map(
+            (item) => `
+              <article class="guide-status-chip-card">
+                <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(item.label || statusLabel(item.status || "neutral"))}</div>
+                <p>${escapeHtml(item.detail || "")}</p>
+              </article>
+            `,
+          )
+          .join("")}
+      </div>
+      <details class="guide-disclosure">
+        <summary>Show the main questions and technical note</summary>
+        <div class="reading-guide-grid">
+          <section class="guide-card">
+            <h3>Main questions this page answers</h3>
+            <div class="guide-question-grid">
+              ${questions
+                .map(
+                  (item) => `
+                    <a class="guide-question-card"${linkAttributes(item.href)}>
+                      <div class="card-topline">
+                        <span class="metric-label">${escapeHtml(item.question || "")}</span>
+                        ${renderStatusPill(item.status || "neutral", { hideHealthy: true, hideNeutral: true })}
+                      </div>
+                      <strong>${escapeHtml(item.answer || "")}</strong>
+                      <p>${escapeHtml(item.detail || "")}</p>
+                    </a>
+                  `,
+                )
+                .join("")}
+            </div>
+            <p class="guide-note">${escapeHtml(guide.technical_note || "")}</p>
+          </section>
+        </div>
+      </details>
+    </section>
   `;
 }
 
@@ -691,6 +771,7 @@ async function boot() {
     renderHero(payload);
     renderModeBanner(payload.mode_banner || {});
     renderBriefing(payload.command_center || {});
+    renderProofPipeline(payload.command_center?.proof_pipeline || {});
     renderReadingGuide(payload.reading_guide || {});
     renderKpis(payload.audience_paths || []);
     renderTabs(payload.tabs);
@@ -707,6 +788,9 @@ async function boot() {
     `;
     if (briefingRoot) {
       briefingRoot.innerHTML = "";
+    }
+    if (proofPipelineRoot) {
+      proofPipelineRoot.innerHTML = "";
     }
     if (kpiRoot) {
       kpiRoot.innerHTML = "";

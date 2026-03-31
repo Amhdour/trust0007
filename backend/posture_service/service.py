@@ -1076,6 +1076,14 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     live_evidence_mode = str(governed_flow_summary.get("evidence_mode", "")).lower() == "live"
     latest_trace_id = str(governed_flow_summary.get("trace_id", "")) or str(trace_correlation.get("trace_id", ""))
     latest_session_id = str(governed_flow_summary.get("session_id", "")) or str(trace_correlation.get("session_id", ""))
+    latest_governed_flow_href = _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json")
+    dependency_status = governed_flow_summary.get("dependency_status", {})
+    dependency_status = dependency_status if isinstance(dependency_status, dict) else {}
+    identity_dependency = dict(dependency_status.get("identity", {}))
+    policy_dependency = dict(dependency_status.get("policy", {}))
+    retrieval_dependency = dict(dependency_status.get("retrieval", {}))
+    secret_dependency = dict(dependency_status.get("secret", {}))
+    trace_dependency = dict(dependency_status.get("trace", {}))
     identity_live = bool(identity_evidence.get("live"))
     policy_engine = str(policy_evidence.get("engine", policy_source))
     retrieval_live_backend = bool(retrieval_evidence.get("live_backend"))
@@ -1089,6 +1097,15 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     latest_reason_codes = _string_list(governed_flow_summary.get("reasons", []))
     latest_handoff_reason = latest_reason_codes[0] if latest_reason_codes else "policy.allow"
     latest_missing_evidence = _string_list(governed_flow_summary.get("launch_gate", {}).get("missing_evidence", []))
+    identity_authenticated = bool(identity_dependency.get("authenticated", identity_evidence.get("authenticated")))
+    identity_live_step = bool(identity_dependency.get("live", identity_live))
+    policy_allowed = bool(policy_dependency.get("allow", policy_evidence.get("allow")))
+    policy_engine_step = str(policy_dependency.get("engine", policy_engine))
+    retrieval_allowed = bool(retrieval_dependency.get("allow", retrieval_evidence.get("allow")))
+    retrieval_live_step = bool(retrieval_dependency.get("live_backend", retrieval_live_backend))
+    secret_required_step = bool(secret_dependency.get("mandatory", secret_required))
+    secret_fetched_step = bool(secret_dependency.get("fetched", secret_fetched))
+    trace_complete_step = bool(trace_dependency.get("complete", trace_complete))
     identity_timestamp = str(identity_evidence.get("timestamp") or identity_evidence.get("captured_at") or governed_flow_summary.get("generated_at") or "")
     policy_timestamp = str(policy_evidence.get("timestamp") or policy_evidence.get("captured_at") or governed_flow_summary.get("generated_at") or "")
     retrieval_timestamp = str(retrieval_evidence.get("timestamp") or retrieval_evidence.get("captured_at") or governed_flow_summary.get("generated_at") or "")
@@ -1287,6 +1304,120 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         {"label": "Trace ID", "value": str(latest_request.get("trace_id", "")) or "unavailable"},
         {"label": "Timestamp", "value": str(latest_request.get("timestamp", "")) or "unavailable"},
     ]
+    identity_step_status = (
+        "healthy"
+        if identity_authenticated and (identity_live_step or not live_evidence_mode)
+        else ("warning" if identity_authenticated else "critical")
+    )
+    policy_step_status = (
+        "healthy"
+        if policy_allowed and (policy_engine_step.strip().lower() == "opa" or not live_evidence_mode)
+        else ("warning" if policy_allowed else "critical")
+    )
+    retrieval_step_status = (
+        "healthy"
+        if retrieval_allowed and (retrieval_live_step or not live_evidence_mode)
+        else ("warning" if retrieval_allowed else "critical")
+    )
+    secret_step_status = "neutral" if not secret_required_step else ("healthy" if secret_fetched_step else "critical")
+    trace_step_status = "healthy" if trace_complete_step else "critical"
+    handoff_step_status = "healthy" if latest_handoff_allowed else "critical"
+    pipeline_steps = [
+        {
+            "id": "identity",
+            "label": "Identity",
+            "value": (
+                "Live identity passed"
+                if identity_authenticated and identity_live_step
+                else ("Identity passed" if identity_authenticated else "Identity missing")
+            ),
+            "detail": str(identity_dependency.get("source") or identity_evidence.get("source") or "Identity evidence unavailable"),
+            "status": identity_step_status,
+            "href": "#identity-session",
+        },
+        {
+            "id": "policy",
+            "label": "Policy",
+            "value": (
+                f"{policy_engine_step.upper()} allowed"
+                if policy_allowed and policy_engine_step
+                else ("Allowed" if policy_allowed else "Blocked")
+            ),
+            "detail": "Current rule evaluation before AI access.",
+            "status": policy_step_status,
+            "href": "#policy-enforcement",
+        },
+        {
+            "id": "retrieval",
+            "label": "Retrieval",
+            "value": (
+                "Allowed on live source"
+                if retrieval_allowed and retrieval_live_step
+                else ("Allowed on reviewed source" if retrieval_allowed else "Blocked")
+            ),
+            "detail": "Checks which information sources the AI can read.",
+            "status": retrieval_step_status,
+            "href": "#retrieval-boundaries",
+        },
+        {
+            "id": "secret",
+            "label": "Secret",
+            "value": (
+                "No secret needed"
+                if not secret_required_step
+                else ("Required secret fetched" if secret_fetched_step else "Required secret missing")
+            ),
+            "detail": "Protected credentials stay governed before runtime access.",
+            "status": secret_step_status,
+            "href": "#secret-access",
+        },
+        {
+            "id": "trace",
+            "label": "Trace",
+            "value": "Trace complete" if trace_complete_step else "Trace incomplete",
+            "detail": (
+                "Cross-step proof is tied together under one trace."
+                if trace_complete_step
+                else (
+                    f"Missing proof: {', '.join(latest_missing_evidence)}."
+                    if latest_missing_evidence
+                    else "Cross-step proof is incomplete."
+                )
+            ),
+            "status": trace_step_status,
+            "href": "#trace-correlation",
+        },
+        {
+            "id": "handoff",
+            "label": "Handoff",
+            "value": _allow_deny_display(latest_handoff_allowed),
+            "detail": (
+                "Access reached the AI runtime through the governed path."
+                if latest_handoff_allowed
+                else "Access stayed blocked because the full governed path did not pass."
+            ),
+            "status": handoff_step_status,
+            "href": "#entry-points",
+        },
+    ]
+    pipeline_statuses = [str(step["status"]) for step in pipeline_steps]
+    if "critical" in pipeline_statuses:
+        pipeline_status = "critical"
+    elif "warning" in pipeline_statuses:
+        pipeline_status = "warning"
+    elif "neutral" in pipeline_statuses:
+        pipeline_status = "neutral"
+    else:
+        pipeline_status = "healthy"
+    pipeline_summary = (
+        "The latest governed path cleared the mandatory checks and allowed AI access."
+        if latest_handoff_allowed
+        else (
+            f"The latest governed path was blocked because required proof is missing: {', '.join(latest_missing_evidence)}."
+            if latest_missing_evidence
+            else f"The latest governed path was blocked with reason {_humanize_reason(latest_request_reason)}."
+        )
+    )
     flagship_proof = _spotlight(
         eyebrow="Flagship proof",
         title="Denied /launch/onyx handoff",
@@ -1320,6 +1451,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 _status_from_launch(launch_summary["status"]),
                 "Launch posture for the governed runtime right now.",
                 "#launch-gate",
+                id="readiness",
                 display_label="Can it be used safely now?",
                 display_value=f"{_readiness_display(launch_summary['status'])} · {launch_summary['readiness_score']}/100",
                 display_detail=f"Technical launch verdict: {launch_summary['status'].upper()}. {launch_summary['control_coverage']} checks are currently passing.",
@@ -1330,6 +1462,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 "healthy" if latest_handoff_allowed else "critical",
                 f"Most recent governed handoff reason: {latest_handoff_reason}.",
                 "#entry-points",
+                id="latest_handoff",
                 display_label="Latest access decision",
                 display_value=_allow_deny_display(latest_handoff_allowed),
                 display_detail="Shows whether the latest checked handoff into the AI system was allowed or blocked.",
@@ -1340,6 +1473,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 "critical" if top_failing_control else "healthy",
                 str(top_failing_control.get("summary", "No failing controls are currently listed.")),
                 "#launch-gate",
+                id="top_failing_control",
                 display_label="Most important issue",
                 display_value=str(top_failing_control.get("control", "none")).replace("_", " ").title() if top_failing_control else "No major issue listed",
                 display_detail=(
@@ -1354,6 +1488,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 "healthy" if artifact_counts["stale"] == 0 and artifact_counts["missing"] == 0 else "warning",
                 f"Stale: {artifact_counts['stale']}. Missing: {artifact_counts['missing']}.",
                 "#evidence-integrity",
+                id="evidence_freshness",
                 display_label="How up to date the proof is",
                 display_value=evidence_freshness_value,
                 display_detail=f"{artifact_counts['stale']} stale and {artifact_counts['missing']} missing proof item(s).",
@@ -1387,6 +1522,17 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         ),
         "flagship_proof": flagship_proof,
+        "proof_pipeline": {
+            "title": "Latest governed path",
+            "detail": "Follow the latest request through the mandatory checks that must line up before the AI runtime is allowed.",
+            "summary": pipeline_summary,
+            "status": pipeline_status,
+            "summary_href": latest_governed_flow_href,
+            "trace_id": latest_trace_id,
+            "mode": "live" if live_evidence_mode else "demo",
+            "mode_label": "Live proof" if live_evidence_mode else "Demo or local proof",
+            "steps": pipeline_steps,
+        },
         "actions": [
             _link("Inspect pass flow", _raw(INSPECTABLE_ALLOWED_FLOW), "Reviewer-ready allowed governed handoff proof.", "healthy", display_label="See approved example", display_description="Open a full example where the checks passed and access was allowed."),
             _link("Inspect deny flow", _raw(INSPECTABLE_DENIED_FLOW), "Reviewer-ready denied governed handoff proof.", "critical", display_label="See blocked example", display_description="Open a full example where the checks failed and access was blocked."),
@@ -2429,15 +2575,15 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     sections.sort(key=lambda section: section_order.get(str(section.get("id", "")), len(section_order)))
 
     sources = [
-        _link("Governed event feed", _raw(event_feed_path), "Event feed used by the dashboard overview and blocked-actions views.", "healthy"),
-        _link("Governed request feed", governed_request_feed_href, "Reviewer-safe request telemetry with sanitized previews and per-trace evidence history.", "healthy" if governed_request_feed else "warning"),
-        _link("Governed audit records", _raw(AUDIT_RECORDS_PATH), "Audit-stage records tied to the same trace/request/session model when a governed flow has run.", "healthy" if audit_provenance == "runtime-generated" else "warning"),
-        _link("Policy bundle", policy_href, "Runtime surface, retrieval, and tool governance policy.", "healthy" if policy_source == "overlay" else "warning"),
-        _link("Governed flow summary", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), "Latest governed-flow summary including identity, policy, retrieval, secret, trace, and launch-gate evidence.", "healthy" if governed_flow_summary else "warning"),
-        _link("Upstream usage inventory", _raw("evidence/upstream_usage.inventory.json"), "Classification of active, partial, optional, and reference-only upstream components.", "healthy"),
-        _link("Reviewer evidence bundle", reviewer_href, "Consolidated reviewer-facing evidence pack.", "healthy"),
-        _link("Launch report", launch_report_href, "Launch-gate findings and residual risk guidance.", "warning"),
-        _link("Dashboard ingestion feed", ingestion_href, "Dashboard export sample used for evidence drill-through and replay references.", "neutral"),
+        _link("Governed event feed", _raw(event_feed_path), "Event feed used by the dashboard overview and blocked-actions views.", "healthy", id="governed_event_feed"),
+        _link("Governed request feed", governed_request_feed_href, "Reviewer-safe request telemetry with sanitized previews and per-trace evidence history.", "healthy" if governed_request_feed else "warning", id="governed_request_feed"),
+        _link("Governed audit records", _raw(AUDIT_RECORDS_PATH), "Audit-stage records tied to the same trace/request/session model when a governed flow has run.", "healthy" if audit_provenance == "runtime-generated" else "warning", id="governed_audit_records"),
+        _link("Policy bundle", policy_href, "Runtime surface, retrieval, and tool governance policy.", "healthy" if policy_source == "overlay" else "warning", id="policy_bundle"),
+        _link("Governed flow summary", latest_governed_flow_href, "Latest governed-flow summary including identity, policy, retrieval, secret, trace, and launch-gate evidence.", "healthy" if governed_flow_summary else "warning", id="governed_flow_summary"),
+        _link("Upstream usage inventory", _raw("evidence/upstream_usage.inventory.json"), "Classification of active, partial, optional, and reference-only upstream components.", "healthy", id="upstream_usage_inventory"),
+        _link("Reviewer evidence bundle", reviewer_href, "Consolidated reviewer-facing evidence pack.", "healthy", id="reviewer_evidence_bundle"),
+        _link("Launch report", launch_report_href, "Launch-gate findings and residual risk guidance.", "warning", id="launch_report"),
+        _link("Dashboard ingestion feed", ingestion_href, "Dashboard export sample used for evidence drill-through and replay references.", "neutral", id="dashboard_ingestion_feed"),
     ]
 
     return {
