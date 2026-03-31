@@ -193,6 +193,33 @@ def _parse_timestamp(value: str) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _timestamp_display(value: str) -> str:
+    parsed = _parse_timestamp(value)
+    if parsed is None:
+        return value or "Unavailable"
+    return parsed.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _timestamp_badges(
+    *,
+    timestamp: str,
+    evidence_mode: str = "",
+    provenance: str = "",
+    label: str = "Checked",
+) -> list[dict[str, str]]:
+    if not timestamp:
+        return []
+    freshness_status, _ = _format_age_bucket(timestamp)
+    return [
+        {"label": label, "value": timestamp, "kind": "timestamp"},
+        {
+            "label": "Freshness",
+            "value": _freshness_label(timestamp=timestamp, evidence_mode=evidence_mode, provenance=provenance),
+            "status": freshness_status,
+        },
+    ]
+
+
 def _payload(event: dict[str, Any]) -> dict[str, Any]:
     payload = event.get("payload", {})
     return payload if isinstance(payload, dict) else {}
@@ -1253,6 +1280,39 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     if isinstance(latest_request.get("artifact_refs"), dict) and latest_request["artifact_refs"].get("governed_flow_summary"):
         latest_request_href = _raw(str(latest_request["artifact_refs"]["governed_flow_summary"]))
     top_failing_control = failing_controls[0] if failing_controls else {}
+    governed_flow_generated_at = str(governed_flow_summary.get("generated_at", ""))
+    latest_request_timestamp = str(latest_request.get("timestamp") or governed_flow_generated_at or "")
+    trace_timestamp = str(trace_correlation.get("timestamp") or trace_correlation.get("generated_at") or governed_flow_generated_at or "")
+    handoff_timestamp = latest_request_timestamp or governed_flow_generated_at
+    launch_report_timestamp = str(launch_summary.get("generated_at") or readiness_panel["generated_at"] or "")
+    evidence_summary_timestamp = str(
+        evidence_summary.get("generated_at")
+        or reviewer.get("generated_at")
+        or artifact_inventory[0]["last_updated"]
+        or ""
+    )
+    latest_allowed_request = next((item for item in governed_request_feed if bool(item.get("handoff_allowed"))), {})
+    last_good_run_timestamp = str(latest_allowed_request.get("timestamp") or "")
+    last_good_run_trace = str(latest_allowed_request.get("trace_id") or "")
+    if last_good_run_timestamp:
+        last_good_run_status, _ = _format_age_bucket(last_good_run_timestamp)
+        last_good_run_value = _timestamp_display(last_good_run_timestamp)
+        last_good_run_detail = (
+            f"Latest approved trace {last_good_run_trace}."
+            if last_good_run_trace
+            else "Latest approved governed handoff in the request feed."
+        )
+        last_good_run_badges = _timestamp_badges(
+            timestamp=last_good_run_timestamp,
+            evidence_mode=str(latest_allowed_request.get("evidence_mode", "")),
+            provenance="runtime-generated",
+            label="Approved",
+        )
+    else:
+        last_good_run_status = "warning"
+        last_good_run_value = "No recent approved run"
+        last_good_run_detail = "The recent request feed does not show an allowed governed handoff yet."
+        last_good_run_badges = []
     mode_banner = {
         "label": "LIVE GOVERNED MODE" if live_evidence_mode else "DEMO / FALLBACK MODE",
         "status": "healthy" if live_evidence_mode else "warning",
@@ -1334,6 +1394,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "detail": str(identity_dependency.get("source") or identity_evidence.get("source") or "Identity evidence unavailable"),
             "status": identity_step_status,
             "href": "#identity-session",
+            "meta_badges": _timestamp_badges(
+                timestamp=identity_timestamp,
+                evidence_mode="live" if live_evidence_mode else "demo",
+                provenance="runtime-generated",
+            ),
         },
         {
             "id": "policy",
@@ -1346,6 +1411,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "detail": "Current rule evaluation before AI access.",
             "status": policy_step_status,
             "href": "#policy-enforcement",
+            "meta_badges": _timestamp_badges(
+                timestamp=policy_timestamp,
+                evidence_mode="live" if live_evidence_mode else "demo",
+                provenance="runtime-generated",
+            ),
         },
         {
             "id": "retrieval",
@@ -1358,6 +1428,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "detail": "Checks which information sources the AI can read.",
             "status": retrieval_step_status,
             "href": "#retrieval-boundaries",
+            "meta_badges": _timestamp_badges(
+                timestamp=retrieval_timestamp,
+                evidence_mode="live" if live_evidence_mode else "demo",
+                provenance="runtime-generated",
+            ),
         },
         {
             "id": "secret",
@@ -1370,6 +1445,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "detail": "Protected credentials stay governed before runtime access.",
             "status": secret_step_status,
             "href": "#secret-access",
+            "meta_badges": _timestamp_badges(
+                timestamp=secret_timestamp,
+                evidence_mode="live" if live_evidence_mode else "demo",
+                provenance="runtime-generated",
+            ),
         },
         {
             "id": "trace",
@@ -1386,6 +1466,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ),
             "status": trace_step_status,
             "href": "#trace-correlation",
+            "meta_badges": _timestamp_badges(
+                timestamp=trace_timestamp,
+                evidence_mode="live" if live_evidence_mode else "demo",
+                provenance="runtime-generated",
+            ),
         },
         {
             "id": "handoff",
@@ -1398,6 +1483,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ),
             "status": handoff_step_status,
             "href": "#entry-points",
+            "meta_badges": _timestamp_badges(
+                timestamp=handoff_timestamp,
+                evidence_mode="live" if live_evidence_mode else "demo",
+                provenance="runtime-generated",
+            ),
         },
     ]
     pipeline_statuses = [str(step["status"]) for step in pipeline_steps]
@@ -1457,13 +1547,19 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         ],
         display_eyebrow="Flagship blocked-access proof",
         display_title="Example of the system blocking unsafe or unauthorized access",
-        display_detail="This is the clearest example showing that the system can refuse access to the AI runtime when the rules or proof do not support it.",
+        display_detail="Clearest proof that the system can refuse AI access when the rules or proof do not support it.",
         display_fields=[
             {"label": "Why it was blocked", "value": flagship_denied["reason"]},
             {"label": "Customer or tenant", "value": flagship_denied["tenant"]},
             {"label": "Person or actor", "value": flagship_denied["actor"]},
             {"label": "Technical trace", "value": flagship_denied["trace_id"]},
         ],
+        meta_badges=_timestamp_badges(
+            timestamp=flagship_denied["timestamp"],
+            evidence_mode="live" if live_evidence_mode else "demo",
+            provenance="runtime-generated",
+            label="Blocked",
+        ),
     )
     command_center = {
         "cards": [
@@ -1476,7 +1572,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 id="readiness",
                 display_label="Can it be used safely now?",
                 display_value=f"{_readiness_display(launch_summary['status'])} · {launch_summary['readiness_score']}/100",
-                display_detail=f"Technical launch verdict: {launch_summary['status'].upper()}. {launch_summary['control_coverage']} checks are currently passing.",
+                display_detail=f"Launch verdict: {launch_summary['status'].upper()}. {launch_summary['control_coverage']} checks are passing.",
+                meta_badges=_timestamp_badges(
+                    timestamp=launch_report_timestamp,
+                    evidence_mode="live" if live_evidence_mode else "demo",
+                    provenance="file-backed",
+                ),
             ),
             _card(
                 "Latest handoff",
@@ -1488,6 +1589,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 display_label="Latest access decision",
                 display_value=_allow_deny_display(latest_handoff_allowed),
                 display_detail="Shows whether the latest checked handoff into the AI system was allowed or blocked.",
+                meta_badges=_timestamp_badges(
+                    timestamp=handoff_timestamp,
+                    evidence_mode="live" if live_evidence_mode else "demo",
+                    provenance="runtime-generated",
+                ),
             ),
             _card(
                 "Top failing control",
@@ -1499,9 +1605,15 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 display_label="Most important issue",
                 display_value=str(top_failing_control.get("control", "none")).replace("_", " ").title() if top_failing_control else "No major issue listed",
                 display_detail=(
-                    f"There {'is' if len(failing_controls) == 1 else 'are'} {len(failing_controls)} important issue{'s' if len(failing_controls) != 1 else ''} still affecting safe use."
+                    f"{len(failing_controls)} important issue{'s' if len(failing_controls) != 1 else ''} still affect safe use."
                     if top_failing_control
                     else "No failing control is listed in the current launch report."
+                ),
+                meta_badges=_timestamp_badges(
+                    timestamp=launch_report_timestamp,
+                    evidence_mode="live" if live_evidence_mode else "demo",
+                    provenance="file-backed",
+                    label="From report",
                 ),
             ),
             _card(
@@ -1514,6 +1626,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 display_label="How up to date the proof is",
                 display_value=evidence_freshness_value,
                 display_detail=f"{artifact_counts['stale']} stale and {artifact_counts['missing']} missing proof item(s).",
+                meta_badges=_timestamp_badges(
+                    timestamp=evidence_summary_timestamp,
+                    evidence_mode="live" if live_evidence_mode else "demo",
+                    provenance="file-backed",
+                ),
             ),
         ],
         "latest_request": _spotlight(
@@ -1532,7 +1649,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             display_eyebrow="Latest checked request",
             display_title=str(latest_request.get("question_preview", "No recent checked request yet")),
             display_detail=(
-                "This is the latest safe preview of a request the system checked. The full raw prompt is not shown here."
+                "Latest safe preview of a checked request. The full raw prompt is not shown here."
                 if latest_request
                 else "Run a new checked flow to show the latest request, decision, and proof links."
             ),
@@ -1542,8 +1659,49 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 {"label": "Customer or tenant", "value": str(latest_request.get("tenant_id", "")) or "Unavailable"},
                 {"label": "Time", "value": str(latest_request.get("timestamp", "")) or "Unavailable"},
             ],
+            meta_badges=_timestamp_badges(
+                timestamp=latest_request_timestamp,
+                evidence_mode=str(latest_request.get("evidence_mode", "")),
+                provenance="runtime-generated",
+            ),
         ),
         "flagship_proof": flagship_proof,
+        "risk_strip": {
+            "eyebrow": "Current risk strip",
+            "title": "Four signals to watch",
+            "detail": "These four signals tell you fastest whether the system needs review right now.",
+            "items": [
+                _card(
+                    "Blocked handoffs",
+                    str(denied_request_count),
+                    "critical" if denied_request_count else "healthy",
+                    "Recent governed requests that stayed blocked.",
+                    "#blocked-actions",
+                ),
+                _card(
+                    "Failing controls",
+                    str(len(failing_controls)),
+                    "critical" if failing_controls else "healthy",
+                    "Launch or readiness checks still not fully passing.",
+                    "#launch-gate",
+                ),
+                _card(
+                    "Stale / missing proof",
+                    f"{artifact_counts['stale']} / {artifact_counts['missing']}",
+                    "warning" if artifact_counts["stale"] or artifact_counts["missing"] else "healthy",
+                    "Counts of stale and missing evidence items.",
+                    "#evidence-integrity",
+                ),
+                _card(
+                    "Last good run",
+                    last_good_run_value,
+                    last_good_run_status,
+                    last_good_run_detail,
+                    "#governed-requests",
+                    meta_badges=last_good_run_badges,
+                ),
+            ],
+        },
         "incident_banner": {
             "visible": incident_visible,
             "status": incident_status,
@@ -1565,13 +1723,18 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         "proof_pipeline": {
             "title": "Latest governed path",
-            "detail": "Follow the latest request through the mandatory checks that must line up before the AI runtime is allowed.",
+            "detail": "Follow the latest request through the checks that must line up before AI access is allowed.",
             "summary": pipeline_summary,
             "status": pipeline_status,
             "summary_href": latest_governed_flow_href,
             "trace_id": latest_trace_id,
             "mode": "live" if live_evidence_mode else "demo",
             "mode_label": "Live proof" if live_evidence_mode else "Demo or local proof",
+            "meta_badges": _timestamp_badges(
+                timestamp=handoff_timestamp,
+                evidence_mode="live" if live_evidence_mode else "demo",
+                provenance="runtime-generated",
+            ),
             "steps": pipeline_steps,
         },
         "actions": [
@@ -1660,7 +1823,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
 
     reading_guide = {
         "title": "How to read this dashboard",
-        "intro": "This page is a safety and review report for the AI system. Start with the summary cards and the two spotlight panels. Technical details and raw evidence are available lower on the page.",
+        "intro": "Start with the summary cards and the two spotlight panels. Open the lower sections only when you need the technical proof.",
         "statuses": [
             {"status": "healthy", "label": "Good", "detail": "The available proof supports the current claim."},
             {"status": "warning", "label": "Needs attention", "detail": "Something important is incomplete, aging, or limited."},
@@ -1676,7 +1839,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             }
             for item in quick_answers
         ],
-        "technical_note": "If you need the engineering proof, open the lower technical sections or the raw evidence links.",
+        "technical_note": "Need the engineering proof? Open the lower technical sections or the raw evidence links.",
     }
 
     kpis = [

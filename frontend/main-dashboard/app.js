@@ -6,6 +6,7 @@ const heroMeta = document.getElementById("hero-meta");
 const heroSteps = document.getElementById("hero-steps");
 const modeBannerRoot = document.getElementById("mode-banner-root");
 const incidentBannerRoot = document.getElementById("incident-banner-root");
+const riskStripRoot = document.getElementById("risk-strip-root");
 const briefingRoot = document.getElementById("briefing-root");
 const proofPipelineRoot = document.getElementById("proof-pipeline-root");
 const readingGuideRoot = document.getElementById("reading-guide-root");
@@ -78,6 +79,45 @@ function formatTimestamp(value) {
   }
 
   return parsed.toLocaleString();
+}
+
+function formatBadgeValue(badge) {
+  if (!badge) {
+    return "";
+  }
+
+  if (badge.kind === "timestamp") {
+    return formatTimestamp(badge.value);
+  }
+
+  return String(badge.value || "");
+}
+
+function renderMetaBadges(items, className = "evidence-meta-row") {
+  const badges = Array.isArray(items) ? items.filter((item) => item && item.value) : [];
+  if (!badges.length) {
+    return "";
+  }
+
+  return `
+    <div class="${className}">
+      ${badges
+        .map((badge) => {
+          const classes = ["evidence-meta-chip"];
+          if (badge.status) {
+            classes.push(`evidence-meta-chip-${badge.status}`);
+          }
+
+          return `
+            <span class="${classes.join(" ")}">
+              ${badge.label ? `<span class="evidence-meta-chip-label">${escapeHtml(badge.label)}</span>` : ""}
+              <strong>${escapeHtml(formatBadgeValue(badge))}</strong>
+            </span>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
 }
 
 function renderHero(payload) {
@@ -199,6 +239,7 @@ function renderSpotlight(item, className = "spotlight-card") {
       </div>
       <h3>${escapeHtml(item.display_title || item.title || "")}</h3>
       <p class="record-detail">${escapeHtml(item.display_detail || item.detail || "")}</p>
+      ${renderMetaBadges(item.display_meta_badges || item.meta_badges, "evidence-meta-row spotlight-meta-row")}
       ${renderFieldGrid(item.display_fields || item.fields)}
     </${item.href ? "a" : "article"}>
   `;
@@ -219,7 +260,7 @@ function renderBriefing(commandCenter) {
       <section class="command-primary-panel">
         <div class="command-primary-head">
           <p class="eyebrow">Safety summary</p>
-          <p class="record-detail">Read this first for the current decision, the latest access outcome, and the smallest set of proof links you need.</p>
+          <p class="record-detail">Read this first for the current decision and the few proof links you need.</p>
         </div>
         ${renderCards(cards, "cards-grid command-cards-grid")}
         <div class="command-primary-footer">
@@ -232,6 +273,47 @@ function renderBriefing(commandCenter) {
         ${renderSpotlight(flagshipProof, "command-focus-panel spotlight-card")}
       </div>
     </div>
+  `;
+}
+
+function renderRiskStrip(strip) {
+  if (!riskStripRoot) {
+    return;
+  }
+
+  const items = Array.isArray(strip.items) ? strip.items : [];
+  if (!items.length) {
+    riskStripRoot.innerHTML = "";
+    return;
+  }
+
+  riskStripRoot.innerHTML = `
+    <section class="risk-strip-card">
+      <div class="support-card-head">
+        <div>
+          <p class="eyebrow">${escapeHtml(strip.eyebrow || "Current risk strip")}</p>
+          <h3>${escapeHtml(strip.title || "Four signals to watch")}</h3>
+        </div>
+      </div>
+      <p class="record-detail">${escapeHtml(strip.detail || "")}</p>
+      <div class="risk-strip-grid">
+        ${items
+          .map(
+            (item) => `
+              <${item.href ? "a" : "article"} class="risk-stat-card risk-stat-${escapeHtml(item.status || "neutral")}"${linkAttributes(item.href)}>
+                <div class="card-topline">
+                  <div class="metric-label">${escapeHtml(item.display_label || item.label || "")}</div>
+                  ${renderStatusPill(item.status || "neutral", { hideNeutral: true })}
+                </div>
+                <strong class="risk-stat-value">${escapeHtml(item.display_value || item.value || "")}</strong>
+                <p class="risk-stat-detail">${escapeHtml(item.display_detail || item.detail || "")}</p>
+                ${renderMetaBadges(item.meta_badges, "evidence-meta-row risk-meta-row")}
+              </${item.href ? "a" : "article"}>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
   `;
 }
 
@@ -304,6 +386,7 @@ function renderProofPipeline(pipeline) {
         ${renderStatusPill(pipeline.status || "neutral")}
       </div>
       <p class="record-detail">${escapeHtml(pipeline.detail || "")}</p>
+      ${renderMetaBadges(pipeline.meta_badges, "evidence-meta-row pipeline-summary-meta")}
       <div class="pipeline-step-grid">
         ${steps
           .map(
@@ -315,6 +398,7 @@ function renderProofPipeline(pipeline) {
                 </div>
                 <p class="pipeline-step-label">${escapeHtml(step.label || "")}</p>
                 <strong class="pipeline-step-value">${escapeHtml(step.value || "")}</strong>
+                ${renderMetaBadges(step.meta_badges, "evidence-meta-row pipeline-step-meta")}
                 <p class="pipeline-step-detail">${escapeHtml(step.detail || "")}</p>
               </${step.href ? "a" : "article"}>
             `,
@@ -365,6 +449,7 @@ function renderCards(items, className = "cards-grid") {
                 <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(statusLabel(item.status || "neutral"))}</div>
               </div>
               <div class="metric-value">${escapeHtml(item.display_value || item.value || "")}</div>
+              ${renderMetaBadges(item.meta_badges)}
               <div class="metric-detail">${escapeHtml(item.display_detail || item.detail || "")}</div>
             </${item.href ? "a" : "article"}>
           `,
@@ -387,7 +472,7 @@ function renderKpis(paths) {
           <h3 id="kpi-title">Reviewer View And Operator Drilldown</h3>
         </div>
       </div>
-      <p class="record-detail">Use the first lane for the plain-language safety story. Use the second lane when you need raw reasons, traces, and deeper technical proof.</p>
+      <p class="record-detail">Start with the plain-language lane. Use the technical lane when you need traces and raw reasons.</p>
       <div class="audience-path-grid">
         ${(Array.isArray(paths) ? paths : [])
           .map(
@@ -434,6 +519,7 @@ function renderRecords(items) {
               </div>
               <h3>${escapeHtml(item.display_title || item.title || "")}</h3>
               <p class="record-detail">${escapeHtml(item.display_detail || item.detail || "")}</p>
+              ${renderMetaBadges(item.meta_badges)}
             </${item.href ? "a" : "article"}>
           `,
         )
@@ -496,6 +582,7 @@ function renderLinks(items, className = "link-grid") {
               </div>
               <h3>${escapeHtml(item.display_label || item.label || "")}</h3>
               <p class="link-description">${escapeHtml(item.display_description || item.description || "")}</p>
+              ${renderMetaBadges(item.meta_badges)}
             </a>
           `,
         )
@@ -769,6 +856,7 @@ function renderSources(sources) {
           </div>
           <h3>${escapeHtml(source.label || "")}</h3>
           <p class="source-description">${escapeHtml(source.description || "")}</p>
+          ${renderMetaBadges(source.meta_badges)}
         </a>
       `,
     )
@@ -881,6 +969,7 @@ async function boot() {
     renderHero(payload);
     renderModeBanner(payload.mode_banner || {});
     renderIncidentBanner(payload.command_center?.incident_banner || {});
+    renderRiskStrip(payload.command_center?.risk_strip || {});
     renderBriefing(payload.command_center || {});
     renderProofPipeline(payload.command_center?.proof_pipeline || {});
     renderReadingGuide(payload.reading_guide || {});
@@ -902,6 +991,9 @@ async function boot() {
     }
     if (incidentBannerRoot) {
       incidentBannerRoot.innerHTML = "";
+    }
+    if (riskStripRoot) {
+      riskStripRoot.innerHTML = "";
     }
     if (proofPipelineRoot) {
       proofPipelineRoot.innerHTML = "";

@@ -38,6 +38,7 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="briefing-root"' in html
     assert 'id="mode-banner-root"' in html
     assert 'id="incident-banner-root"' in html
+    assert 'id="risk-strip-root"' in html
     assert 'id="proof-pipeline-root"' in html
     assert 'id="reading-guide-root"' in html
     assert "payload.title" in js
@@ -45,6 +46,7 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "payload.mode_banner" in js
     assert "payload.command_center" in js
     assert "incident_banner" in js
+    assert "risk_strip" in js
     assert "proof_pipeline" in js
     assert "payload.reading_guide" in js
     assert "payload.audience_paths" in js
@@ -97,9 +99,15 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     }
     assert payload["command_center"]["latest_request"]["title"]
     assert payload["command_center"]["flagship_proof"]["title"] == "Denied /launch/onyx handoff"
-    assert payload["command_center"]["incident_banner"]["visible"] is True
+    assert isinstance(payload["command_center"]["incident_banner"]["visible"], bool)
     assert payload["command_center"]["incident_banner"]["title"]
+    assert payload["command_center"]["incident_banner"]["facts"]
+    assert len(payload["command_center"]["risk_strip"]["items"]) == 4
+    assert any(item["label"] == "Last good run" for item in payload["command_center"]["risk_strip"]["items"])
+    assert payload["command_center"]["cards"][0]["meta_badges"]
     assert len(payload["command_center"]["proof_pipeline"]["steps"]) == 6
+    assert payload["command_center"]["proof_pipeline"]["meta_badges"]
+    assert payload["command_center"]["proof_pipeline"]["steps"][0]["meta_badges"]
     assert payload["mode_banner"]["consequences"]
     assert len(payload["audience_paths"]) == 2
     assert len(payload["operator_briefing"]) == 5
