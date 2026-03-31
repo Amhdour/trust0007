@@ -104,7 +104,18 @@ def test_dashboard_payload_uses_shared_contract_fields() -> None:
 def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     payload = build_control_plane_dashboard()
 
-    assert payload["mode_banner"]["label"] in {"LIVE GOVERNED MODE", "DEMO / FALLBACK MODE"}
+    assert payload["mode_banner"]["label"] in {"LIVE GOVERNED MODE", "GOVERNED DEMO MODE", "DEMO FALLBACK MODE"}
+    chip_labels = {chip["display_label"] for chip in payload["mode_banner"]["chips"]}
+    assert {
+        "Proof source",
+        "Latest governed decision",
+        "Latest run posture",
+        "Live readiness",
+        "Baseline posture",
+        "Latest technical trace",
+    } <= chip_labels
+    assert "Latest governed run:" in payload["mode_banner"]["display_detail"]
+    assert "Baseline repo posture:" in payload["mode_banner"]["display_detail"]
     assert len(payload["command_center"]["cards"]) >= 4
     assert {card["id"] for card in payload["command_center"]["cards"]} >= {
         "readiness",
