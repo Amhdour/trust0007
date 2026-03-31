@@ -74,13 +74,23 @@ Behavior:
 - Records the pinned upstream ref and commit in `evidence/upstream.lock.json`.
 - Updates validation date and refresh notes so the vendored snapshot has a repo-visible refresh trail.
 
+### 6) Sync pins from local standalone upstream checkouts
+```bash
+python scripts/sync-upstream-pins-from-checkout.py
+```
+
+Behavior:
+- Attempts to fill `source_ref` and `source_commit` from local upstream git metadata when a vendored path is a standalone git checkout.
+- Skips plain vendored directories that do not carry standalone upstream git metadata in this repo.
+
 ## Recommended workflow
 1. Run bootstrap script after cloning if the overlay submodule is missing.
 2. Commit `.gitmodules` and gitlink updates if bootstrap introduced new entries.
 3. Run update script whenever you need to refresh managed overlay working trees.
 4. Use `list-upstream-groups.py` to keep optional and reference upstreams explicitly opt-in in workflow decisions.
 5. Use `record-upstream-refresh.py` whenever a vendored snapshot is intentionally updated.
-6. Run the upstream validator whenever the vendored source set or classification model changes.
+6. Run `sync-upstream-pins-from-checkout.py` when vendored paths are refreshed from standalone upstream repos.
+7. Run the upstream validator whenever the vendored source set or classification model changes.
 
 ## Notes
 - `upstream/*` is treated as third-party code.

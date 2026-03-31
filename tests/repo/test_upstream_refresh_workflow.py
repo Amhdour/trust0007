@@ -56,3 +56,26 @@ def test_record_upstream_refresh_script_updates_lock_copy() -> None:
     assert envoy["source_ref"] == "v1.99.0"
     assert envoy["source_commit"] == "deadbeef12345678"
     assert envoy["refresh_notes"] == "validated ingress config"
+
+
+def test_sync_upstream_pins_script_handles_plain_vendored_directories() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        lock_copy = Path(tmpdir) / "upstream.lock.json"
+        lock_copy.write_text((ROOT / "evidence/upstream.lock.json").read_text(encoding="utf-8"), encoding="utf-8")
+
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/sync-upstream-pins-from-checkout.py",
+                "--lock-path",
+                str(lock_copy),
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert "Updated source pins for" in completed.stdout
+    assert "Skipped components without standalone git metadata:" in completed.stdout

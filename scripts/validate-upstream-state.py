@@ -61,6 +61,16 @@ def main() -> int:
         "Opt-in checkout paths: "
         f"{len(lock_manifest.get('audit', {}).get('opt_in_checkout_paths', []))}"
     )
+    print(
+        "Pinned source snapshots: "
+        f"{lock_manifest.get('audit', {}).get('pinned_source_count', 0)} / "
+        f"{lock_manifest.get('component_count', 0)}"
+    )
+    unpinned = list(lock_manifest.get("audit", {}).get("unpinned_source_components", []))
+    if unpinned:
+        print("Unpinned source snapshots remain recorded in the lock manifest for manual refresh capture:")
+        for name in unpinned[:5]:
+            print(f"- {name}")
     return 0
 
 

@@ -214,6 +214,16 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
         for component in components
         if str(component.get("integration_decision", "")).strip() == "platform_only"
     )
+    pinned_source_paths = sorted(
+        str(component.get("upstream_path", "")).strip()
+        for component in components
+        if str(component.get("source_ref", "")).strip() and str(component.get("source_commit", "")).strip()
+    )
+    unpinned_source_components = sorted(
+        str(component.get("component_name", "")).strip()
+        for component in components
+        if not str(component.get("source_ref", "")).strip() or not str(component.get("source_commit", "")).strip()
+    )
     checkout_policy_mismatches = []
     integration_decision_mismatches = []
     for component in components:
@@ -272,6 +282,12 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
         "default_paths": default_checkout_paths,
         "opt_in_paths": opt_in_checkout_paths,
     }
+    enriched_lock["pin_coverage"] = {
+        "pinned_paths": pinned_source_paths,
+        "unpinned_components": unpinned_source_components,
+        "pinned_count": len(pinned_source_paths),
+        "total_count": len(components),
+    }
     enriched_lock["audit"] = {
         "lock_path": UPSTREAM_SOURCE_LOCK_PATH,
         "component_paths_in_repo": component_paths,
@@ -285,6 +301,10 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
         "default_checkout_paths": default_checkout_paths,
         "opt_in_checkout_paths": opt_in_checkout_paths,
         "platform_only_components": platform_only_components,
+        "pinned_source_paths": pinned_source_paths,
+        "unpinned_source_components": unpinned_source_components,
+        "pinned_source_count": len(pinned_source_paths),
+        "source_pins_complete": len(pinned_source_paths) == len(components),
         "checkout_policy_mismatches": checkout_policy_mismatches,
         "checkout_policies_consistent": not checkout_policy_mismatches,
         "integration_decision_mismatches": integration_decision_mismatches,
@@ -296,8 +316,6 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
 
 def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
     inventory = read_json(repo_root(root) / UPSTREAM_USAGE_INVENTORY_PATH)
-    components = list(inventory.get("components", []))
-    component_paths = list_upstream_component_paths(root)
     lock_manifest = load_upstream_source_lock(root)
     lock_components = list(lock_manifest.get("components", []))
     lock_by_path = {
@@ -305,6 +323,28 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
         for component in lock_components
         if str(component.get("upstream_path", "")).strip()
     }
+    components = []
+    for component in list(inventory.get("components", [])):
+        component_path = str(component.get("upstream_path", "")).strip()
+        lock_component = dict(lock_by_path.get(component_path, {}))
+        merged_component = dict(component)
+        for field in (
+            "source_repo",
+            "source_owner",
+            "integration_owner",
+            "tracked_as",
+            "checkout_policy",
+            "integration_decision",
+            "source_ref",
+            "source_commit",
+            "refresh_policy",
+            "refresh_notes",
+            "last_validated",
+        ):
+            if field in lock_component:
+                merged_component[field] = lock_component[field]
+        components.append(merged_component)
+    component_paths = list_upstream_component_paths(root)
 
     path_to_components: dict[str, list[dict[str, Any]]] = {}
     invalid_components: list[str] = []
@@ -374,6 +414,7 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
     duplicate_paths = sorted(path for path, mapped in path_to_components.items() if len(mapped) > 1)
 
     enriched_inventory = dict(inventory)
+    enriched_inventory["components"] = components
     enriched_inventory["component_count"] = len(components)
     enriched_inventory["upstream_paths"] = component_paths
     enriched_inventory["classification_counts"] = classification_counts
@@ -384,6 +425,9 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
         "default_checkout_paths": list(lock_manifest.get("checkout_groups", {}).get("default_paths", [])),
         "opt_in_checkout_paths": list(lock_manifest.get("checkout_groups", {}).get("opt_in_paths", [])),
         "platform_only_components": list(lock_manifest.get("audit", {}).get("platform_only_components", [])),
+        "pinned_source_count": int(lock_manifest.get("pin_coverage", {}).get("pinned_count", 0)),
+        "total_source_count": int(lock_manifest.get("pin_coverage", {}).get("total_count", 0)),
+        "unpinned_source_components": list(lock_manifest.get("pin_coverage", {}).get("unpinned_components", [])),
     }
     enriched_inventory["audit"] = {
         "inventory_path": UPSTREAM_USAGE_INVENTORY_PATH,
@@ -412,6 +456,9 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
         "managed_submodules": list(lock_manifest.get("managed_submodules", [])),
         "default_checkout_paths": list(lock_manifest.get("audit", {}).get("default_checkout_paths", [])),
         "opt_in_checkout_paths": list(lock_manifest.get("audit", {}).get("opt_in_checkout_paths", [])),
+        "pinned_source_count": int(lock_manifest.get("audit", {}).get("pinned_source_count", 0)),
+        "source_pins_complete": bool(lock_manifest.get("audit", {}).get("source_pins_complete")),
+        "unpinned_source_components": list(lock_manifest.get("audit", {}).get("unpinned_source_components", [])),
         "checkout_policies_consistent": bool(lock_manifest.get("audit", {}).get("checkout_policies_consistent")),
         "integration_decisions_consistent": bool(lock_manifest.get("audit", {}).get("integration_decisions_consistent")),
         "envoy_platform_only_locked": bool(lock_manifest.get("audit", {}).get("envoy_platform_only_locked")),

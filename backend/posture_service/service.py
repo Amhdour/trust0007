@@ -849,11 +849,22 @@ def _upstream_table_rows(components: list[dict[str, Any]]) -> list[dict[str, str
     for component in components:
         signals = _string_list(component.get("governance_signals"))
         evidence = _string_list(component.get("evidence_artifacts"))
+        source_ref = str(component.get("source_ref", "")).strip()
+        source_commit = str(component.get("source_commit", "")).strip()
+        source_pin = (
+            f"{source_ref} @ {source_commit[:8]}"
+            if source_ref and source_commit
+            else "Pin not recorded"
+        )
         rows.append(
             {
                 "component": str(component.get("component_name", "Component")),
                 "classification": str(component.get("classification", "reference_only")),
                 "path_status": str(component.get("runtime_path_status", "reference")),
+                "decision": str(component.get("integration_decision", "reference_only")).replace("_", " "),
+                "checkout": str(component.get("checkout_policy", "opt_in")).replace("_", "-"),
+                "validated": str(component.get("last_validated", "")) or "Not recorded",
+                "source_pin": source_pin,
                 "location": str(component.get("runtime_location", "Runtime location not documented.")),
                 "signal": signals[0] if signals else "No dedicated governance signal yet.",
                 "evidence": evidence[0] if evidence else "No evidence artifact listed.",
@@ -872,12 +883,21 @@ def _upstream_record_items(components: list[dict[str, Any]]) -> list[dict[str, s
                 (
                     str(component.get("classification", "reference_only")),
                     str(component.get("runtime_path_status", "reference")),
+                    str(component.get("integration_decision", "reference_only")).replace("_", " "),
                     str(component.get("recommended_action", "review classification")),
                 )
             ),
             detail=" ".join(
                 part
                 for part in (
+                    f"Checkout: {str(component.get('checkout_policy', 'opt_in')).replace('_', '-')}.",
+                    f"Last validated: {str(component.get('last_validated', '') or 'Not recorded')}.",
+                    (
+                        f"Source pin: {str(component.get('source_ref', '')).strip()} @ "
+                        f"{str(component.get('source_commit', '')).strip()[:8]}."
+                        if str(component.get("source_ref", "")).strip() and str(component.get("source_commit", "")).strip()
+                        else "Source pin: not recorded yet."
+                    ),
                     f"Why it stays: {str(component.get('necessity_rationale', '')).strip()}",
                     f"Current gap: {str(component.get('missing_integration_depth', '')).strip()}",
                     f"Removal impact: {str(component.get('removal_impact', '')).strip()}",
@@ -904,6 +924,11 @@ def _upstream_audit_cards(inventory: dict[str, Any]) -> list[dict[str, str]]:
     total_paths = len(audit.get("component_paths_in_repo", []))
     coverage_status = "healthy" if audit.get("inventory_covers_all_upstreams") else "critical"
     dashboard_visible_count = int(audit.get("dashboard_visible_count", 0))
+    pinned_source_count = int(audit.get("pinned_source_count", 0))
+    total_source_count = len(components)
+    default_checkout_count = len(audit.get("default_checkout_paths", []))
+    opt_in_checkout_count = len(audit.get("opt_in_checkout_paths", []))
+    platform_only_count = len(audit.get("platform_only_components", []))
 
     return [
         _card("Used now", str(counts.get("used_now", 0)), "healthy", "Components that currently strengthen the repo's real runtime or evidence path.", "#upstream-posture"),
@@ -911,6 +936,10 @@ def _upstream_audit_cards(inventory: dict[str, Any]) -> list[dict[str, str]]:
         _card("Optional / future", str(counts.get("optional_future", 0)), "neutral", "Components intentionally kept out of active architecture claims until they produce reviewer-visible outcomes.", "#upstream-posture"),
         _card("Reference only", str(counts.get("reference_only", 0)), "neutral", "Vendored snapshots retained for compatibility or implementation reference only.", "#upstream-posture"),
         _card("Inventory coverage", f"{covered} / {total_paths or len(components)}", coverage_status, "Every vendored upstream path should be classified exactly once.", "#upstream-posture"),
+        _card("Pinned sources", f"{pinned_source_count} / {total_source_count}", "healthy" if audit.get("source_pins_complete") else "warning", "Pinned upstream refs and commits recorded in the lock manifest.", "#upstream-posture"),
+        _card("Default checkout", str(default_checkout_count), "healthy", "Vendored upstreams expected to stay in the default checkout group.", "#upstream-posture"),
+        _card("Opt-in checkout", str(opt_in_checkout_count), "neutral", "Optional and reference-only upstreams explicitly treated as opt-in.", "#upstream-posture"),
+        _card("Platform-only", str(platform_only_count), "neutral", "Components intentionally kept off the mandatory governed path until deeper proof exists.", "#upstream-posture"),
         _card("Dashboard-visible signals", str(dashboard_visible_count), "healthy" if dashboard_visible_count else "warning", "Components with a reviewer-visible posture, evidence, or activity signal on the homepage.", "#upstream-posture"),
         _card("Mandatory path components", str(runtime_path_counts.get("mandatory", 0)), "healthy", "Components the repo currently treats as part of the proved runtime or evidence path.", "#upstream-posture"),
         _card("Supporting path components", str(runtime_path_counts.get("supporting", 0)), "neutral", "Components that strengthen the platform but are not yet proven as mandatory request-path dependencies.", "#upstream-posture"),
@@ -2524,7 +2553,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "items": [
                         item
                         for item in _upstream_audit_cards(upstream_inventory)
-                        if item["label"] in {"Used now", "Partially used", "Inventory coverage", "Mandatory path components"}
+                        if item["label"] in {"Used now", "Partially used", "Inventory coverage", "Pinned sources", "Mandatory path components"}
                     ],
                 },
                 {
@@ -2534,13 +2563,17 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 },
                 {
                     "type": "table",
-                    "title": "Top homepage components",
+                    "title": "Top homepage components and lifecycle",
                     "collapsed": True,
                     "summary": "Open upstream component slice (top 5 rows)",
                     "columns": [
                         {"key": "component", "label": "Component"},
                         {"key": "classification", "label": "Classification"},
                         {"key": "path_status", "label": "Path status"},
+                        {"key": "decision", "label": "Lifecycle decision"},
+                        {"key": "checkout", "label": "Checkout"},
+                        {"key": "validated", "label": "Last validated"},
+                        {"key": "source_pin", "label": "Source pin"},
                         {"key": "location", "label": "Where it sits"},
                         {"key": "signal", "label": "Governance signal"},
                         {"key": "evidence", "label": "Evidence artifact"},
@@ -2556,7 +2589,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _link("Full upstream inventory", _dashboard_url("/api/control-plane/upstream-usage"), "Full machine-readable component inventory beyond the homepage slice.", "healthy", display_label="Full connected-system inventory", display_description="Open the complete machine-readable inventory."),
                         _link("Upstream usage API", _dashboard_url("/api/control-plane/upstream-usage"), "Machine-readable upstream inventory exposed by the control plane.", "healthy", display_label="Connected-system API", display_description="Open the technical API view of the component inventory."),
                         _link("Upstream usage inventory", _raw("evidence/upstream_usage.inventory.json"), "Repo-owned component inventory with classification, signals, evidence, and removal impact.", "healthy", display_label="Inventory file", display_description="Open the raw inventory file behind this section."),
+                        _link("Upstream source lock", _raw("evidence/upstream.lock.json"), "Checkout/source-management lock with checkout policy, validation date, lifecycle decision, and source-pin fields.", "healthy", display_label="Lifecycle lock file", display_description="Open the raw lock file for vendored source tracking."),
                         _link("Upstream usage matrix", _raw("docs/upstream-usage-matrix.md"), "Reviewer-facing explanation of what is active, partial, optional, or reference-only.", "neutral", display_label="How connected systems are classified", display_description="Open the explanation of active, supporting, optional, and reference-only components."),
+                        _link("Upstream tracking guide", _raw("docs/submodules.md"), "Repo checkout guidance for vendored upstreams, overlay submodules, pin recording, and validation.", "neutral", display_label="Tracking guide", display_description="Open the operational guide for vendored upstream tracking."),
                     ],
                 },
             ],

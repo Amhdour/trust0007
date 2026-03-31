@@ -30,6 +30,10 @@ def test_upstream_inventory_components_include_required_reviewer_fields() -> Non
         assert component["evidence_artifacts"]
         assert component["missing_integration_depth"]
         assert component["removal_impact"]
+        assert component["checkout_policy"] in {"default", "opt_in"}
+        assert component["integration_decision"] in {"active_now", "platform_only", "opt_in_only", "reference_only"}
+        assert "source_ref" in component
+        assert "source_commit" in component
 
 
 def test_upstream_source_lock_covers_every_vendored_component_once() -> None:
@@ -44,6 +48,8 @@ def test_upstream_source_lock_covers_every_vendored_component_once() -> None:
     assert lock_manifest["audit"]["checkout_policies_consistent"] is True
     assert lock_manifest["audit"]["integration_decisions_consistent"] is True
     assert lock_manifest["audit"]["envoy_platform_only_locked"] is True
+    assert lock_manifest["pin_coverage"]["total_count"] == len(repo_paths)
+    assert isinstance(lock_manifest["pin_coverage"]["pinned_count"], int)
 
 
 def test_upstream_inventory_and_lock_manifest_stay_aligned() -> None:
@@ -53,6 +59,8 @@ def test_upstream_inventory_and_lock_manifest_stay_aligned() -> None:
     assert inventory["tracking_model"]["managed_submodules"] == ["overlays/myStarterKit"]
     assert inventory["tracking_model"]["opt_in_checkout_paths"]
     assert "Envoy" in inventory["tracking_model"]["platform_only_components"]
+    assert isinstance(inventory["tracking_model"]["pinned_source_count"], int)
+    assert inventory["tracking_model"]["total_source_count"] == len(list_upstream_component_paths())
     assert inventory["audit"]["lock_consistent"] is True
     assert inventory["audit"]["checkout_policies_consistent"] is True
     assert inventory["audit"]["integration_decisions_consistent"] is True
