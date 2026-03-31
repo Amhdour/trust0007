@@ -30,105 +30,105 @@
     {
       "id": "overview",
       "title": "Big Picture",
-      "description": "A plain-language summary of the current safety state, the strongest proof, and where to look next.",
+      "description": "Current safety state, strongest proof, and where to drill next.",
       "group": "reviewer",
       "group_label": "Plain-Language Review"
     },
     {
       "id": "governed-requests",
       "title": "Recent Requests",
-      "description": "Shows the latest requests the system checked, using safe previews instead of raw prompts.",
+      "description": "Latest checked requests, using safe previews instead of raw prompts.",
       "group": "reviewer",
       "group_label": "Plain-Language Review"
     },
     {
       "id": "blocked-actions",
       "title": "What The System Stopped",
-      "description": "Shows requests or actions the system stopped to prevent unsafe, unauthorized, or unsupported behavior.",
+      "description": "Requests or actions stopped to prevent unsafe or unauthorized behavior.",
       "group": "reviewer",
       "group_label": "Plain-Language Review"
     },
     {
       "id": "launch-gate",
       "title": "Safety Check Before Use",
-      "description": "Shows whether the system is safe enough to use now, what still needs fixing, and what proof supports that decision.",
+      "description": "Whether the system is safe to use now, what still blocks it, and why.",
       "group": "reviewer",
       "group_label": "Plain-Language Review"
     },
     {
       "id": "entry-points",
       "title": "AI System Access",
-      "description": "Shows when access to the AI system was allowed or blocked, and which proof supports that decision.",
+      "description": "When AI access was allowed or blocked, and the proof behind that decision.",
       "group": "reviewer",
       "group_label": "Plain-Language Review"
     },
     {
       "id": "evidence-integrity",
       "title": "How Reliable The Proof Is",
-      "description": "Shows whether the proof is present, up to date, and complete enough to trust.",
+      "description": "Whether the proof is present, current, and complete enough to trust.",
       "group": "reviewer",
       "group_label": "Plain-Language Review"
     },
     {
       "id": "upstream-posture",
       "title": "Connected Parts Of The System",
-      "description": "Shows which connected components are actively part of the proven path today and which are only supporting, optional, or reference material.",
+      "description": "Which connected components are on the proven path today and which are supporting or reference-only.",
       "group": "reviewer",
       "group_label": "Plain-Language Review"
     },
     {
       "id": "identity-session",
       "title": "Who Is Trying To Use It",
-      "description": "Shows identity and session checks that help determine who is allowed to reach each protected surface.",
+      "description": "Identity and session checks behind protected access.",
       "group": "operator",
       "group_label": "Technical Details"
     },
     {
       "id": "policy-enforcement",
       "title": "Rules Being Applied",
-      "description": "Shows which rules were applied, what they blocked, and the technical reasons behind those decisions.",
+      "description": "Rules applied, what they blocked, and why.",
       "group": "operator",
       "group_label": "Technical Details"
     },
     {
       "id": "retrieval-boundaries",
       "title": "What Information It Can Access",
-      "description": "Shows what data the AI is allowed to access and whether any access was refused.",
+      "description": "What data the AI can access and what was refused.",
       "group": "operator",
       "group_label": "Technical Details"
     },
     {
       "id": "secret-access",
       "title": "Protected Keys And Passwords",
-      "description": "Shows whether protected credentials were needed and whether the system handled them safely.",
+      "description": "Whether protected credentials were needed and handled safely.",
       "group": "operator",
       "group_label": "Technical Details"
     },
     {
       "id": "tool-mcp-governance",
       "title": "What Actions The AI Can Take",
-      "description": "Shows which actions the AI is allowed to take, which ones were blocked, and which need approval.",
+      "description": "Which AI actions are allowed, blocked, or approval-gated.",
       "group": "operator",
       "group_label": "Technical Details"
     },
     {
       "id": "audit-replay",
       "title": "What Happened And How We Review It",
-      "description": "Shows what was recorded, what can be replayed or inspected later, and where the detailed proof lives.",
+      "description": "What was recorded, what can be replayed, and where the detailed proof lives.",
       "group": "operator",
       "group_label": "Technical Details"
     },
     {
       "id": "trace-correlation",
       "title": "Did We Follow The Full Process?",
-      "description": "Shows whether the full checked process was followed from start to finish and tied together correctly.",
+      "description": "Whether the full checked process stayed tied together from start to finish.",
       "group": "operator",
       "group_label": "Technical Details"
     },
     {
       "id": "asset-coverage",
       "title": "What The System Is Watching",
-      "description": "Shows the parts of the product, data, tools, and users that are currently under protection.",
+      "description": "The product, data, tools, and users currently under protection.",
       "group": "operator",
       "group_label": "Technical Details"
     }

@@ -99,10 +99,13 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     }
     assert payload["command_center"]["latest_request"]["title"]
     assert payload["command_center"]["flagship_proof"]["title"] == "Denied /launch/onyx handoff"
-    assert isinstance(payload["command_center"]["incident_banner"]["visible"], bool)
+    assert payload["command_center"]["incident_banner"]["visible"] is True
+    assert payload["command_center"]["incident_banner"]["status"] in {"healthy", "warning", "critical"}
     assert payload["command_center"]["incident_banner"]["title"]
     assert payload["command_center"]["incident_banner"]["facts"]
     assert len(payload["command_center"]["risk_strip"]["items"]) == 4
+    assert payload["command_center"]["risk_strip"]["items"][0]["trend"]["label"]
+    assert payload["command_center"]["risk_strip"]["items"][1]["trend"]["label"]
     assert any(item["label"] == "Last good run" for item in payload["command_center"]["risk_strip"]["items"])
     assert payload["command_center"]["cards"][0]["meta_badges"]
     assert len(payload["command_center"]["proof_pipeline"]["steps"]) == 6

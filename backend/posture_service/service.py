@@ -220,6 +220,74 @@ def _timestamp_badges(
     ]
 
 
+def _trend_summary(
+    current: int,
+    previous: int | None,
+    *,
+    lower_is_better: bool,
+    context: str,
+    baseline_label: str,
+    worse_status: str = "warning",
+) -> dict[str, str]:
+    if previous is None:
+        return {
+            "label": "No earlier baseline",
+            "detail": f"No earlier {baseline_label} is available yet.",
+            "status": "neutral",
+        }
+
+    delta = current - previous
+    if delta == 0:
+        return {
+            "label": f"Flat vs previous {context}",
+            "detail": f"Previous {baseline_label}: {previous}.",
+            "status": "healthy" if current == 0 else "neutral",
+        }
+
+    improved = delta < 0 if lower_is_better else delta > 0
+    direction = "Down" if delta < 0 else "Up"
+    return {
+        "label": f"{direction} {abs(delta)} vs previous {context}",
+        "detail": f"Previous {baseline_label}: {previous}.",
+        "status": "healthy" if improved else worse_status,
+    }
+
+
+def _launch_gate_run_metrics(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+
+    document = read_json(path)
+    if not isinstance(document, dict):
+        return {}
+
+    machine = document.get("machine", {})
+    if not isinstance(machine, dict):
+        machine = {}
+    governed_request = document.get("governed_request", {})
+    if not isinstance(governed_request, dict):
+        governed_request = {}
+
+    return {
+        "controls_failed": len(_string_list(machine.get("controls_failed", []))),
+        "missing_evidence": len(_string_list(machine.get("missing_evidence", []))),
+        "decision": str(machine.get("decision") or ""),
+        "timestamp": str(governed_request.get("timestamp") or _artifact_timestamp(path)),
+    }
+
+
+def _artifact_gap_count(paths: list[Path]) -> int:
+    gap_count = 0
+    for path in paths:
+        if not path.exists():
+            gap_count += 1
+            continue
+        freshness_status, _ = _format_age_bucket(_artifact_timestamp(path))
+        if freshness_status == "critical":
+            gap_count += 1
+    return gap_count
+
+
 def _payload(event: dict[str, Any]) -> dict[str, Any]:
     payload = event.get("payload", {})
     return payload if isinstance(payload, dict) else {}
@@ -1294,6 +1362,73 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     latest_allowed_request = next((item for item in governed_request_feed if bool(item.get("handoff_allowed"))), {})
     last_good_run_timestamp = str(latest_allowed_request.get("timestamp") or "")
     last_good_run_trace = str(latest_allowed_request.get("trace_id") or "")
+    history_root = resolved_root / "overlays/myStarterKit/artifacts/governed-request-history"
+    recent_window = governed_request_feed[:5]
+    previous_window = governed_request_feed[5:10]
+    recent_blocked_handoffs = sum(1 for item in recent_window if not bool(item.get("handoff_allowed")))
+    previous_blocked_handoffs = (
+        sum(1 for item in previous_window if not bool(item.get("handoff_allowed")))
+        if previous_window
+        else None
+    )
+    previous_trace_id = ""
+    previous_trace_timestamp = ""
+    previous_launch_gate_metrics: dict[str, Any] = {}
+    for item in governed_request_feed:
+        candidate_trace_id = str(item.get("trace_id") or "")
+        if not candidate_trace_id or candidate_trace_id == latest_trace_id:
+            continue
+        candidate_launch_gate = history_root / candidate_trace_id / "launch-gate-result.json"
+        if not candidate_launch_gate.exists():
+            continue
+        previous_trace_id = candidate_trace_id
+        previous_launch_gate_metrics = _launch_gate_run_metrics(candidate_launch_gate)
+        previous_trace_timestamp = str(previous_launch_gate_metrics.get("timestamp") or _artifact_timestamp(candidate_launch_gate))
+        break
+    core_artifact_names = [
+        "governed-flow-summary.json",
+        "identity-evidence.json",
+        "policy-evidence.json",
+        "retrieval-evidence.json",
+        "secret-evidence.json",
+        "trace-correlation.json",
+        "launch-gate-result.json",
+    ]
+    current_core_artifact_paths = [(resolved_root / "overlays/myStarterKit/artifacts" / name) for name in core_artifact_names]
+    current_core_proof_gap_count = _artifact_gap_count(current_core_artifact_paths)
+    previous_core_proof_gap_count = (
+        _artifact_gap_count([(history_root / previous_trace_id / name) for name in core_artifact_names])
+        if previous_trace_id
+        else None
+    )
+    blocked_handoff_trend = _trend_summary(
+        recent_blocked_handoffs,
+        previous_blocked_handoffs,
+        lower_is_better=True,
+        context="window",
+        baseline_label="5-request window",
+        worse_status="critical",
+    )
+    failing_controls_trend = _trend_summary(
+        len(failing_controls),
+        (
+            int(previous_launch_gate_metrics.get("controls_failed", 0))
+            if previous_launch_gate_metrics
+            else None
+        ),
+        lower_is_better=True,
+        context="run",
+        baseline_label="launch run",
+        worse_status="critical",
+    )
+    proof_gap_trend = _trend_summary(
+        current_core_proof_gap_count,
+        previous_core_proof_gap_count,
+        lower_is_better=True,
+        context="run",
+        baseline_label="runtime proof set",
+        worse_status="warning",
+    )
     if last_good_run_timestamp:
         last_good_run_status, _ = _format_age_bucket(last_good_run_timestamp)
         last_good_run_value = _timestamp_display(last_good_run_timestamp)
@@ -1509,9 +1644,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         )
     )
     incident_status = "critical" if not latest_handoff_allowed else _status_from_launch(launch_summary["status"])
-    incident_visible = incident_status in {"critical", "warning"} and (
-        not latest_handoff_allowed or incident_status == "critical"
-    )
+    if incident_status == "healthy" and (
+        artifact_counts["stale"]
+        or artifact_counts["missing"]
+        or not live_evidence_mode
+    ):
+        incident_status = "warning"
     incident_main_blocker = (
         f"Missing proof: {', '.join(latest_missing_evidence)}"
         if latest_missing_evidence
@@ -1520,16 +1658,43 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             or _humanize_reason(latest_request_reason)
         )
     )
-    incident_summary = (
-        "The latest governed request did not reach the AI runtime because a mandatory proof or control failed."
-        if not latest_handoff_allowed
-        else "The governed path is showing a non-ready state and should not be treated as launch-ready until the blocker is fixed."
-    )
-    incident_title = (
-        "AI access is blocked right now"
-        if not latest_handoff_allowed
-        else "Safety posture needs attention right now"
-    )
+    incident_visible = True
+    if incident_status == "healthy":
+        incident_eyebrow = "Why the page is green right now"
+        incident_title = "Current checks look healthy"
+        incident_summary = "The latest governed request was allowed, the launch check is GO, and the key proof is current enough to trust."
+        incident_detail = (
+            f"Latest approved trace {latest_trace_id or 'available'} shows a governed handoff with "
+            f"{artifact_counts['stale']} stale and {artifact_counts['missing']} missing proof item(s)."
+        )
+        incident_signal_value = "Approved handoff with current proof"
+        incident_actions = [
+            _link("Open latest technical summary", latest_governed_flow_href, "Inspect the latest governed-flow summary behind the healthy state.", "healthy"),
+            _link("Open approved example", _raw(INSPECTABLE_ALLOWED_FLOW), "Open the strongest approved governed handoff proof path.", "healthy"),
+            _link("Open safety check", "#launch-gate", "Jump straight to the launch and readiness evidence.", "healthy"),
+        ]
+    elif not latest_handoff_allowed:
+        incident_eyebrow = "Why the page is red right now"
+        incident_title = "AI access is blocked right now"
+        incident_summary = "The latest governed request did not reach the AI runtime because a mandatory proof or control failed."
+        incident_detail = incident_main_blocker
+        incident_signal_value = incident_main_blocker or "No primary blocker recorded"
+        incident_actions = [
+            _link("Open latest technical summary", latest_governed_flow_href, "Inspect the latest governed-flow summary tied to this blocked state.", "critical"),
+            _link("Open safety check", "#launch-gate", "Jump straight to the launch and readiness evidence.", "critical"),
+            _link("Open blocked example", flagship_denied["bundle_href"], "Open the strongest blocked-access proof path.", "critical"),
+        ]
+    else:
+        incident_eyebrow = "Why the page is not green yet"
+        incident_title = "Current safety checks still need attention"
+        incident_summary = "The latest handoff passed, but the posture still has at least one issue that keeps this page out of a fully healthy state."
+        incident_detail = incident_main_blocker
+        incident_signal_value = incident_main_blocker or "No primary blocker recorded"
+        incident_actions = [
+            _link("Open latest technical summary", latest_governed_flow_href, "Inspect the latest governed-flow summary behind this warning state.", "warning"),
+            _link("Open safety check", "#launch-gate", "Jump straight to the launch and readiness evidence.", "warning"),
+            _link("Open approved example", _raw(INSPECTABLE_ALLOWED_FLOW), "Open the latest approved governed handoff proof path.", "healthy"),
+        ]
     flagship_proof = _spotlight(
         eyebrow="Flagship proof",
         title="Denied /launch/onyx handoff",
@@ -1673,10 +1838,14 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "items": [
                 _card(
                     "Blocked handoffs",
-                    str(denied_request_count),
-                    "critical" if denied_request_count else "healthy",
-                    "Recent governed requests that stayed blocked.",
+                    str(recent_blocked_handoffs),
+                    "critical" if recent_blocked_handoffs else ("warning" if denied_request_count else "healthy"),
+                    f"Blocked handoffs in the latest {len(recent_window) or 1} checked request(s).",
                     "#blocked-actions",
+                    trend=blocked_handoff_trend,
+                    meta_badges=[
+                        {"label": "Retained feed", "value": f"{denied_request_count} blocked total"},
+                    ],
                 ),
                 _card(
                     "Failing controls",
@@ -1684,13 +1853,28 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "critical" if failing_controls else "healthy",
                     "Launch or readiness checks still not fully passing.",
                     "#launch-gate",
+                    trend=failing_controls_trend,
+                    meta_badges=(
+                        _timestamp_badges(
+                            timestamp=previous_trace_timestamp,
+                            evidence_mode="live" if live_evidence_mode else "demo",
+                            provenance="runtime-generated",
+                            label="Previous run",
+                        )
+                        if previous_trace_timestamp
+                        else []
+                    ),
                 ),
                 _card(
                     "Stale / missing proof",
                     f"{artifact_counts['stale']} / {artifact_counts['missing']}",
                     "warning" if artifact_counts["stale"] or artifact_counts["missing"] else "healthy",
-                    "Counts of stale and missing evidence items.",
+                    "Current stale and missing counts across the reviewer-visible proof set.",
                     "#evidence-integrity",
+                    trend=proof_gap_trend,
+                    meta_badges=[
+                        {"label": "Core runtime proof", "value": f"{current_core_proof_gap_count} stale or missing", "status": "warning" if current_core_proof_gap_count else "healthy"},
+                    ],
                 ),
                 _card(
                     "Last good run",
@@ -1699,27 +1883,35 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     last_good_run_detail,
                     "#governed-requests",
                     meta_badges=last_good_run_badges,
+                    trend=_trend_summary(
+                        sum(1 for item in recent_window if bool(item.get("handoff_allowed"))),
+                        (
+                            sum(1 for item in previous_window if bool(item.get("handoff_allowed")))
+                            if previous_window
+                            else None
+                        ),
+                        lower_is_better=False,
+                        context="window",
+                        baseline_label="5-request window",
+                    ),
                 ),
             ],
         },
         "incident_banner": {
             "visible": incident_visible,
             "status": incident_status,
-            "eyebrow": "Why the page is red right now",
+            "eyebrow": incident_eyebrow,
             "title": incident_title,
             "summary": incident_summary,
-            "detail": incident_main_blocker,
+            "detail": incident_detail,
             "facts": [
+                {"label": "Readiness", "value": _readiness_display(launch_summary["status"])},
                 {"label": "Latest access decision", "value": _allow_deny_display(latest_handoff_allowed)},
-                {"label": "Main blocker", "value": incident_main_blocker or "No primary blocker recorded"},
+                {"label": "Main signal", "value": incident_signal_value},
                 {"label": "Latest trace", "value": latest_trace_id or "Missing"},
                 {"label": "Proof mode", "value": "Live evidence" if live_evidence_mode else "Demo or local evidence"},
             ],
-            "actions": [
-                _link("Open latest technical summary", latest_governed_flow_href, "Inspect the latest governed-flow summary tied to this blocked or degraded state.", incident_status),
-                _link("Open safety check", "#launch-gate", "Jump straight to the launch and readiness evidence.", incident_status),
-                _link("Open blocked example", flagship_denied["bundle_href"], "Open the strongest blocked-access proof path.", "critical"),
-            ],
+            "actions": incident_actions,
         },
         "proof_pipeline": {
             "title": "Latest governed path",

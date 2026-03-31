@@ -415,6 +415,12 @@ h3 {
   box-shadow: inset 0 0 0 1px rgba(157, 45, 45, 0.08);
 }
 
+.incident-banner-healthy {
+  border-color: rgba(15, 108, 94, 0.18);
+  background: linear-gradient(135deg, rgba(15, 108, 94, 0.12), rgba(246, 255, 251, 0.98));
+  box-shadow: inset 0 0 0 1px rgba(15, 108, 94, 0.08);
+}
+
 .incident-banner-warning {
   border-color: rgba(173, 93, 22, 0.2);
   background: linear-gradient(135deg, rgba(173, 93, 22, 0.12), rgba(255, 249, 242, 0.98));
@@ -462,6 +468,7 @@ h3 {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   margin-top: 14px;
+  align-items: stretch;
 }
 
 .risk-stat-card {
@@ -502,6 +509,51 @@ h3 {
   margin: 10px 0 0;
   color: var(--muted);
   line-height: 1.55;
+}
+
+.trend-summary {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(16, 33, 45, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.trend-summary-label {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trend-summary strong {
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.trend-summary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.trend-summary-healthy {
+  border-color: rgba(15, 108, 94, 0.16);
+  background: rgba(15, 108, 94, 0.08);
+}
+
+.trend-summary-warning {
+  border-color: rgba(173, 93, 22, 0.18);
+  background: rgba(173, 93, 22, 0.08);
+}
+
+.trend-summary-critical {
+  border-color: rgba(157, 45, 45, 0.18);
+  background: rgba(157, 45, 45, 0.08);
 }
 
 .incident-fact-card {
@@ -547,6 +599,11 @@ h3 {
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
+}
+
+.section-head .section-description,
+.tab-strip-head .section-description {
+  max-width: 58ch;
 }
 
 .reading-guide-grid {
@@ -694,6 +751,7 @@ h3 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
+  align-items: stretch;
 }
 
 .pipeline-step-card {
@@ -855,6 +913,18 @@ h3 {
   transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
+.metric-card,
+.record-card,
+.link-card,
+.source-card,
+.risk-stat-card,
+.pipeline-step-card,
+.spotlight-card,
+.audience-path-card,
+.guide-question-card {
+  height: 100%;
+}
+
 .briefing-card {
   padding: 18px;
 }
@@ -881,6 +951,7 @@ h3 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
+  align-items: stretch;
 }
 
 .command-cards-grid {
@@ -956,6 +1027,7 @@ h3 {
 .audience-path-grid {
   display: grid;
   gap: 12px;
+  align-items: stretch;
 }
 
 .audience-path-card {
@@ -1068,10 +1140,12 @@ h3 {
   overflow-x: auto;
   flex-wrap: nowrap;
   padding-bottom: 4px;
+  scroll-snap-type: x proximity;
 }
 
 .tab-primary-row .tab-button {
   flex: 0 0 auto;
+  scroll-snap-align: start;
 }
 
 .tab-disclosure {
@@ -1182,6 +1256,7 @@ h3 {
 .source-grid {
   display: grid;
   gap: 14px;
+  align-items: stretch;
 }
 
 .records-grid {

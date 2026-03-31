@@ -120,6 +120,21 @@ function renderMetaBadges(items, className = "evidence-meta-row") {
   `;
 }
 
+function renderTrendSummary(trend) {
+  if (!trend?.label) {
+    return "";
+  }
+
+  const status = trend.status || "neutral";
+  return `
+    <div class="trend-summary trend-summary-${escapeHtml(status)}">
+      <span class="trend-summary-label">Trend</span>
+      <strong>${escapeHtml(trend.label)}</strong>
+      ${trend.detail ? `<p>${escapeHtml(trend.detail)}</p>` : ""}
+    </div>
+  `;
+}
+
 function renderHero(payload) {
   if (heroTitle) {
     heroTitle.textContent = payload.title || "AI Trust & Security Stack Control Plane";
@@ -306,6 +321,7 @@ function renderRiskStrip(strip) {
                   ${renderStatusPill(item.status || "neutral", { hideNeutral: true })}
                 </div>
                 <strong class="risk-stat-value">${escapeHtml(item.display_value || item.value || "")}</strong>
+                ${renderTrendSummary(item.trend)}
                 <p class="risk-stat-detail">${escapeHtml(item.display_detail || item.detail || "")}</p>
                 ${renderMetaBadges(item.meta_badges, "evidence-meta-row risk-meta-row")}
               </${item.href ? "a" : "article"}>
@@ -688,8 +704,8 @@ function renderSections(sections) {
               <h2>${escapeHtml(section.group_label || nextGroup)}</h2>
               <p class="section-description">${
                 nextGroup === "reviewer"
-                  ? "Start here for the plain-language safety story: what happened, what was stopped, what proof exists, and whether the system looks safe to use."
-                  : "Continue here for the engineering detail: raw reasons, traces, evidence links, and lower-level control information."
+                  ? "Start here for the plain-language story: current state, blocked actions, proof, and readiness."
+                  : "Continue here for traces, raw reasons, evidence links, and control detail."
               }</p>
             </section>
           `
@@ -787,7 +803,7 @@ function renderTabs(tabs) {
       <div class="tab-strip-head">
         <div>
           <p class="eyebrow">Quick jump</p>
-          <p class="section-description">Use the short jump row for the main story. Open the full section list only when you need deeper navigation.</p>
+          <p class="section-description">Use the short row for the main story. Open the full list only for deeper drill-down.</p>
         </div>
       </div>
       <div class="tab-group-row tab-primary-row">
