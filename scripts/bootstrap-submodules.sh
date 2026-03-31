@@ -24,4 +24,4 @@ for path in "${!SUBMODULES[@]}"; do
   git submodule add "$url" "$path"
 done
 
-echo "Done. Run 'git submodule update --init --recursive' to populate the remaining managed submodule working trees."
+echo "Done. Run 'git submodule update --init --recursive' to populate the managed overlay submodule working tree."

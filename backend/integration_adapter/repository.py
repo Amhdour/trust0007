@@ -16,6 +16,7 @@ DASHBOARD_INGESTION_PRIMARY = "overlays/myStarterKit/artifacts/dashboard/dashboa
 DASHBOARD_INGESTION_FALLBACK = "telemetry/exports/mystarterkit_dashboard_feed.json"
 DASHBOARD_CONTRACT_PATH = "contracts/control-plane-dashboard.json"
 UPSTREAM_USAGE_INVENTORY_PATH = "evidence/upstream_usage.inventory.json"
+UPSTREAM_SOURCE_LOCK_PATH = "evidence/upstream.lock.json"
 GOVERNED_FLOW_SUMMARY_PATH = "overlays/myStarterKit/artifacts/governed-flow-summary.json"
 GOVERNED_REQUEST_FEED_PATH = "overlays/myStarterKit/artifacts/governed-request-feed.json"
 IDENTITY_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/identity-evidence.json"
@@ -30,6 +31,9 @@ UPSTREAM_INVENTORY_CLASSIFICATIONS = {
     "optional_future",
     "reference_only",
 }
+UPSTREAM_RUNTIME_PATH_STATUSES = {"mandatory", "supporting", "optional", "reference"}
+UPSTREAM_SOURCE_TRACKING_MODES = {"vendored_snapshot"}
+UPSTREAM_SOURCE_CHECKOUT_POLICIES = {"default", "opt_in"}
 
 
 @dataclass(frozen=True)
@@ -147,10 +151,81 @@ def load_dashboard_contract(root: Path | None = None) -> dict[str, Any]:
     return read_json(repo_root(root) / DASHBOARD_CONTRACT_PATH)
 
 
+def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
+    lock_manifest = read_json(repo_root(root) / UPSTREAM_SOURCE_LOCK_PATH)
+    components = list(lock_manifest.get("components", []))
+    component_paths = list_upstream_component_paths(root)
+
+    path_to_components: dict[str, list[dict[str, Any]]] = {}
+    invalid_components: list[str] = []
+    for component in components:
+        component_name = str(component.get("component_name", "")).strip()
+        component_path = str(component.get("upstream_path", "")).strip()
+        classification = str(component.get("classification", "")).strip()
+        runtime_path_status = str(component.get("runtime_path_status", "")).strip()
+        tracked_as = str(component.get("tracked_as", "")).strip()
+        checkout_policy = str(component.get("checkout_policy", "")).strip()
+        if component_path:
+            path_to_components.setdefault(component_path, []).append(component)
+        required_fields = (
+            component_name,
+            component_path,
+            str(component.get("source_repo", "")).strip(),
+            str(component.get("source_owner", "")).strip(),
+            classification,
+            runtime_path_status,
+            str(component.get("integration_owner", "")).strip(),
+            tracked_as,
+            checkout_policy,
+            str(component.get("refresh_policy", "")).strip(),
+            str(component.get("last_validated", "")).strip(),
+        )
+        if (
+            not all(required_fields)
+            or classification not in UPSTREAM_INVENTORY_CLASSIFICATIONS
+            or runtime_path_status not in UPSTREAM_RUNTIME_PATH_STATUSES
+            or tracked_as not in UPSTREAM_SOURCE_TRACKING_MODES
+            or checkout_policy not in UPSTREAM_SOURCE_CHECKOUT_POLICIES
+        ):
+            invalid_components.append(component_name or component_path or "unknown-component")
+
+    missing_paths = [path for path in component_paths if path not in path_to_components]
+    extra_paths = [path for path in path_to_components if path not in component_paths]
+    duplicate_paths = sorted(path for path, mapped in path_to_components.items() if len(mapped) > 1)
+    managed_submodules = [
+        str(path).strip()
+        for path in lock_manifest.get("managed_submodules", [])
+        if str(path).strip()
+    ]
+
+    enriched_lock = dict(lock_manifest)
+    enriched_lock["component_count"] = len(components)
+    enriched_lock["upstream_paths"] = component_paths
+    enriched_lock["audit"] = {
+        "lock_path": UPSTREAM_SOURCE_LOCK_PATH,
+        "component_paths_in_repo": component_paths,
+        "declared_paths": sorted(path_to_components),
+        "missing_paths": missing_paths,
+        "extra_paths": extra_paths,
+        "duplicate_paths": duplicate_paths,
+        "invalid_components": sorted(invalid_components),
+        "lock_covers_all_upstreams": not missing_paths and not extra_paths and not duplicate_paths,
+        "managed_submodules": managed_submodules,
+    }
+    return enriched_lock
+
+
 def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
     inventory = read_json(repo_root(root) / UPSTREAM_USAGE_INVENTORY_PATH)
     components = list(inventory.get("components", []))
     component_paths = list_upstream_component_paths(root)
+    lock_manifest = load_upstream_source_lock(root)
+    lock_components = list(lock_manifest.get("components", []))
+    lock_by_path = {
+        str(component.get("upstream_path", "")).strip(): component
+        for component in lock_components
+        if str(component.get("upstream_path", "")).strip()
+    }
 
     path_to_components: dict[str, list[dict[str, Any]]] = {}
     invalid_components: list[str] = []
@@ -191,6 +266,30 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
         for component in components
         if bool(component.get("source_snapshot_required"))
     ]
+    lock_path_mismatches = sorted(set(component_paths) ^ set(lock_by_path))
+    lock_classification_mismatches = []
+    lock_runtime_path_status_mismatches = []
+    for component in components:
+        component_path = str(component.get("upstream_path", "")).strip()
+        if component_path not in lock_by_path:
+            continue
+        lock_component = lock_by_path[component_path]
+        if component.get("classification") != lock_component.get("classification"):
+            lock_classification_mismatches.append(
+                {
+                    "upstream_path": component_path,
+                    "inventory_classification": str(component.get("classification", "")),
+                    "lock_classification": str(lock_component.get("classification", "")),
+                }
+            )
+        if component.get("runtime_path_status") != lock_component.get("runtime_path_status"):
+            lock_runtime_path_status_mismatches.append(
+                {
+                    "upstream_path": component_path,
+                    "inventory_runtime_path_status": str(component.get("runtime_path_status", "")),
+                    "lock_runtime_path_status": str(lock_component.get("runtime_path_status", "")),
+                }
+            )
     missing_paths = [path for path in component_paths if path not in path_to_components]
     extra_paths = [path for path in path_to_components if path not in component_paths]
     duplicate_paths = sorted(path for path, mapped in path_to_components.items() if len(mapped) > 1)
@@ -199,8 +298,14 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
     enriched_inventory["component_count"] = len(components)
     enriched_inventory["upstream_paths"] = component_paths
     enriched_inventory["classification_counts"] = classification_counts
+    enriched_inventory["tracking_model"] = {
+        "mode": str(lock_manifest.get("tracking_model", "")).strip(),
+        "lock_path": UPSTREAM_SOURCE_LOCK_PATH,
+        "managed_submodules": list(lock_manifest.get("managed_submodules", [])),
+    }
     enriched_inventory["audit"] = {
         "inventory_path": UPSTREAM_USAGE_INVENTORY_PATH,
+        "lock_path": UPSTREAM_SOURCE_LOCK_PATH,
         "component_paths_in_repo": component_paths,
         "classified_paths": sorted(path_to_components),
         "missing_paths": missing_paths,
@@ -213,6 +318,16 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
         "source_snapshot_required_components": source_snapshot_required,
         "source_snapshot_required_count": len(source_snapshot_required),
         "runtime_path_counts": runtime_path_counts,
+        "lock_path_mismatches": lock_path_mismatches,
+        "lock_classification_mismatches": lock_classification_mismatches,
+        "lock_runtime_path_status_mismatches": lock_runtime_path_status_mismatches,
+        "lock_consistent": (
+            not lock_path_mismatches
+            and not lock_classification_mismatches
+            and not lock_runtime_path_status_mismatches
+            and bool(lock_manifest.get("audit", {}).get("lock_covers_all_upstreams"))
+        ),
+        "managed_submodules": list(lock_manifest.get("managed_submodules", [])),
     }
     return enriched_inventory
 

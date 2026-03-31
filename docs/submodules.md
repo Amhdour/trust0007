@@ -1,8 +1,14 @@
-# Submodule Bootstrap & Update Guide
+# Overlay Submodule & Vendored Upstream Guide
 
-This repository vendors third-party projects via git submodules under `upstream/` and overlay sources under `overlays/`.
+This repository tracks `upstream/*` as vendored source snapshots in the main repo checkout. The only currently managed git submodule is `overlays/myStarterKit`.
 
-## Managed submodule paths
+## Managed git submodule paths
+- `overlays/myStarterKit`
+
+## Vendored upstream paths
+
+These are tracked as normal directories by the main repository, not as git submodules:
+
 - `upstream/onyx`
 - `upstream/keycloak`
 - `upstream/keycloak-quickstarts`
@@ -16,20 +22,21 @@ This repository vendors third-party projects via git submodules under `upstream/
 - `upstream/langfuse-python`
 - `upstream/grafana`
 - `upstream/superset`
-- `overlays/myStarterKit`
+
+The checkout/source lock for those paths lives in `evidence/upstream.lock.json`. Reviewer-facing classification lives in `evidence/upstream_usage.inventory.json`.
 
 ## Scripts
-### 1) Bootstrap missing submodule definitions
+### 1) Bootstrap missing overlay submodule definitions
 ```bash
 bash scripts/bootstrap-submodules.sh
 ```
 
 Behavior:
-- Checks each target path.
-- Adds a submodule only when the path is missing from `.gitmodules`.
+- Checks the managed overlay target path.
+- Adds a submodule only when the overlay path is missing from `.gitmodules`.
 - Leaves existing submodule entries unchanged.
 
-### 2) Sync and update submodule working trees
+### 2) Sync and update managed overlay working trees
 ```bash
 bash scripts/update-submodules.sh
 ```
@@ -37,14 +44,26 @@ bash scripts/update-submodules.sh
 Behavior:
 - Syncs submodule URLs from `.gitmodules`.
 - Initializes and updates submodules recursively.
-- Pulls latest configured remote commits for each submodule (`--remote`).
+- Pulls latest configured remote commits for each managed submodule (`--remote`).
+
+### 3) Validate vendored upstream tracking state
+```bash
+python scripts/validate-upstream-state.py
+```
+
+Behavior:
+- Confirms no `upstream/*` paths are declared as managed submodules.
+- Confirms `evidence/upstream.lock.json` covers every vendored upstream exactly once.
+- Confirms the lock manifest and dashboard inventory agree on path classification and runtime status.
 
 ## Recommended workflow
-1. Run bootstrap script after cloning (or when adding missing module definitions).
+1. Run bootstrap script after cloning if the overlay submodule is missing.
 2. Commit `.gitmodules` and gitlink updates if bootstrap introduced new entries.
-3. Run update script whenever you need to refresh submodule working trees.
+3. Run update script whenever you need to refresh managed overlay working trees.
+4. Run the upstream validator whenever the vendored source set or classification model changes.
 
 ## Notes
 - `upstream/*` is treated as third-party code.
+- `upstream/*` is intentionally not declared in `.gitmodules` for this checkout model.
 - Not every vendored upstream is an active runtime dependency; use `docs/upstream-usage-matrix.md` before making architecture claims.
 - Avoid direct modifications in upstream repositories unless strictly necessary.

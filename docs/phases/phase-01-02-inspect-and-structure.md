@@ -5,8 +5,8 @@
 Inspection findings:
 
 - Repository already includes core top-level domains: `adapters/`, `policies/`, `telemetry/`, `launch-gate/`, `compose/`, `docs/`, `scripts/`, `upstream/`, and `overlays/`.
-- `upstream/*` and `overlays/myStarterKit` are tracked as git submodules via `.gitmodules`.
-- Submodules are currently present but not initialized in this workspace (`git submodule status` shows leading `-`).
+- `overlays/myStarterKit` is the managed git submodule in `.gitmodules`.
+- `upstream/*` is present as vendored source tracked by the main repository rather than as managed submodules.
 - No `AGENTS.md` file was found under `/workspace`, so no additional local agent constraints were discovered.
 
 ## Phase 2: Missing Structure

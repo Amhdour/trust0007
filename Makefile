@@ -1,4 +1,4 @@
-.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules
+.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream
 
 demo:
 	bash scripts/run-demo.sh
@@ -26,3 +26,6 @@ bootstrap-submodules:
 
 update-submodules:
 	bash scripts/update-submodules.sh
+
+validate-upstream:
+	python scripts/validate-upstream-state.py

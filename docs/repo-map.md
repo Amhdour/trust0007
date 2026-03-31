@@ -19,7 +19,7 @@ This document describes the umbrella repository layout for the AI Trust & Securi
 - `telemetry/` — Observability configuration and dashboards.
 - `launch-gate/` — Startup readiness and enforcement checks.
 - `overlays/` — Local overlays/customizations layered over upstream components.
-- `upstream/` — Third-party source mirrors/submodules.
+- `upstream/` — Third-party source snapshots tracked by the main repository.
 
 ## Notes
 - `upstream/*` is treated as third-party and should remain unchanged unless strictly necessary.

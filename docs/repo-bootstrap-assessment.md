@@ -8,8 +8,8 @@ _Date: 2026-03-25_
 .
 ├── .gitmodules
 ├── overlays/
-│   └── myStarterKit/              (git submodule; not initialized)
-└── upstream/                      (git submodule placeholders; not initialized)
+│   └── myStarterKit/              (git submodule)
+└── upstream/                      (vendored source snapshots tracked by the main repo)
     ├── envoy/
     ├── grafana/
     ├── gvisor/
@@ -67,9 +67,10 @@ Additional top-level folders now provisioned for additive implementation overlay
 
 ### Phase 0 — Baseline inventory (completed)
 - Inspect root, `.devcontainer/`, `compose/`, `upstream/`, `overlays/`, `docs/`.
-- Record submodule state and missing bootstrap assets.
+- Record managed submodule state, vendored upstream ownership, and missing bootstrap assets.
 - Validation:
   - `git submodule status --recursive`
+  - `python scripts/validate-upstream-state.py`
   - `find . -maxdepth 2 -type d`
 
 ### Phase 1 — Codespaces bootstrap skeleton

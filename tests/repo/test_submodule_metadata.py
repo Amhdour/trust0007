@@ -29,6 +29,14 @@ def test_gitlinks_are_declared_in_gitmodules() -> None:
     assert set(_gitlinks()) <= declared_paths
 
 
+def test_upstream_paths_are_not_declared_as_submodules() -> None:
+    gitmodules = (ROOT / ".gitmodules").read_text(encoding="utf-8")
+    declared_paths = re.findall(r"^\s*path = (.+)$", gitmodules, re.MULTILINE)
+
+    assert "overlays/myStarterKit" in declared_paths
+    assert not any(path.startswith("upstream/") for path in declared_paths)
+
+
 def test_compatibility_snapshot_submodule_is_not_managed() -> None:
     gitmodules = (ROOT / ".gitmodules").read_text(encoding="utf-8")
 

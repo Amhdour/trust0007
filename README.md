@@ -147,7 +147,8 @@ When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a gover
 ## Design intent
 
 - Lead with the dashboard, then identity/session, then governed AI runtime, then evidence/analytics.
-- Treat `upstream/*` as vendored third-party source snapshots.
+- Treat `upstream/*` as vendored third-party source snapshots tracked by this repository.
+- Treat `overlays/myStarterKit` as the only currently managed git submodule checkout.
 - Treat `overlays/myStarterKit` as the governance overlay baseline.
 - Keep local platform logic additive in:
   - `frontend/`
@@ -173,7 +174,7 @@ When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a gover
 - `apps/`: logical runtime/governance grouping for Onyx and myStarterKit.
 - `infra/`: logical mapping for identity, policy, retrieval, telemetry, and evidence systems.
 - `evidence/`: dashboard-owned evidence export area.
-- `upstream/`: vendored copies of Keycloak, Envoy, Onyx, OPA, Vault, Qdrant, optional gVisor, Langfuse, Grafana, and Superset sources.
+- `upstream/`: vendored copies of Keycloak, Envoy, Onyx, OPA, Vault, Qdrant, optional gVisor, Langfuse, Grafana, and Superset sources tracked by the main repo checkout.
 - `overlays/myStarterKit/`: governance-overlay submodule.
 - `overlays/governance-overlay/`: local, additive overlay contracts and integration wiring (this repo).
 - `adapters/`: Python adapters for policy/runtime/retrieval/secrets/sandbox/observability bridges.
@@ -242,6 +243,8 @@ docker-compose -f compose/docker-compose.prod-sim.yml up
 
 Not every vendored upstream under `upstream/` is an equally active part of the current architecture.
 
+Checkout/source-management state is locked in `evidence/upstream.lock.json`. Reviewer-facing classification for the dashboard lives in `evidence/upstream_usage.inventory.json`, and `scripts/validate-upstream-state.py` checks that both views stay aligned.
+
 - Active now:
   - Onyx is the governed runtime target behind `/launch/onyx`.
   - Langfuse is a supporting evidence-plane activity source the dashboard can consume live.
@@ -262,7 +265,7 @@ Every component that remains in scope is expected to answer:
 - what evidence artifact it contributes
 - what control gap appears if it is removed
 
-See `docs/upstream-usage-matrix.md` for the reviewer-facing explanation and `evidence/upstream_usage.inventory.json` for the machine-readable inventory surfaced by the dashboard.
+See `docs/upstream-usage-matrix.md` for the reviewer-facing explanation, `evidence/upstream.lock.json` for the checkout/source lock, and `evidence/upstream_usage.inventory.json` for the machine-readable inventory surfaced by the dashboard.
 See `docs/strict-live-proof-matrix.md` for the acceptance criteria and pass/fail proof matrix for the strict live governed path.
 
 ## Runtime Testing Model

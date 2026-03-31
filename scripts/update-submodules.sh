@@ -12,4 +12,4 @@ fi
 git submodule sync --recursive
 git submodule update --init --recursive --remote
 
-echo "Remaining managed submodules synced and updated recursively."
+echo "Managed overlay submodules synced and updated recursively."
