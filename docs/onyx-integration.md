@@ -48,6 +48,7 @@ Any failed check results in deny with aggregated reasons.
 
 ## Runtime proof after handoff
 - `/launch/onyx` is the governed entry point into the runtime plane.
+- `/launch/onyx?path=/app&mode=live&view=embedded` is the dashboard-owned live workspace view for that same governed entry point.
 - A successful or denied handoff now writes `overlays/myStarterKit/artifacts/onyx-runtime-proof.json`.
 - That artifact summarizes:
   - the requested Onyx path,
@@ -62,6 +63,7 @@ This keeps the proof model honest: the control plane proves the launch decision 
 - `scripts/start-onyx-lite.sh` remains the supported way to start the local runtime quickly.
 - Runtime readiness is treated separately from governance approval.
 - A handoff can be approved while readiness is still degraded, and the runtime proof artifact should show that difference clearly.
+- The embedded live workspace only frames Onyx when the public runtime target is reachable; otherwise it stays in the control-plane shell and explains what still needs to be exposed or repaired.
 
 ## Guardrails for future changes
 - Keep governance logic in repo-owned adapters and evaluators, not inside upstream Onyx modules.

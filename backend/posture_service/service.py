@@ -132,8 +132,13 @@ def _dashboard_url(path: str = "") -> str:
     return _public_service_url(3000, path)
 
 
-def _launch_handoff_url(path: str) -> str:
-    return _dashboard_url(f"/launch/onyx?path={quote(path, safe='/?=&')}")
+def _launch_handoff_url(path: str, *, mode: str = "", view: str = "") -> str:
+    href = f"/launch/onyx?path={quote(path, safe='/?=&')}"
+    if mode:
+        href = f"{href}&mode={quote(mode, safe='')}"
+    if view:
+        href = f"{href}&view={quote(view, safe='')}"
+    return _dashboard_url(href)
 
 
 def _status_from_launch(verdict: str) -> str:
@@ -3434,6 +3439,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "type": "links",
                     "title": "AI-access links",
                     "items": [
+                        _link("Live Workspace", _launch_handoff_url("/app", mode="live", view="embedded"), "Open the dashboard-owned live runtime workspace with governance context and embedded Onyx access when reachable.", "healthy", display_label="Use live chat here", display_description="Open the live chat surface inside the dashboard-owned runtime workspace."),
                         _link("Open Chat", _launch_handoff_url("/app"), "Launch the governed Onyx chat surface through the dashboard handoff.", "healthy", display_label="Open chat", display_description="Open the checked chat entry point for the AI system."),
                         _link("Search Knowledge", _launch_handoff_url("/app?chatMode=search"), "Launch the governed search-oriented Onyx surface.", "healthy", display_label="Open search", display_description="Open the checked search entry point for the AI system."),
                         _link("Open Agents", _launch_handoff_url("/app/agents"), "Governed agents surface; non-admin roles should be denied.", "warning", display_label="Open agents", display_description="Open the agents entry point. Non-admin roles should still be blocked here."),

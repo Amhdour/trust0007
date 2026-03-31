@@ -22,7 +22,8 @@ def test_dashboard_exposes_onyx_entry_points() -> None:
     labels = {item["label"] for item in links}
     hrefs = {item["href"] for item in links}
 
-    assert {"Open Chat", "Open Agents", "Search Knowledge"} <= labels
+    assert {"Live Workspace", "Open Chat", "Open Agents", "Search Knowledge"} <= labels
+    assert any("/launch/onyx?path=/app&mode=live&view=embedded" in href for href in hrefs)
     assert any("/launch/onyx?path=/app" in href for href in hrefs) or any("/app" in href for href in hrefs) or any("/raw/docs/onyx-integration.md" in href for href in hrefs)
     assert any("/launch/onyx?path=/app/agents" in href for href in hrefs) or any("/app/agents" in href for href in hrefs) or any("/raw/docs/onyx-integration.md" in href for href in hrefs)
     assert any("/launch/onyx?path=/app?chatMode=search" in href for href in hrefs) or any("chatMode=search" in href for href in hrefs) or any("/raw/docs/onyx-integration.md" in href for href in hrefs)

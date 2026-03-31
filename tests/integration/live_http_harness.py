@@ -231,11 +231,19 @@ class StrictLiveHarness:
             return [json.loads(line) for line in raw.splitlines() if line.strip()]
         return json.loads(raw)
 
-    def launch(self, *, token: str | None = "valid-live-token", path: str = "/app", question: str = "") -> HTTPResponse:
+    def launch(
+        self,
+        *,
+        token: str | None = "valid-live-token",
+        path: str = "/app",
+        question: str = "",
+        view: str = "",
+    ) -> HTTPResponse:
         authorization_header = f"Bearer {token}" if token is not None else ""
         question_query = f"&question={quote(question, safe='')}" if question else ""
+        view_query = f"&view={quote(view, safe='')}" if view else ""
         handler = _FakeLaunchHandler(
-            path=f"/launch/onyx?path={path}&mode=live{question_query}",
+            path=f"/launch/onyx?path={path}&mode=live{question_query}{view_query}",
             authorization_header=authorization_header,
             onyx_running=self.scenario.onyx_running,
         )

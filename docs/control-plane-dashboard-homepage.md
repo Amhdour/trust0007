@@ -40,6 +40,7 @@ The page now leads with:
    - newest governed request spotlight
    - flagship denied `/launch/onyx` proof spotlight
    - primary proof links
+   - live workspace launch into the governed Onyx runtime without leaving a dashboard-owned shell
 5. Plain-language review / technical-details lanes: clear split between simple safety meaning and deeper engineering proof.
 6. Compact quick-jump row with expandable full section list.
 7. Drill-down sections grouped into:
@@ -106,6 +107,10 @@ The page now leads with:
 - recent activity feed
   - `/api/control-plane/live-log`
   - Onyx container logs and Langfuse activity when available
+- live runtime workspace
+  - `/launch/onyx?path=/app&mode=live&view=embedded`
+  - same governance evaluation as the standard handoff route
+  - embeds the reachable Onyx surface inside a dashboard-owned page while preserving trace and evidence context
 
 ## Real vs demo-derived
 

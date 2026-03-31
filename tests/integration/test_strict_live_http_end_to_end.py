@@ -88,6 +88,23 @@ def test_strict_live_handoff_passes_through_http_dependency_chain() -> None:
         assert governed_request_table["rows"][0]["trace"] == summary["trace_id"]
 
 
+def test_strict_live_workspace_shell_embeds_runtime_when_reachable() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+
+    with StrictLiveHarness(repo_root, LiveFixtureScenario()) as harness:
+        response = harness.launch(path="/app", view="embedded")
+
+        assert response.status_code == 200
+        assert "Live Runtime Workspace" in response.text
+        assert "Dashboard-owned live runtime" in response.text
+        assert "Open in new tab" in response.text
+        assert "Return to dashboard" in response.text
+        assert 'src="' in response.text
+        assert '/app"' in response.text
+        assert 'title="Live Onyx runtime for /app"' in response.text
+        assert "Trace ID" in response.text
+
+
 @pytest.mark.parametrize(
     ("scenario", "token", "path", "expected_reason", "artifact_name", "artifact_field", "dashboard_section", "dashboard_card"),
     [

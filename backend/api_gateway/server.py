@@ -749,8 +749,18 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(getattr(self, "path", f"/launch/onyx?path={quote(safe_path, safe='/?=&')}"))
         query = parse_qs(parsed.query)
         flow_mode = _governance_mode(query.get("mode", [""])[-1] if query.get("mode") else "")
+        view_mode = query.get("view", [""])[-1].strip().lower()
+        dashboard_workspace_view = view_mode in {"dashboard", "embedded", "workspace"}
         live_mode = flow_mode == "live"
         question = query.get("question", [f"Navigate to Onyx path: {safe_path}"])[-1]
+
+        def launch_view_href(path: str, *, mode: str = "", view: str = "") -> str:
+            href = f"/launch/onyx?path={quote(path, safe='/?=&')}"
+            if mode:
+                href = f"{href}&mode={quote(mode, safe='')}"
+            if view:
+                href = f"{href}&view={quote(view, safe='')}"
+            return href
 
         # Run governance check for Onyx handoff
         try:
@@ -880,6 +890,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     <main>
       <h1>⛔ Access Denied</h1>
       <p>The governance layer has blocked your access to <code>{safe_path_html}</code>.</p>
+      <p><a href="/">Return to dashboard</a></p>
       <div class="status">
         <strong>Handoff to Onyx was denied by control-plane policy.</strong>
         <div class="muted">Evidence mode: <code>{escape(flow_result.evidence_mode if flow_result else flow_mode)}</code></div>
@@ -983,6 +994,295 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         <li>Use <strong>Open in Browser</strong> or change visibility from <code>Private</code> to <code>Public</code> or <code>Organization</code>.</li>
       </ol>
 """
+
+        if dashboard_workspace_view:
+            workspace_nav = [
+                ("Chat", launch_view_href("/app", mode="live", view="embedded")),
+                ("Search", launch_view_href("/app?chatMode=search", mode="live", view="embedded")),
+                ("Agents", launch_view_href("/app/agents", mode="live", view="embedded")),
+            ]
+            workspace_nav_markup = "".join(
+                f'<a class="surface-link{" is-active" if href == launch_view_href(safe_path, mode="live", view="embedded") else ""}" href="{href}">{label}</a>'
+                for label, href in workspace_nav
+            )
+            workspace_main_markup = ""
+            frame_callout_markup = ""
+            if codespaces_visible:
+                frame_callout_markup = (
+                    '<p class="frame-status">The live runtime target responded to the public dashboard handoff, so you can use Onyx here without leaving the control-plane shell.</p>'
+                )
+                workspace_main_markup = f"""
+      <section class="workspace-runtime" aria-label="Live Onyx runtime">
+        <iframe
+          class="runtime-frame"
+          src="{public_url}"
+          title="Live Onyx runtime for {safe_path_html}"
+          loading="eager"
+          referrerpolicy="no-referrer"
+        ></iframe>
+      </section>
+"""
+            else:
+                frame_callout_markup = """
+        <div class="status-note">The live handoff passed, but the browser still cannot reach the public Onyx port. Expose port <code>3010</code> and then re-check governance to load the embedded runtime.</div>
+"""
+                workspace_main_markup = f"""
+      <div class="runtime-placeholder">
+        <h2>Runtime frame is not reachable yet</h2>
+        <p>The dashboard approved this live handoff, but the public Onyx port is not reachable from the browser yet for <code>{safe_path_html}</code>.</p>
+        <p>Expose port <code>3010</code> in Codespaces, then refresh this workspace to load the embedded runtime.</p>
+      </div>
+"""
+            runtime_health_note_markup = ""
+            if codespaces_visible and not local_ready:
+                runtime_health_note_markup = (
+                    '<div class="status-note">Local runtime health is still degraded. The dashboard is showing the live surface only because the public target responded.</div>'
+                )
+
+            body = f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Live Runtime Workspace</title>
+    <style>
+      :root {{
+        color-scheme: light;
+        --bg: #f4efe6;
+        --panel: #fffdf8;
+        --panel-alt: #f8f2e8;
+        --ink: #1f2430;
+        --muted: #576072;
+        --border: #d8cfc2;
+        --accent: #a03d26;
+        --accent-soft: #f5e1da;
+        --healthy: #1f6f43;
+        --warning: #8a5a12;
+      }}
+      * {{
+        box-sizing: border-box;
+      }}
+      body {{
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background:
+          radial-gradient(circle at top left, #fff8eb 0%, rgba(255, 248, 235, 0.2) 35%, transparent 60%),
+          linear-gradient(180deg, #efe6d9 0%, var(--bg) 58%, #ede7df 100%);
+        color: var(--ink);
+      }}
+      .workspace-shell {{
+        min-height: 100vh;
+        padding: 28px;
+        display: grid;
+        grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+        gap: 22px;
+      }}
+      .workspace-panel,
+      .workspace-runtime,
+      .runtime-placeholder {{
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        box-shadow: 0 18px 60px rgba(31, 36, 48, 0.12);
+      }}
+      .workspace-panel {{
+        padding: 24px;
+      }}
+      .workspace-runtime,
+      .runtime-placeholder {{
+        min-height: calc(100vh - 56px);
+        overflow: hidden;
+      }}
+      .runtime-placeholder {{
+        padding: 28px;
+        display: grid;
+        align-content: start;
+        gap: 12px;
+      }}
+      .eyebrow {{
+        margin: 0 0 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }}
+      h1 {{
+        margin: 0;
+        font-size: clamp(2rem, 3vw, 2.8rem);
+      }}
+      p {{
+        line-height: 1.6;
+      }}
+      .lede {{
+        color: var(--muted);
+        margin: 14px 0 20px;
+      }}
+      .toolbar,
+      .surface-links {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }}
+      .toolbar {{
+        margin: 18px 0 22px;
+      }}
+      .toolbar a,
+      .surface-link {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 16px;
+        border-radius: 999px;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        color: var(--ink);
+        background: #fffaf2;
+        font-weight: 600;
+      }}
+      .toolbar a.primary {{
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }}
+      .surface-link.is-active {{
+        background: var(--accent-soft);
+        border-color: #cf8d76;
+      }}
+      .signal-grid {{
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        margin: 18px 0 22px;
+      }}
+      .signal-card {{
+        background: var(--panel-alt);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 14px 16px;
+      }}
+      .signal-card strong,
+      .signal-card code {{
+        display: block;
+        margin-top: 6px;
+      }}
+      .checklist {{
+        margin: 0;
+        padding-left: 18px;
+      }}
+      .checklist li {{
+        margin: 0 0 8px;
+      }}
+      .frame-status {{
+        margin: 18px 0 0;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: #eef6f0;
+        border: 1px solid #b8d0bf;
+        color: var(--healthy);
+      }}
+      .runtime-frame {{
+        width: 100%;
+        height: calc(100vh - 56px);
+        border: 0;
+        background: white;
+      }}
+      .status-note {{
+        margin: 18px 0 0;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: #fff4e5;
+        border: 1px solid #e2c48e;
+        color: var(--warning);
+      }}
+      .proof-block {{
+        margin-top: 22px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+      }}
+      code {{
+        font-family: "SFMono-Regular", Consolas, monospace;
+        background: #f3eee6;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }}
+      @media (max-width: 1100px) {{
+        .workspace-shell {{
+          grid-template-columns: 1fr;
+        }}
+        .workspace-runtime,
+        .runtime-placeholder {{
+          min-height: 70vh;
+        }}
+        .runtime-frame {{
+          height: 70vh;
+        }}
+      }}
+    </style>
+  </head>
+  <body>
+    <main class="workspace-shell">
+      <section class="workspace-panel">
+        <p class="eyebrow">Dashboard-owned live runtime</p>
+        <h1>Live Runtime Workspace</h1>
+        <p class="lede">
+          Governance approved the live handoff for <code>{safe_path_html}</code>. This page keeps the control-plane context, traceability, and runtime access together in one dashboard-owned workspace.
+        </p>
+        <div class="toolbar">
+          <a class="primary" href="{public_url}" target="_blank" rel="noreferrer">Open in new tab</a>
+          <a href="/">Return to dashboard</a>
+          <a href="{launch_view_href(safe_path, mode='live', view='embedded')}">Re-check governance</a>
+        </div>
+        <div class="surface-links" aria-label="Switch live Onyx surface">
+          {workspace_nav_markup}
+        </div>
+        <div class="signal-grid">
+          <div class="signal-card">
+            Requested path
+            <code>{safe_path_html}</code>
+          </div>
+          <div class="signal-card">
+            Evidence mode
+            <strong>{escape(flow_result.evidence_mode if flow_result else flow_mode)}</strong>
+          </div>
+          <div class="signal-card">
+            Trace ID
+            <code>{flow_result.trace_id if flow_result else 'unknown'}</code>
+          </div>
+          <div class="signal-card">
+            Session ID
+            <code>{flow_result.session_id if flow_result and flow_result.session_id else 'missing'}</code>
+          </div>
+        </div>
+        {frame_callout_markup}
+        {runtime_health_note_markup}
+        <div class="proof-block">
+          <p class="eyebrow">Why access was allowed</p>
+          <ul class="checklist">
+            <li>Identity, policy, retrieval, secret access, trace, and launch-gate checks were evaluated under the same governed flow.</li>
+            <li>Runtime proof was written at <code>{escape(str(runtime_proof.get("artifact", "")))}</code>.</li>
+            <li>Missing evidence: <code>{escape(', '.join(flow_result.launch_gate_missing_evidence) if flow_result and flow_result.launch_gate_missing_evidence else 'none')}</code></li>
+          </ul>
+        </div>
+        <div class="proof-block">
+          <strong>Governance audit trail</strong>
+          <p>Policy source: <code>{escape(flow_result.policy_source if flow_result else 'unknown')}</code> via <code>{escape(flow_result.policy_path if flow_result else 'unknown')}</code></p>
+          <p>Reasons: <code>{escape(', '.join(flow_result.reasons) if flow_result and flow_result.reasons else 'policy.allow')}</code></p>
+          {runtime_proof_section}
+        </div>
+      </section>
+      {workspace_main_markup}
+    </main>
+  </body>
+</html>
+"""
+            encoded = body.encode("utf-8")
+            self.send_response(HTTPStatus.OK.value)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+            return
 
         body = f"""<!doctype html>
 <html lang="en">
