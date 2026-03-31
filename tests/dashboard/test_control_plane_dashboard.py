@@ -36,12 +36,14 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="hero-title"' in html
     assert 'id="hero-copy"' in html
     assert 'id="hero-eyebrow"' in html
+    assert 'id="summary-sheet-root"' in html
     assert 'id="briefing-root"' in html
     assert 'id="mode-banner-root"' in html
     assert 'id="incident-banner-root"' in html
     assert 'id="risk-strip-root"' in html
     assert 'id="next-action-root"' in html
     assert 'id="walkthrough-root"' in html
+    assert 'id="compare-root"' in html
     assert 'id="proof-pipeline-root"' in html
     assert 'id="client-overview-link"' in html
     assert 'id="presentation-mode-button"' in html
@@ -54,6 +56,9 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "risk_strip" in js
     assert "next_action" in js
     assert "walkthrough" in js
+    assert "example_compare" in js
+    assert "presentation_summary" in js
+    assert "freshness-strip" in js
     assert "proof_pipeline" in js
     assert "presentation-mode" in js
     assert "live-log-source-filter" in js
@@ -124,6 +129,10 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     assert payload["command_center"]["next_action"]["change"]["label"]
     assert len(payload["command_center"]["walkthrough"]) == 4
     assert payload["command_center"]["walkthrough"][0]["label"] == "Start with posture"
+    assert payload["command_center"]["example_compare"]["approved"]["title"]
+    assert payload["command_center"]["example_compare"]["blocked"]["title"]
+    assert payload["command_center"]["freshness_bar"]["items"][0]["label"] == "Updated"
+    assert payload["command_center"]["presentation_summary"]["export_text"]
     assert len(payload["command_center"]["proof_pipeline"]["steps"]) == 6
     assert payload["command_center"]["proof_pipeline"]["meta_badges"]
     assert payload["command_center"]["proof_pipeline"]["steps"][0]["meta_badges"]

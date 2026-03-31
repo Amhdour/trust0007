@@ -5,11 +5,13 @@ const heroTitle = document.getElementById("hero-title");
 const heroCopy = document.getElementById("hero-copy");
 const heroMeta = document.getElementById("hero-meta");
 const heroSteps = document.getElementById("hero-steps");
+const summarySheetRoot = document.getElementById("summary-sheet-root");
 const modeBannerRoot = document.getElementById("mode-banner-root");
 const incidentBannerRoot = document.getElementById("incident-banner-root");
 const riskStripRoot = document.getElementById("risk-strip-root");
 const nextActionRoot = document.getElementById("next-action-root");
 const walkthroughRoot = document.getElementById("walkthrough-root");
+const compareRoot = document.getElementById("compare-root");
 const briefingRoot = document.getElementById("briefing-root");
 const proofPipelineRoot = document.getElementById("proof-pipeline-root");
 const readingGuideRoot = document.getElementById("reading-guide-root");
@@ -33,6 +35,9 @@ let lastOverviewPayload = null;
 let lastLiveLogPayload = null;
 let liveLogStatusFilter = "all";
 let liveLogSourceFilter = "all";
+let dashboardFingerprints = new Map();
+let changedDashboardKeys = new Set();
+let changeHighlightTimer = 0;
 
 function escapeHtml(value) {
   return String(value)
@@ -146,6 +151,124 @@ function renderTrendSummary(trend, label = "Changed since last refresh") {
   `;
 }
 
+function normalizeKeyFragment(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function fingerprintValue(value) {
+  try {
+    return JSON.stringify(value ?? null);
+  } catch {
+    return String(value ?? "");
+  }
+}
+
+function buildDashboardFingerprints(payload) {
+  const commandCenter = payload.command_center || {};
+  const nextFingerprints = new Map();
+
+  nextFingerprints.set("incident-banner", fingerprintValue(commandCenter.incident_banner || {}));
+  nextFingerprints.set("next-action", fingerprintValue(commandCenter.next_action || {}));
+  nextFingerprints.set("walkthrough", fingerprintValue(commandCenter.walkthrough || []));
+  nextFingerprints.set("example-compare", fingerprintValue(commandCenter.example_compare || {}));
+  nextFingerprints.set("proof-pipeline", fingerprintValue(commandCenter.proof_pipeline || {}));
+  nextFingerprints.set("freshness-strip", fingerprintValue(commandCenter.freshness_bar || {}));
+  nextFingerprints.set("presentation-summary", fingerprintValue(commandCenter.presentation_summary || {}));
+
+  for (const card of Array.isArray(commandCenter.cards) ? commandCenter.cards : []) {
+    const key = card.id ? `card:${card.id}` : `card:${normalizeKeyFragment(card.label || card.display_label)}`;
+    nextFingerprints.set(
+      key,
+      fingerprintValue({
+        value: card.value,
+        display_value: card.display_value,
+        status: card.status,
+        detail: card.detail,
+        display_detail: card.display_detail,
+        meta_badges: card.meta_badges,
+      }),
+    );
+  }
+
+  const riskItems = Array.isArray(commandCenter.risk_strip?.items) ? commandCenter.risk_strip.items : [];
+  for (const item of riskItems) {
+    const key = `risk:${normalizeKeyFragment(item.label || item.display_label)}`;
+    nextFingerprints.set(
+      key,
+      fingerprintValue({
+        value: item.value,
+        display_value: item.display_value,
+        status: item.status,
+        detail: item.detail,
+        display_detail: item.display_detail,
+        trend: item.trend,
+      }),
+    );
+  }
+
+  const comparison = commandCenter.example_compare || {};
+  if (comparison.approved) {
+    nextFingerprints.set("compare:approved", fingerprintValue(comparison.approved));
+  }
+  if (comparison.blocked) {
+    nextFingerprints.set("compare:blocked", fingerprintValue(comparison.blocked));
+  }
+
+  return nextFingerprints;
+}
+
+function updateDashboardChangeTracking(payload) {
+  const nextFingerprints = buildDashboardFingerprints(payload);
+  const changed = new Set();
+
+  if (dashboardFingerprints.size) {
+    for (const [key, value] of nextFingerprints.entries()) {
+      if (dashboardFingerprints.has(key) && dashboardFingerprints.get(key) !== value) {
+        changed.add(key);
+      }
+    }
+  }
+
+  dashboardFingerprints = nextFingerprints;
+  changedDashboardKeys = changed;
+}
+
+function changeAttributes(key) {
+  if (!key) {
+    return "";
+  }
+
+  return ` data-change-key="${escapeHtml(key)}"`;
+}
+
+function applyChangeHighlights() {
+  window.clearTimeout(changeHighlightTimer);
+  for (const node of document.querySelectorAll(".recent-change")) {
+    node.classList.remove("recent-change");
+  }
+
+  if (!changedDashboardKeys.size) {
+    return;
+  }
+
+  for (const node of document.querySelectorAll("[data-change-key]")) {
+    if (changedDashboardKeys.has(node.dataset.changeKey || "")) {
+      node.classList.add("recent-change");
+    }
+  }
+
+  changeHighlightTimer = window.setTimeout(() => {
+    for (const node of document.querySelectorAll(".recent-change")) {
+      node.classList.remove("recent-change");
+    }
+    changedDashboardKeys = new Set();
+  }, 4200);
+}
+
 function resolveInitialPresentationMode() {
   const params = new URLSearchParams(window.location.search);
   const view = params.get("view");
@@ -185,6 +308,7 @@ function setPresentationMode(enabled) {
 
   if (lastOverviewPayload) {
     renderHero(lastOverviewPayload);
+    renderSummarySheet(lastOverviewPayload.command_center?.presentation_summary || {});
   }
   scheduleActiveTabSync();
 }
@@ -236,6 +360,20 @@ function renderHero(payload) {
       `,
     )
     .join("");
+}
+
+function compactSectionDescription(section) {
+  const description = String(section.description || "");
+  if (section.group !== "operator" || description.length <= 120) {
+    return description;
+  }
+
+  const firstSentence = description.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim();
+  if (firstSentence && firstSentence.length >= 50) {
+    return firstSentence;
+  }
+
+  return `${description.slice(0, 117).trimEnd()}...`;
 }
 
 function renderModeBanner(modeBanner) {
@@ -376,7 +514,7 @@ function renderRiskStrip(strip) {
   }
 
   riskStripRoot.innerHTML = `
-    <section class="risk-strip-card">
+    <section class="risk-strip-card"${changeAttributes("risk-strip")}>
       <div class="support-card-head">
         <div>
           <p class="eyebrow">${escapeHtml(strip.eyebrow || "Current risk strip")}</p>
@@ -388,7 +526,7 @@ function renderRiskStrip(strip) {
         ${items
           .map(
             (item) => `
-              <${item.href ? "a" : "article"} class="risk-stat-card risk-stat-${escapeHtml(item.status || "neutral")}"${linkAttributes(item.href)}>
+              <${item.href ? "a" : "article"} class="risk-stat-card risk-stat-${escapeHtml(item.status || "neutral")}"${linkAttributes(item.href)}${changeAttributes(`risk:${normalizeKeyFragment(item.label || item.display_label)}`)}>
                 <div class="card-topline">
                   <div class="metric-label">${escapeHtml(item.display_label || item.label || "")}</div>
                   ${renderStatusPill(item.status || "neutral", { hideNeutral: true })}
@@ -419,7 +557,7 @@ function renderIncidentBanner(banner) {
   const facts = Array.isArray(banner.facts) ? banner.facts : [];
   const actions = Array.isArray(banner.actions) ? banner.actions : [];
   incidentBannerRoot.innerHTML = `
-    <section class="incident-banner incident-banner-${escapeHtml(banner.status || "warning")}">
+    <section class="incident-banner incident-banner-${escapeHtml(banner.status || "warning")}"${changeAttributes("incident-banner")}>
       <div class="incident-banner-head">
         <div>
           <p class="eyebrow">${escapeHtml(banner.eyebrow || "Current blocker")}</p>
@@ -462,7 +600,7 @@ function renderNextAction(nextAction) {
   const steps = Array.isArray(nextAction.steps) ? nextAction.steps : [];
 
   nextActionRoot.innerHTML = `
-    <section class="next-action-card next-action-${escapeHtml(status)}">
+    <section class="next-action-card next-action-${escapeHtml(status)}"${changeAttributes("next-action")}>
       <div class="next-action-layout">
         <div class="next-action-copy">
           <div class="card-topline">
@@ -512,6 +650,73 @@ function renderNextAction(nextAction) {
   `;
 }
 
+function renderSummarySheet(summary) {
+  if (!summarySheetRoot) {
+    return;
+  }
+
+  if (!presentationModeEnabled || !summary?.title) {
+    summarySheetRoot.innerHTML = "";
+    return;
+  }
+
+  const bullets = Array.isArray(summary.bullets) ? summary.bullets : [];
+  summarySheetRoot.innerHTML = `
+    <section class="summary-sheet-card"${changeAttributes("presentation-summary")}>
+      <div class="summary-sheet-head">
+        <div>
+          <p class="eyebrow">${escapeHtml(summary.eyebrow || "Share summary")}</p>
+          <h2>${escapeHtml(summary.title || "External summary")}</h2>
+        </div>
+        ${renderStatusPill(summary.status || "neutral")}
+      </div>
+      <p class="summary-sheet-summary">${escapeHtml(summary.summary || "")}</p>
+      <div class="summary-sheet-grid">
+        <div class="summary-sheet-panel">
+          <p class="eyebrow">Talking points</p>
+          <div class="summary-sheet-bullet-list">
+            ${bullets.map((bullet) => `<p>${escapeHtml(bullet)}</p>`).join("")}
+          </div>
+        </div>
+        <div class="summary-sheet-panel">
+          <p class="eyebrow">Export options</p>
+          <div class="summary-sheet-actions">
+            <button class="summary-sheet-button" type="button" data-summary-action="copy">Copy summary</button>
+            <button class="summary-sheet-button" type="button" data-summary-action="print">Print brief</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+
+  for (const button of summarySheetRoot.querySelectorAll("[data-summary-action]")) {
+    button.addEventListener("click", async () => {
+      const action = button.dataset.summaryAction;
+      if (action === "copy") {
+        try {
+          if (!navigator.clipboard?.writeText) {
+            throw new Error("Clipboard unavailable");
+          }
+          await navigator.clipboard.writeText(summary.export_text || summary.summary || "");
+          button.textContent = "Copied";
+          window.setTimeout(() => {
+            button.textContent = "Copy summary";
+          }, 1500);
+        } catch {
+          button.textContent = "Copy failed";
+          window.setTimeout(() => {
+            button.textContent = "Copy summary";
+          }, 1500);
+        }
+      }
+
+      if (action === "print") {
+        window.print();
+      }
+    });
+  }
+}
+
 function renderWalkthrough(walkthrough) {
   if (!walkthroughRoot) {
     return;
@@ -524,7 +729,7 @@ function renderWalkthrough(walkthrough) {
   }
 
   walkthroughRoot.innerHTML = `
-    <section class="walkthrough-card">
+    <section class="walkthrough-card"${changeAttributes("walkthrough")}>
       <div class="support-card-head">
         <div>
           <p class="eyebrow">Guided walkthrough</p>
@@ -547,6 +752,98 @@ function renderWalkthrough(walkthrough) {
           )
           .join("")}
       </div>
+    </section>
+  `;
+}
+
+function renderCompareFieldGrid(fields) {
+  const items = Array.isArray(fields) ? fields.filter((item) => item && item.value) : [];
+  if (!items.length) {
+    return "";
+  }
+
+  return `
+    <div class="compare-field-grid">
+      ${items
+        .map(
+          (field) => `
+            <article class="compare-field-card">
+              <span class="compare-field-label">${escapeHtml(field.label || "")}</span>
+              <strong>${escapeHtml(field.value || "")}</strong>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderCompareExample(item, key) {
+  if (!item) {
+    return "";
+  }
+
+  return `
+    <${item.href ? "a" : "article"} class="compare-example-card compare-example-${escapeHtml(item.status || "neutral")}"${linkAttributes(item.href)}${changeAttributes(key)}>
+      <div class="card-topline">
+        <div>
+          <p class="eyebrow">${escapeHtml(item.eyebrow || "")}</p>
+          <h3>${escapeHtml(item.title || "")}</h3>
+        </div>
+        ${renderStatusPill(item.status || "neutral")}
+      </div>
+      <p class="record-detail">${escapeHtml(item.detail || "")}</p>
+      ${renderMetaBadges(item.meta_badges, "evidence-meta-row")}
+      ${renderCompareFieldGrid(item.fields)}
+    </${item.href ? "a" : "article"}>
+  `;
+}
+
+function renderCompareView(compare) {
+  if (!compareRoot) {
+    return;
+  }
+
+  if (!compare?.title) {
+    compareRoot.innerHTML = "";
+    return;
+  }
+
+  const contrasts = Array.isArray(compare.contrasts) ? compare.contrasts : [];
+  compareRoot.innerHTML = `
+    <section class="compare-card"${changeAttributes("example-compare")}>
+      <div class="support-card-head">
+        <div>
+          <p class="eyebrow">${escapeHtml(compare.eyebrow || "Compare outcomes")}</p>
+          <h3>${escapeHtml(compare.title || "Approved and blocked examples")}</h3>
+        </div>
+      </div>
+      <p class="record-detail">${escapeHtml(compare.detail || "")}</p>
+      <div class="compare-grid">
+        ${renderCompareExample(compare.approved, "compare:approved")}
+        ${renderCompareExample(compare.blocked, "compare:blocked")}
+      </div>
+      ${
+        contrasts.length
+          ? `
+            <div class="compare-contrast-grid">
+              ${contrasts
+                .map(
+                  (row) => `
+                    <article class="compare-contrast-row">
+                      <span class="compare-contrast-label">${escapeHtml(row.label || "")}</span>
+                      <div class="compare-contrast-values">
+                        <p><strong>Approved:</strong> ${escapeHtml(row.approved || "")}</p>
+                        <p><strong>Blocked:</strong> ${escapeHtml(row.blocked || "")}</p>
+                      </div>
+                    </article>
+                  `,
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
     </section>
   `;
 }
@@ -637,7 +934,7 @@ function renderCards(items, className = "cards-grid") {
       ${(Array.isArray(items) ? items : [])
         .map(
           (item) => `
-            <${item.href ? "a" : "article"} class="metric-card"${linkAttributes(item.href)}>
+            <${item.href ? "a" : "article"} class="metric-card"${linkAttributes(item.href)}${changeAttributes(item.id ? `card:${item.id}` : "")}>
               <div class="card-topline">
                 <div class="metric-label">${escapeHtml(item.display_label || item.label || "")}</div>
                 <div class="${statusClass(item.status || "neutral")}" title="${escapeHtml(item.status || "neutral")}">${escapeHtml(statusLabel(item.status || "neutral"))}</div>
@@ -909,7 +1206,7 @@ function renderSections(sections) {
           <div class="section-head">
             <p class="eyebrow">${escapeHtml(section.id || "")}</p>
             <h2>${escapeHtml(section.title || "")}</h2>
-            <p class="section-description">${escapeHtml(section.description || "")}</p>
+            <p class="section-description">${escapeHtml(compactSectionDescription(section))}</p>
           </div>
           ${renderBlocks(section.blocks)}
         </section>
@@ -976,7 +1273,32 @@ function scrollToSection(targetId) {
   setActiveTab(targetId);
 }
 
-function renderTabs(tabs) {
+function renderFreshnessStrip(bar) {
+  const items = Array.isArray(bar.items) ? bar.items : [];
+  if (!items.length) {
+    return "";
+  }
+
+  return `
+    <div class="freshness-strip"${changeAttributes("freshness-strip")}>
+      <span class="freshness-strip-title">${escapeHtml(bar.title || "Current proof")}</span>
+      <div class="freshness-strip-row">
+        ${items
+          .map(
+            (item) => `
+              <span class="freshness-strip-chip freshness-strip-chip-${escapeHtml(item.status || "neutral")}">
+                <span class="freshness-strip-chip-label">${escapeHtml(item.label || "")}</span>
+                <strong>${escapeHtml(item.value || "")}</strong>
+              </span>
+            `,
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderTabs(tabs, freshnessBar = {}) {
   const groups = new Map();
   const allTabs = Array.isArray(tabs) ? tabs : [];
   for (const tab of allTabs) {
@@ -997,6 +1319,7 @@ function renderTabs(tabs) {
           <p class="section-description">Use the short row for the main story. Open the full list only for deeper drill-down.</p>
         </div>
       </div>
+      ${renderFreshnessStrip(freshnessBar)}
       <div class="tab-group-row tab-primary-row">
         ${primaryTabs
           .map(
@@ -1252,20 +1575,24 @@ async function boot() {
     }
 
     const payload = await response.json();
+    updateDashboardChangeTracking(payload);
     lastOverviewPayload = payload;
     renderHero(payload);
+    renderSummarySheet(payload.command_center?.presentation_summary || {});
     renderModeBanner(payload.mode_banner || {});
     renderIncidentBanner(payload.command_center?.incident_banner || {});
     renderRiskStrip(payload.command_center?.risk_strip || {});
     renderNextAction(payload.command_center?.next_action || {});
     renderWalkthrough(payload.command_center?.walkthrough || []);
+    renderCompareView(payload.command_center?.example_compare || {});
     renderBriefing(payload.command_center || {});
     renderProofPipeline(payload.command_center?.proof_pipeline || {});
     renderReadingGuide(payload.reading_guide || {});
     renderKpis(payload.audience_paths || []);
     renderSections(payload.sections);
-    renderTabs(payload.tabs);
+    renderTabs(payload.tabs, payload.command_center?.freshness_bar || {});
     renderSources(payload.sources);
+    applyChangeHighlights();
   } catch (error) {
     const message = escapeHtml(error.message || "Unknown error");
     root.innerHTML = `
@@ -1287,8 +1614,14 @@ async function boot() {
     if (nextActionRoot) {
       nextActionRoot.innerHTML = "";
     }
+    if (summarySheetRoot) {
+      summarySheetRoot.innerHTML = "";
+    }
     if (walkthroughRoot) {
       walkthroughRoot.innerHTML = "";
+    }
+    if (compareRoot) {
+      compareRoot.innerHTML = "";
     }
     if (proofPipelineRoot) {
       proofPipelineRoot.innerHTML = "";

@@ -1706,6 +1706,46 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             _link("Open safety check", "#launch-gate", "Jump straight to the launch and readiness evidence.", "warning"),
             _link("Open approved example", _raw(INSPECTABLE_ALLOWED_FLOW), "Open the latest approved governed handoff proof path.", "healthy"),
         ]
+    dashboard_generated_at = _iso_now()
+    approved_example_timestamp = last_good_run_timestamp or handoff_timestamp
+    approved_example = {
+        "eyebrow": "Approved example",
+        "title": "Governed handoff allowed",
+        "detail": "Use this example when you need to show the system allowing AI access only after the governed checks align.",
+        "status": "healthy",
+        "href": _raw(INSPECTABLE_ALLOWED_FLOW),
+        "fields": [
+            {"label": "Decision", "value": "Allowed"},
+            {"label": "Latest approved trace", "value": last_good_run_trace or "Unavailable"},
+            {"label": "Tenant", "value": str(latest_allowed_request.get("tenant_id", "")) or "Unavailable"},
+            {"label": "Checked", "value": _timestamp_display(approved_example_timestamp) if approved_example_timestamp else "Unavailable"},
+        ],
+        "meta_badges": _timestamp_badges(
+            timestamp=approved_example_timestamp,
+            evidence_mode=str(latest_allowed_request.get("evidence_mode", "")) or ("live" if live_evidence_mode else "demo"),
+            provenance="runtime-generated",
+            label="Approved",
+        ),
+    }
+    blocked_example = {
+        "eyebrow": "Blocked example",
+        "title": "Governed handoff blocked",
+        "detail": "Use this example when you need to show the system refusing unsafe or unsupported AI access.",
+        "status": "critical",
+        "href": flagship_denied["bundle_href"],
+        "fields": [
+            {"label": "Decision", "value": "Blocked"},
+            {"label": "Why it stopped", "value": flagship_denied["reason"]},
+            {"label": "Trace", "value": flagship_denied["trace_id"]},
+            {"label": "Tenant", "value": flagship_denied["tenant"]},
+        ],
+        "meta_badges": _timestamp_badges(
+            timestamp=flagship_denied["timestamp"],
+            evidence_mode="live" if live_evidence_mode else "demo",
+            provenance="runtime-generated",
+            label="Blocked",
+        ),
+    }
     if not latest_handoff_allowed:
         next_action_change = blocked_handoff_trend
         next_action = {
@@ -1813,6 +1853,31 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             label="Blocked",
         ),
     )
+    presentation_summary = {
+        "eyebrow": "Share summary",
+        "title": incident_title,
+        "summary": incident_summary,
+        "status": incident_status,
+        "bullets": [
+            f"Current safety state: {_readiness_display(launch_summary['status'])}.",
+            f"Latest access decision: {_allow_deny_display(latest_handoff_allowed)}.",
+            f"Proof freshness: {evidence_freshness_value}.",
+            f"Latest technical trace: {latest_trace_id or 'Missing'}.",
+            f"Next recommended action: {next_action['title']}.",
+        ],
+        "export_text": "\n".join(
+            [
+                incident_title,
+                incident_summary,
+                f"- Current safety state: {_readiness_display(launch_summary['status'])}.",
+                f"- Latest access decision: {_allow_deny_display(latest_handoff_allowed)}.",
+                f"- Proof freshness: {evidence_freshness_value}.",
+                f"- Latest technical trace: {latest_trace_id or 'Missing'}.",
+                f"- Next recommended action: {next_action['title']}.",
+                f"- Snapshot generated: {_timestamp_display(dashboard_generated_at)}.",
+            ]
+        ),
+    }
     command_center = {
         "cards": [
             _card(
@@ -1997,6 +2062,44 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             _link("Show approved example", _raw(INSPECTABLE_ALLOWED_FLOW), "Open the governed handoff example where the checks passed end to end.", "healthy", display_label="Show approved example", display_description="Use the approved example to show what a healthy governed flow looks like."),
             _link("Open technical proof", latest_governed_flow_href or "#audit-replay", "Inspect the newest governed-flow summary and trace-linked proof trail.", "neutral", display_label="Open technical proof", display_description="Use the latest technical summary when someone needs the raw proof behind the story."),
         ],
+        "example_compare": {
+            "eyebrow": "Compare outcomes",
+            "title": "Approved and blocked examples side by side",
+            "detail": "Use the two examples together to explain what changes between a safe governed handoff and a blocked one.",
+            "approved": approved_example,
+            "blocked": blocked_example,
+            "contrasts": [
+                {
+                    "label": "Decision",
+                    "approved": "Allowed after the governed checks lined up.",
+                    "blocked": "Blocked before the AI runtime handoff.",
+                },
+                {
+                    "label": "Main reason",
+                    "approved": "Identity, policy, retrieval, secret, and trace checks aligned under one governed path.",
+                    "blocked": incident_main_blocker or flagship_denied["reason"],
+                },
+                {
+                    "label": "Best way to use it",
+                    "approved": "Show what healthy governed access looks like.",
+                    "blocked": "Show why the system refuses unsafe or unsupported access.",
+                },
+            ],
+        },
+        "freshness_bar": {
+            "title": "Current proof",
+            "items": [
+                {"label": "Updated", "value": _timestamp_display(dashboard_generated_at), "status": "healthy"},
+                {
+                    "label": "Proof freshness",
+                    "value": evidence_freshness_value,
+                    "status": "healthy" if artifact_counts["stale"] == 0 and artifact_counts["missing"] == 0 else "warning",
+                },
+                {"label": "Latest trace", "value": latest_trace_id or "Missing", "status": "healthy" if latest_trace_id else "critical"},
+                {"label": "Mode", "value": "Live evidence" if live_evidence_mode else "Demo or local evidence", "status": "healthy" if live_evidence_mode else "warning"},
+            ],
+        },
+        "presentation_summary": presentation_summary,
         "proof_pipeline": {
             "title": "Latest governed path",
             "detail": "Follow the latest request through the checks that must line up before AI access is allowed.",
@@ -3071,7 +3174,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "subtitle": str(contract.get("subtitle", "")),
         "hero_copy": str(contract.get("hero_copy", "")),
         "landing_steps": list(contract.get("landing_steps", [])),
-        "generated_at": _iso_now(),
+        "generated_at": dashboard_generated_at,
         "runtime_module": "Safety review layer over the Onyx AI system",
         "data_mode": {
             "label": "Live current evidence" if live_evidence_mode else ("Recent generated governed evidence" if has_live_governed_flow_artifacts(resolved_root) else "Sample/demo governed evidence"),
