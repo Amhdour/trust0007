@@ -243,7 +243,7 @@ docker-compose -f compose/docker-compose.prod-sim.yml up
 
 Not every vendored upstream under `upstream/` is an equally active part of the current architecture.
 
-Checkout/source-management state is locked in `evidence/upstream.lock.json`. Reviewer-facing classification for the dashboard lives in `evidence/upstream_usage.inventory.json`, and `scripts/validate-upstream-state.py` checks that both views stay aligned.
+Checkout/source-management state is locked in `evidence/upstream.lock.json`. Reviewer-facing classification for the dashboard lives in `evidence/upstream_usage.inventory.json`, `scripts/validate-upstream-state.py` checks that both views stay aligned, `scripts/list-upstream-groups.py` prints the default versus opt-in checkout sets, and `scripts/record-upstream-refresh.py` records vendored upstream ref/commit refreshes back into the lock file.
 
 - Active now:
   - Onyx is the governed runtime target behind `/launch/onyx`.

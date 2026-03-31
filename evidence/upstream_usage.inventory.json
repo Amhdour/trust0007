@@ -86,7 +86,7 @@
       "upstream_path": "upstream/envoy",
       "classification": "partially_used",
       "runtime_path_status": "supporting",
-      "recommended_action": "keep as platform dependency but mark source snapshot as reference",
+      "recommended_action": "keep as platform-only dependency until ingress enforcement is proven",
       "runtime_role": "Ingress and edge policy bridge stub for future governed routing into runtime services.",
       "runtime_location": "Compose service and local config under `compose/envoy/`; the current `/launch/onyx` flow does not traverse Envoy.",
       "necessity_rationale": "It remains the intended ingress chokepoint for future JWT validation and route-level governance.",
@@ -110,7 +110,7 @@
       "source_snapshot_required": false,
       "missing_integration_depth": "The governed dashboard-to-Onyx runtime path does not require Envoy yet.",
       "removal_impact": "Would remove the clearest ingress-policy bridge for future hardening, but current governed handoffs would still work.",
-      "status_notes": "Keep the config and container wiring, but avoid describing Envoy as mandatory in the current runtime path."
+      "status_notes": "Keep the config and container wiring, but treat Envoy as platform-only until the governed request path actually traverses it."
     },
     {
       "component_name": "OPA",

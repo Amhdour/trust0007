@@ -41,6 +41,9 @@ def test_upstream_source_lock_covers_every_vendored_component_once() -> None:
     assert len(declared_paths) == len(set(declared_paths))
     assert lock_manifest["audit"]["lock_covers_all_upstreams"] is True
     assert lock_manifest["managed_submodules"] == ["overlays/myStarterKit"]
+    assert lock_manifest["audit"]["checkout_policies_consistent"] is True
+    assert lock_manifest["audit"]["integration_decisions_consistent"] is True
+    assert lock_manifest["audit"]["envoy_platform_only_locked"] is True
 
 
 def test_upstream_inventory_and_lock_manifest_stay_aligned() -> None:
@@ -48,4 +51,9 @@ def test_upstream_inventory_and_lock_manifest_stay_aligned() -> None:
 
     assert inventory["tracking_model"]["lock_path"] == "evidence/upstream.lock.json"
     assert inventory["tracking_model"]["managed_submodules"] == ["overlays/myStarterKit"]
+    assert inventory["tracking_model"]["opt_in_checkout_paths"]
+    assert "Envoy" in inventory["tracking_model"]["platform_only_components"]
     assert inventory["audit"]["lock_consistent"] is True
+    assert inventory["audit"]["checkout_policies_consistent"] is True
+    assert inventory["audit"]["integration_decisions_consistent"] is True
+    assert inventory["audit"]["envoy_platform_only_locked"] is True

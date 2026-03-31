@@ -56,11 +56,31 @@ Behavior:
 - Confirms `evidence/upstream.lock.json` covers every vendored upstream exactly once.
 - Confirms the lock manifest and dashboard inventory agree on path classification and runtime status.
 
+### 4) Print default versus opt-in checkout groups
+```bash
+python scripts/list-upstream-groups.py
+```
+
+Behavior:
+- Prints the upstream components that stay in the default checkout group.
+- Prints the optional/reference upstream components that are explicitly treated as opt-in.
+
+### 5) Record a vendored upstream refresh
+```bash
+python scripts/record-upstream-refresh.py envoy --ref vX.Y.Z --commit <sha> --notes "revalidated ingress config"
+```
+
+Behavior:
+- Records the pinned upstream ref and commit in `evidence/upstream.lock.json`.
+- Updates validation date and refresh notes so the vendored snapshot has a repo-visible refresh trail.
+
 ## Recommended workflow
 1. Run bootstrap script after cloning if the overlay submodule is missing.
 2. Commit `.gitmodules` and gitlink updates if bootstrap introduced new entries.
 3. Run update script whenever you need to refresh managed overlay working trees.
-4. Run the upstream validator whenever the vendored source set or classification model changes.
+4. Use `list-upstream-groups.py` to keep optional and reference upstreams explicitly opt-in in workflow decisions.
+5. Use `record-upstream-refresh.py` whenever a vendored snapshot is intentionally updated.
+6. Run the upstream validator whenever the vendored source set or classification model changes.
 
 ## Notes
 - `upstream/*` is treated as third-party code.

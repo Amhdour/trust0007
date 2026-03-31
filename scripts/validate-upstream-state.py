@@ -36,6 +36,12 @@ def main() -> int:
         errors.append("upstream usage inventory does not cover every vendored upstream exactly once")
     if not inventory.get("audit", {}).get("lock_consistent"):
         errors.append("upstream usage inventory and upstream lock manifest are out of sync")
+    if not lock_manifest.get("audit", {}).get("checkout_policies_consistent"):
+        errors.append("upstream lock manifest checkout policies do not match the component classifications")
+    if not lock_manifest.get("audit", {}).get("integration_decisions_consistent"):
+        errors.append("upstream lock manifest integration decisions do not match the component classifications")
+    if not lock_manifest.get("audit", {}).get("envoy_platform_only_locked"):
+        errors.append("Envoy is no longer explicitly locked as a platform-only dependency")
 
     if errors:
         print("Upstream state validation failed:", file=sys.stderr)
@@ -47,6 +53,14 @@ def main() -> int:
     print(f"Managed submodules: {', '.join(lock_manifest.get('managed_submodules', []))}")
     print(f"Vendored upstream components: {lock_manifest.get('component_count', 0)}")
     print(f"Tracking model: {inventory.get('tracking_model', {}).get('mode', 'unknown')}")
+    print(
+        "Default checkout paths: "
+        f"{len(lock_manifest.get('audit', {}).get('default_checkout_paths', []))}"
+    )
+    print(
+        "Opt-in checkout paths: "
+        f"{len(lock_manifest.get('audit', {}).get('opt_in_checkout_paths', []))}"
+    )
     return 0
 
 

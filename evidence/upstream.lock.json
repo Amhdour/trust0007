@@ -17,7 +17,11 @@
       "integration_owner": "runtime",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "default",
+      "integration_decision": "active_now",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only with governed runtime revalidation and Onyx handoff tests.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -30,7 +34,11 @@
       "integration_owner": "identity",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "default",
+      "integration_decision": "active_now",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only with identity adapter, live handoff, and realm-template validation.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -43,7 +51,11 @@
       "integration_owner": "ingress",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "default",
+      "integration_decision": "platform_only",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only when ingress policy wiring or route-level governance work is being advanced.",
+      "refresh_notes": "Envoy stays platform-only until the governed request path actually traverses it.",
       "last_validated": "2026-03-31"
     },
     {
@@ -56,7 +68,11 @@
       "integration_owner": "policy",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "default",
+      "integration_decision": "active_now",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only with policy bundle validation and strict live governed-path checks.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -69,7 +85,11 @@
       "integration_owner": "secrets",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "default",
+      "integration_decision": "active_now",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only with secret-path validation and fail-closed secret retrieval tests.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -82,7 +102,11 @@
       "integration_owner": "retrieval",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "default",
+      "integration_decision": "active_now",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only with governed retrieval validation and tenant-filter checks.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -95,7 +119,11 @@
       "integration_owner": "observability",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "default",
+      "integration_decision": "active_now",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only with evidence-plane export or live activity feed validation.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -108,7 +136,11 @@
       "integration_owner": "observability",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "default",
+      "integration_decision": "platform_only",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only when operator drill-down dashboards or provisioning change materially.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -121,7 +153,11 @@
       "integration_owner": "analytics",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "opt_in",
+      "integration_decision": "opt_in_only",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only when historical trust analytics becomes an active reviewer workflow.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -134,7 +170,11 @@
       "integration_owner": "sandbox",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "opt_in",
+      "integration_decision": "opt_in_only",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only when sandbox isolation work becomes part of the proven runtime path.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -147,7 +187,11 @@
       "integration_owner": "identity",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "opt_in",
+      "integration_decision": "reference_only",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only when identity integration work needs example scaffolding.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -160,7 +204,11 @@
       "integration_owner": "policy",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "opt_in",
+      "integration_decision": "reference_only",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only when Envoy ext_authz work moves from reference into the live path.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     },
     {
@@ -173,7 +221,11 @@
       "integration_owner": "observability",
       "tracked_as": "vendored_snapshot",
       "checkout_policy": "opt_in",
+      "integration_decision": "reference_only",
+      "source_ref": "",
+      "source_commit": "",
       "refresh_policy": "Refresh only when direct SDK instrumentation replaces or supplements repo-owned exporters.",
+      "refresh_notes": "",
       "last_validated": "2026-03-31"
     }
   ]

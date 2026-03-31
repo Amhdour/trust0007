@@ -34,6 +34,7 @@ UPSTREAM_INVENTORY_CLASSIFICATIONS = {
 UPSTREAM_RUNTIME_PATH_STATUSES = {"mandatory", "supporting", "optional", "reference"}
 UPSTREAM_SOURCE_TRACKING_MODES = {"vendored_snapshot"}
 UPSTREAM_SOURCE_CHECKOUT_POLICIES = {"default", "opt_in"}
+UPSTREAM_INTEGRATION_DECISIONS = {"active_now", "platform_only", "opt_in_only", "reference_only"}
 
 
 @dataclass(frozen=True)
@@ -165,6 +166,7 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
         runtime_path_status = str(component.get("runtime_path_status", "")).strip()
         tracked_as = str(component.get("tracked_as", "")).strip()
         checkout_policy = str(component.get("checkout_policy", "")).strip()
+        integration_decision = str(component.get("integration_decision", "")).strip()
         if component_path:
             path_to_components.setdefault(component_path, []).append(component)
         required_fields = (
@@ -177,6 +179,7 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
             str(component.get("integration_owner", "")).strip(),
             tracked_as,
             checkout_policy,
+            integration_decision,
             str(component.get("refresh_policy", "")).strip(),
             str(component.get("last_validated", "")).strip(),
         )
@@ -186,12 +189,76 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
             or runtime_path_status not in UPSTREAM_RUNTIME_PATH_STATUSES
             or tracked_as not in UPSTREAM_SOURCE_TRACKING_MODES
             or checkout_policy not in UPSTREAM_SOURCE_CHECKOUT_POLICIES
+            or integration_decision not in UPSTREAM_INTEGRATION_DECISIONS
+            or "source_ref" not in component
+            or "source_commit" not in component
+            or "refresh_notes" not in component
         ):
             invalid_components.append(component_name or component_path or "unknown-component")
 
     missing_paths = [path for path in component_paths if path not in path_to_components]
     extra_paths = [path for path in path_to_components if path not in component_paths]
     duplicate_paths = sorted(path for path, mapped in path_to_components.items() if len(mapped) > 1)
+    default_checkout_paths = sorted(
+        str(component.get("upstream_path", "")).strip()
+        for component in components
+        if str(component.get("checkout_policy", "")).strip() == "default"
+    )
+    opt_in_checkout_paths = sorted(
+        str(component.get("upstream_path", "")).strip()
+        for component in components
+        if str(component.get("checkout_policy", "")).strip() == "opt_in"
+    )
+    platform_only_components = sorted(
+        str(component.get("component_name", "")).strip()
+        for component in components
+        if str(component.get("integration_decision", "")).strip() == "platform_only"
+    )
+    checkout_policy_mismatches = []
+    integration_decision_mismatches = []
+    for component in components:
+        component_name = str(component.get("component_name", "")).strip() or "unknown-component"
+        classification = str(component.get("classification", "")).strip()
+        checkout_policy = str(component.get("checkout_policy", "")).strip()
+        integration_decision = str(component.get("integration_decision", "")).strip()
+
+        expected_checkout_policy = "default" if classification in {"used_now", "partially_used"} else "opt_in"
+        if checkout_policy != expected_checkout_policy:
+            checkout_policy_mismatches.append(
+                {
+                    "component_name": component_name,
+                    "classification": classification,
+                    "checkout_policy": checkout_policy,
+                    "expected_checkout_policy": expected_checkout_policy,
+                }
+            )
+
+        expected_integration_decision = {
+            "used_now": "active_now",
+            "partially_used": "platform_only",
+            "optional_future": "opt_in_only",
+            "reference_only": "reference_only",
+        }.get(classification, "")
+        if integration_decision != expected_integration_decision:
+            integration_decision_mismatches.append(
+                {
+                    "component_name": component_name,
+                    "classification": classification,
+                    "integration_decision": integration_decision,
+                    "expected_integration_decision": expected_integration_decision,
+                }
+            )
+
+    envoy_component = next(
+        (component for component in components if str(component.get("upstream_path", "")).strip() == "upstream/envoy"),
+        {},
+    )
+    envoy_platform_only_locked = (
+        str(envoy_component.get("classification", "")).strip() == "partially_used"
+        and str(envoy_component.get("runtime_path_status", "")).strip() == "supporting"
+        and str(envoy_component.get("integration_decision", "")).strip() == "platform_only"
+        and str(envoy_component.get("checkout_policy", "")).strip() == "default"
+    )
     managed_submodules = [
         str(path).strip()
         for path in lock_manifest.get("managed_submodules", [])
@@ -201,6 +268,10 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
     enriched_lock = dict(lock_manifest)
     enriched_lock["component_count"] = len(components)
     enriched_lock["upstream_paths"] = component_paths
+    enriched_lock["checkout_groups"] = {
+        "default_paths": default_checkout_paths,
+        "opt_in_paths": opt_in_checkout_paths,
+    }
     enriched_lock["audit"] = {
         "lock_path": UPSTREAM_SOURCE_LOCK_PATH,
         "component_paths_in_repo": component_paths,
@@ -211,6 +282,14 @@ def load_upstream_source_lock(root: Path | None = None) -> dict[str, Any]:
         "invalid_components": sorted(invalid_components),
         "lock_covers_all_upstreams": not missing_paths and not extra_paths and not duplicate_paths,
         "managed_submodules": managed_submodules,
+        "default_checkout_paths": default_checkout_paths,
+        "opt_in_checkout_paths": opt_in_checkout_paths,
+        "platform_only_components": platform_only_components,
+        "checkout_policy_mismatches": checkout_policy_mismatches,
+        "checkout_policies_consistent": not checkout_policy_mismatches,
+        "integration_decision_mismatches": integration_decision_mismatches,
+        "integration_decisions_consistent": not integration_decision_mismatches,
+        "envoy_platform_only_locked": envoy_platform_only_locked,
     }
     return enriched_lock
 
@@ -302,6 +381,9 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
         "mode": str(lock_manifest.get("tracking_model", "")).strip(),
         "lock_path": UPSTREAM_SOURCE_LOCK_PATH,
         "managed_submodules": list(lock_manifest.get("managed_submodules", [])),
+        "default_checkout_paths": list(lock_manifest.get("checkout_groups", {}).get("default_paths", [])),
+        "opt_in_checkout_paths": list(lock_manifest.get("checkout_groups", {}).get("opt_in_paths", [])),
+        "platform_only_components": list(lock_manifest.get("audit", {}).get("platform_only_components", [])),
     }
     enriched_inventory["audit"] = {
         "inventory_path": UPSTREAM_USAGE_INVENTORY_PATH,
@@ -328,6 +410,11 @@ def load_upstream_usage_inventory(root: Path | None = None) -> dict[str, Any]:
             and bool(lock_manifest.get("audit", {}).get("lock_covers_all_upstreams"))
         ),
         "managed_submodules": list(lock_manifest.get("managed_submodules", [])),
+        "default_checkout_paths": list(lock_manifest.get("audit", {}).get("default_checkout_paths", [])),
+        "opt_in_checkout_paths": list(lock_manifest.get("audit", {}).get("opt_in_checkout_paths", [])),
+        "checkout_policies_consistent": bool(lock_manifest.get("audit", {}).get("checkout_policies_consistent")),
+        "integration_decisions_consistent": bool(lock_manifest.get("audit", {}).get("integration_decisions_consistent")),
+        "envoy_platform_only_locked": bool(lock_manifest.get("audit", {}).get("envoy_platform_only_locked")),
     }
     return enriched_inventory
 

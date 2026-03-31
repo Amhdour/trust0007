@@ -9,3 +9,5 @@ Helper scripts for demo, vendored upstream source management, and local control-
 - `bootstrap-submodules.sh`: declares missing managed overlay submodules that are still intentionally linked.
 - `update-submodules.sh`: syncs and refreshes the managed overlay submodule working trees.
 - `validate-upstream-state.py`: checks that vendored upstream paths, the upstream lock manifest, and the dashboard inventory remain consistent.
+- `list-upstream-groups.py`: prints the default and opt-in vendored upstream checkout groups from the lock manifest.
+- `record-upstream-refresh.py`: records a vendored upstream ref/commit refresh into `evidence/upstream.lock.json`.

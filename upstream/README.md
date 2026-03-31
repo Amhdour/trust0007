@@ -4,6 +4,8 @@
 
 These folders are intentionally kept flat for compatibility with compose files, adapters, and local scripts, but they are not all equally active in the current architecture. The operational classification lives in [upstream-usage-matrix.md](/workspaces/beta011/docs/upstream-usage-matrix.md), the checkout/source lock lives in [upstream.lock.json](/workspaces/beta011/evidence/upstream.lock.json), and the dashboard-facing inventory lives in [upstream_usage.inventory.json](/workspaces/beta011/evidence/upstream_usage.inventory.json).
 
+Use `python /workspaces/beta011/scripts/list-upstream-groups.py` to see the default versus opt-in checkout groups, and `python /workspaces/beta011/scripts/record-upstream-refresh.py ...` whenever a vendored snapshot is intentionally refreshed and needs a pinned ref/commit recorded.
+
 ## Active Now
 
 - `upstream/onyx`

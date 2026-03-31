@@ -178,8 +178,10 @@ def test_upstream_usage_inventory_is_machine_readable() -> None:
     assert inventory["components"]
     assert inventory["audit"]["inventory_covers_all_upstreams"] is True
     assert inventory["audit"]["lock_consistent"] is True
+    assert inventory["audit"]["envoy_platform_only_locked"] is True
     assert set(inventory["upstream_paths"]) == set(list_upstream_component_paths())
     assert inventory["tracking_model"]["lock_path"] == "evidence/upstream.lock.json"
+    assert "upstream/superset" in inventory["tracking_model"]["opt_in_checkout_paths"]
     assert any(component["component_name"] == "Onyx" for component in inventory["components"])
     assert any(component["classification"] == "reference_only" for component in inventory["components"])
     assert any(component["runtime_path_status"] == "mandatory" for component in inventory["components"])
