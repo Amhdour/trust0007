@@ -46,6 +46,13 @@ A live-mode governed handoff is considered proven only if:
 - Each major dependency can fail closed and block Onyx handoff.
 - The dashboard exposes live mode, latest dependency posture, launch-gate status, and latest handoff result.
 - Reviewer artifacts include one passing live flow and dependency-specific failure examples.
+- Unauthenticated requests or bearer tokens without the required `openid` scope still fail closed at the identity boundary.
+
+## What is not yet fully proven
+
+- “The governed live path is proven” is the right claim. It is stronger and more precise than saying the entire project or every supporting service is fully live-ready.
+- In containerized local setups where Onyx runs outside the compose network, runtime-local health proof can remain partial even when the governed live chain is passing. That is why `onyx-runtime-proof.json` can still show runtime-visibility caveats while the live launch gate is passing.
+- The local Keycloak tenant mapper used by the bootstrap flow is intentionally development-only. It is a local single-tenant proof aid, not a production tenant-claim strategy.
 
 ## What remains supporting or future
 

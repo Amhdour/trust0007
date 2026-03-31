@@ -89,6 +89,27 @@ That path proves:
 - launch-gate pass from live evidence
 - governed Onyx handoff approval
 
+## Repeatable Local Live Bootstrap
+
+If you want to stand the strict local live path up from scratch, use the repeatable bootstrap instead of re-seeding Keycloak, Qdrant, and Vault by hand:
+
+```bash
+make bootstrap-live
+make smoke-live
+```
+
+That workflow:
+
+- imports or reuses the local Keycloak realm
+- applies the dev-only local `tenant_id` mapper used by the single-tenant bootstrap
+- creates or refreshes the repeatable live bootstrap user
+- seeds tenant-scoped Qdrant content and the required Vault runtime secret
+- starts the control plane in `live` mode
+- mints a real Keycloak token with `openid email profile` from the control-plane network context
+- verifies `/launch/onyx?path=/app&mode=live` and the live dashboard evidence
+
+The precise claim after `make smoke-live` passes is: the governed live path is proven. That is intentionally narrower and more accurate than claiming every supporting service or every runtime-health surface is fully production-ready.
+
 ## Failing Strict Live Flow Examples
 
 The strongest “see a deny” and “see a no-go” paths are:
@@ -146,7 +167,7 @@ When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a gover
 
 ## What Is Proven Now
 
-- Proven mandatory path elements:
+- Proven mandatory path elements in the governed live flow:
   - Onyx handoff behind the dashboard
   - Keycloak-compatible identity
   - OPA policy decision
@@ -154,6 +175,8 @@ When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a gover
   - Vault secret access when required
   - trace correlation
   - live-evidence launch gate
+- Precise current claim:
+  - the governed live path is proven
 - Active supporting elements:
   - Langfuse
   - Envoy
@@ -172,6 +195,12 @@ When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a gover
 - Grafana is a useful drill-down surface, but not a fail-closed dependency.
 - Langfuse is active for observability, but live handoff proof does not depend on Langfuse reachability.
 - Superset and gVisor remain future or optional depth.
+
+## What Is Not Yet Fully Proven
+
+- The repo should not claim that every supporting service or every runtime-health surface is fully live-ready just because the governed live handoff is passing.
+- In containerized local setups where Onyx runs outside the compose network, runtime-local health proof can remain partial even when the governed live chain is passing. That is why `overlays/myStarterKit/artifacts/onyx-runtime-proof.json` can still show visibility caveats while the live launch gate is passing.
+- The local strict-live bootstrap uses a dev-only Keycloak mapper that hardcodes `tenant_id=tenant-dashboard` for the single-tenant local stack. It is a local proof aid, not a production tenant-claim design.
 
 ## Design intent
 

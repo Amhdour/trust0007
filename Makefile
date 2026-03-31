@@ -1,4 +1,4 @@
-.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template
+.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live
 
 CLIENT_NAME ?= Example Client
 CLIENT_SLUG ?= example-client
@@ -50,3 +50,9 @@ stage-default-upstream:
 
 init-client-template:
 	python scripts/init-client-template.py --client-name "$(CLIENT_NAME)" --client-slug "$(CLIENT_SLUG)" --engagement-track "$(ENGAGEMENT_TRACK)" --primary-runtime "$(PRIMARY_RUNTIME)"
+
+bootstrap-live:
+	bash scripts/bootstrap-live-governed-path.sh
+
+smoke-live:
+	docker compose --env-file compose/.env -f compose/docker-compose.yml exec -T control_plane python scripts/smoke-live-onyx-handoff.py --keycloak-base-url http://keycloak:8080

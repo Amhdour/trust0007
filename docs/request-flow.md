@@ -31,6 +31,7 @@ Demo mode is useful for fast iteration, but it is not equivalent to the strict l
 In live mode, governed handoff to `/launch/onyx` requires this order:
 
 1. Keycloak-backed bearer token or session cookie is resolved into normalized identity.
+   The local strict-live smoke path requests `openid email profile` scope so Keycloak `userinfo` can participate. Without `openid`, identity should fail closed.
 2. OPA receives the live policy input and returns an auditable decision.
 3. Retrieval executes against the configured live backend and passes tenant, trust, and provenance checks.
 4. Required runtime secret access succeeds through Vault-backed secret retrieval.
@@ -118,3 +119,7 @@ Governed handoff to the Onyx runtime.
 ## Reviewer note
 
 Do not describe live identity, live OPA, live retrieval, live secret access, or live-evidence launch-gate as active unless the artifacts above were produced by the governed flow being reviewed.
+
+Local development note:
+
+- The repeatable local bootstrap uses a dev-only Keycloak mapper that hardcodes `tenant_id=tenant-dashboard` so a single local tenant can exercise the strict live path. Treat that as local bootstrap scaffolding, not as a production tenant-claim pattern.
