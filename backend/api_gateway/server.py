@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import urlopen
 
 from adapters.identity.keycloak import KeycloakIdentityProvider
+from backend.activity_service.service import build_onyx_runtime_proof
 from backend.integration_adapter import load_runtime_policy_bundle
 from backend.integration_adapter.repository import load_upstream_usage_inventory
 from backend.posture_service.service import build_control_plane_dashboard, build_control_plane_live_log
@@ -371,6 +372,184 @@ def _artifact_list_markup(artifacts: dict[str, str]) -> str:
     return "".join(items)
 
 
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _artifact_relative_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _load_json_array(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return payload if isinstance(payload, list) else []
+
+
+def _onyx_reachability_summary(
+    *,
+    governance_allowed: bool,
+    local_ready: bool | None,
+    public_ready: bool | None,
+    local_url: str,
+    public_url: str,
+) -> dict[str, object]:
+    if not governance_allowed:
+        status = "blocked_before_runtime"
+        label = "Blocked before runtime"
+        detail = "Governance denied the handoff before the control plane could rely on Onyx runtime availability."
+    elif local_ready and public_ready:
+        status = "local_and_public_ready"
+        label = "Local + public reachable"
+        detail = "The governed target is reachable from the local Onyx runtime and from the public handoff URL."
+    elif local_ready:
+        status = "local_ready_public_pending"
+        label = "Local reachable, public pending"
+        detail = "The local Onyx runtime is up, but the public tunnel still needs attention before outside browser access will work cleanly."
+    elif public_ready:
+        status = "public_visible_local_unhealthy"
+        label = "Public visible, local unhealthy"
+        detail = "The public URL responds, but the local Onyx runtime behind it is not healthy yet."
+    else:
+        status = "runtime_unreachable"
+        label = "Runtime not reachable"
+        detail = "Governance approved the handoff, but the configured Onyx runtime is not responding yet."
+    return {
+        "status": status,
+        "label": label,
+        "detail": detail,
+        "local_url": local_url,
+        "public_url": public_url,
+        "local_ready": bool(local_ready),
+        "public_ready": bool(public_ready),
+    }
+
+
+def _sync_runtime_proof_refs(trace_id: str, proof: dict, refs: dict[str, str]) -> None:
+    runtime_summary = {
+        "captured_at": str(proof.get("generated_at", "")),
+        "artifact": refs.get("latest", ""),
+        "history_artifact": refs.get("history", refs.get("latest", "")),
+        "requested_path": str(proof.get("requested_path", "")),
+        "reachability": dict(proof.get("reachability", {})),
+        "continuity": dict(proof.get("continuity", {})),
+        "latest_activity": dict(proof.get("latest_activity", {})),
+        "matched_activity": dict(proof.get("matched_activity", {})),
+    }
+
+    summary_paths = [
+        ARTIFACT_DIR / "governed-flow-summary.json",
+        ARTIFACT_DIR / "governed-request-history" / trace_id / "governed-flow-summary.json",
+    ]
+    for summary_path in summary_paths:
+        if not summary_path.exists():
+            continue
+        payload = json.loads(summary_path.read_text(encoding="utf-8"))
+        if trace_id and str(payload.get("trace_id", "")) not in {"", trace_id}:
+            continue
+        payload["runtime_proof"] = runtime_summary
+        _write_json(summary_path, payload)
+
+    feed_path = ARTIFACT_DIR / "governed-request-feed.json"
+    feed = _load_json_array(feed_path)
+    if not feed:
+        return
+    updated = False
+    for item in feed:
+        if str(item.get("trace_id", "")) != trace_id:
+            continue
+        artifact_refs = dict(item.get("artifact_refs", {}))
+        artifact_refs["onyx_runtime_proof"] = refs.get("history", refs.get("latest", ""))
+        item["artifact_refs"] = artifact_refs
+        item["runtime_proof"] = runtime_summary
+        updated = True
+    if updated:
+        _write_json(feed_path, feed)
+
+
+def _record_onyx_runtime_proof(
+    *,
+    requested_path: str,
+    governance_allowed: bool,
+    flow_result: GovernedFlowEvaluator | object | None,
+    flow_mode: str,
+    local_ready: bool | None,
+    public_ready: bool | None,
+    local_url: str,
+    public_url: str,
+) -> dict:
+    trace_id = str(getattr(flow_result, "trace_id", "") if flow_result else "")
+    session_id = str(getattr(flow_result, "session_id", "") if flow_result else "")
+    proof = build_onyx_runtime_proof(
+        REPO_ROOT,
+        requested_path=requested_path,
+        trace_id=trace_id,
+        session_id=session_id,
+    )
+    latest_path = ARTIFACT_DIR / "onyx-runtime-proof.json"
+    history_path = ARTIFACT_DIR / "governed-request-history" / trace_id / "onyx-runtime-proof.json" if trace_id else None
+    refs = {
+        "latest": _artifact_relative_path(latest_path),
+        "history": _artifact_relative_path(history_path) if history_path else _artifact_relative_path(latest_path),
+    }
+    proof.update(
+        {
+            "artifact": refs["latest"],
+            "history_artifact": refs["history"],
+            "handoff_allowed": governance_allowed,
+            "evidence_mode": str(getattr(flow_result, "evidence_mode", flow_mode) if flow_result else flow_mode),
+            "launch_gate_decision": str(getattr(flow_result, "launch_gate_decision", "") if flow_result else ""),
+            "policy_source": str(getattr(flow_result, "policy_source", "") if flow_result else ""),
+            "policy_path": str(getattr(flow_result, "policy_path", "") if flow_result else ""),
+            "reachability": _onyx_reachability_summary(
+                governance_allowed=governance_allowed,
+                local_ready=local_ready,
+                public_ready=public_ready,
+                local_url=local_url,
+                public_url=public_url,
+            ),
+        }
+    )
+    _write_json(latest_path, proof)
+    if history_path:
+        _write_json(history_path, proof)
+        _sync_runtime_proof_refs(trace_id, proof, refs)
+    return proof
+
+
+def _runtime_proof_markup(runtime_proof: dict) -> str:
+    continuity = dict(runtime_proof.get("continuity", {}))
+    reachability = dict(runtime_proof.get("reachability", {}))
+    latest_activity = dict(runtime_proof.get("matched_activity") or runtime_proof.get("latest_activity") or {})
+    latest_summary = str(latest_activity.get("summary", "")) or "No recent Onyx runtime activity captured yet."
+    latest_timestamp = str(latest_activity.get("timestamp", ""))
+    latest_activity_markup = escape(latest_summary)
+    if latest_timestamp:
+        latest_activity_markup = f"{latest_activity_markup} <span class=\"muted\">at <code>{escape(latest_timestamp)}</code></span>"
+    artifact_ref = str(runtime_proof.get("artifact", ""))
+    artifact_link = f"/raw/{quote(artifact_ref)}" if artifact_ref else ""
+    artifact_markup = (
+        f'<div class="muted">Proof artifact: <a href="{escape(artifact_link, quote=True)}"><code>{escape(artifact_ref)}</code></a></div>'
+        if artifact_ref
+        else ""
+    )
+    return f"""
+      <div class="status">
+        <strong>Runtime proof after handoff</strong>
+        <div class="muted">Reachability: <code>{escape(str(reachability.get("label", "Unavailable")))}</code></div>
+        <div class="muted">Continuity: <code>{escape(str(continuity.get("label", "Unavailable")))}</code></div>
+        <div class="muted">{escape(str(continuity.get("detail", "")))}</div>
+        <div class="muted">Latest Onyx activity: {latest_activity_markup}</div>
+        {artifact_markup}
+      </div>
+"""
+
+
 def _build_secret_provider() -> VaultSecretsProvider | None:
     vault_addr = os.environ.get("CONTROL_PLANE_VAULT_ADDR", "http://vault:8200").strip()
     vault_token = os.environ.get("CONTROL_PLANE_VAULT_TOKEN", "").strip()
@@ -615,11 +794,27 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
         # Determine if handoff is allowed
         governance_allowed = flow_result.decision if flow_result else False
+        onyx_port = _onyx_runtime_port()
+        local_url = f"http://127.0.0.1:{onyx_port}{safe_path}"
+        public_url = _public_service_url(onyx_port, safe_path)
 
         if not governance_allowed:
+            runtime_proof = _record_onyx_runtime_proof(
+                requested_path=safe_path,
+                governance_allowed=False,
+                flow_result=flow_result,
+                flow_mode=flow_mode,
+                local_ready=None,
+                public_ready=None,
+                local_url=local_url,
+                public_url=public_url,
+            )
+            if flow_result:
+                flow_result.artifacts["onyx_runtime_proof"] = str(runtime_proof.get("artifact", ""))
             denial_reasons = [escape(reason) for reason in (flow_result.reasons if flow_result else [f"Evaluator error: {error_reason or 'governance check failed'}"])]
             artifact_markup = _artifact_list_markup(flow_result.artifacts if flow_result else {})
             dependency_markup = _dependency_summary_markup(flow_result)
+            runtime_proof_section = _runtime_proof_markup(runtime_proof)
             # Governance denied the handoff
             body = f"""<!doctype html>
 <html lang="en">
@@ -695,6 +890,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
       <ul>
         {"".join(f"<li>{reason}</li>" for reason in denial_reasons)}
       </ul>
+      {runtime_proof_section}
       <p><strong>Dependency status:</strong></p>
       <ul>
         {dependency_markup}
@@ -717,11 +913,21 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             return
 
         # Governance allowed the handoff, proceed with link
-        onyx_port = _onyx_runtime_port()
-        local_url = f"http://127.0.0.1:{onyx_port}{safe_path}"
-        public_url = _public_service_url(onyx_port, safe_path)
         local_ready = self._url_is_reachable(local_url)
         codespaces_visible = self._url_is_reachable(_public_service_url(onyx_port))
+        runtime_proof = _record_onyx_runtime_proof(
+            requested_path=safe_path,
+            governance_allowed=True,
+            flow_result=flow_result,
+            flow_mode=flow_mode,
+            local_ready=local_ready,
+            public_ready=codespaces_visible,
+            local_url=local_url,
+            public_url=public_url,
+        )
+        if flow_result:
+            flow_result.artifacts["onyx_runtime_proof"] = str(runtime_proof.get("artifact", ""))
+        runtime_proof_section = _runtime_proof_markup(runtime_proof)
 
         if local_ready and codespaces_visible:
             runtime_summary = (
@@ -873,6 +1079,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
       </div>
       <p class="muted">Target URL: <code>{public_url}</code></p>
       {next_steps}
+      {runtime_proof_section}
       <div class="governance">
         <strong>Governance Audit Trail:</strong><br>
         Trace: <code>{flow_result.trace_id if flow_result else 'unknown'}</code><br>

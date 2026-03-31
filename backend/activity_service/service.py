@@ -412,3 +412,94 @@ def build_activity_snapshot(root: Path, limit: int = DEFAULT_ACTIVITY_LIMIT) -> 
             "langfuse": langfuse_status,
         },
     }
+
+
+def _normalize_requested_path(requested_path: str) -> str:
+    candidate = requested_path.strip()
+    if not candidate:
+        return "/"
+    return candidate if candidate.startswith("/") else f"/{candidate.lstrip('/')}"
+
+
+def _activity_entry_summary(entry: dict[str, str]) -> dict[str, str]:
+    return {
+        "timestamp": str(entry.get("timestamp", "")),
+        "summary": str(entry.get("summary", "")),
+        "source_label": str(entry.get("source_label", "")),
+        "event_type": str(entry.get("event_type", "")),
+        "status": str(entry.get("status", "")),
+        "severity": str(entry.get("severity", "")),
+    }
+
+
+def _matches_requested_path(entry: dict[str, str], requested_path: str) -> bool:
+    if not requested_path or requested_path == "/":
+        return False
+    summary = str(entry.get("summary", ""))
+    if requested_path in summary:
+        return True
+    path_only = requested_path.split("?", 1)[0]
+    return bool(path_only and path_only != "/" and path_only in summary)
+
+
+def build_onyx_runtime_proof(
+    root: Path,
+    *,
+    requested_path: str = "",
+    trace_id: str = "",
+    session_id: str = "",
+    activity_snapshot: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    snapshot = activity_snapshot or build_activity_snapshot(root)
+    normalized_path = _normalize_requested_path(requested_path)
+    onyx_entries = [
+        entry
+        for entry in snapshot.get("entries", [])
+        if entry.get("source") == "onyx" and entry.get("event_type") != "Onyx status"
+    ]
+    matched_entries = [entry for entry in onyx_entries if _matches_requested_path(entry, normalized_path)]
+    latest_activity = matched_entries[0] if matched_entries else (onyx_entries[0] if onyx_entries else {})
+
+    if matched_entries:
+        continuity_status = "path_activity_observed"
+        continuity_label = "Path activity seen"
+        continuity_detail = (
+            "Recent Onyx activity matched the governed target path. Trace and session identifiers remain linked "
+            "through control-plane artifacts rather than current Onyx container logs."
+        )
+    elif onyx_entries:
+        continuity_status = "runtime_activity_observed"
+        continuity_label = "Runtime activity seen"
+        continuity_detail = (
+            "Recent Onyx activity is visible, but the current runtime logs do not expose the same trace or session "
+            "identifiers, so continuity remains anchored in the control-plane trace."
+        )
+    else:
+        continuity_status = "no_runtime_activity"
+        continuity_label = "No recent activity"
+        continuity_detail = (
+            "No recent Onyx container activity was found. The control plane still has the governed handoff trace, "
+            "but there is no fresh runtime activity to compare against it yet."
+        )
+
+    return {
+        "generated_at": _now_iso(),
+        "runtime_target": "onyx",
+        "requested_path": normalized_path,
+        "trace_id": trace_id,
+        "session_id": session_id,
+        "activity_source_status": str(snapshot.get("sources", {}).get("onyx", "")),
+        "activity_observed": bool(onyx_entries),
+        "activity_count": len(onyx_entries),
+        "requested_path_activity_observed": bool(matched_entries),
+        "requested_path_activity_count": len(matched_entries),
+        "latest_activity": _activity_entry_summary(latest_activity) if latest_activity else {},
+        "matched_activity": _activity_entry_summary(matched_entries[0]) if matched_entries else {},
+        "continuity": {
+            "status": continuity_status,
+            "label": continuity_label,
+            "detail": continuity_detail,
+            "trace_visible_in_runtime": False,
+            "session_visible_in_runtime": False,
+        },
+    }
