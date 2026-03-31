@@ -107,7 +107,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--primary-runtime",
         default="Onyx",
-        help="Primary governed runtime label used in the generated scaffold.",
+        help="Primary governed runtime label used in the generated scaffold. Defaults to the repo's reference runtime, Onyx.",
     )
     parser.add_argument(
         "--tenant-id",
@@ -214,7 +214,8 @@ def main() -> int:
     print("Next steps:")
     print("1. Replace scaffold policy, retrieval, secrets, and readiness placeholders with client-specific decisions.")
     print("2. Decide whether this engagement stays demo-only or must prove live identity, policy, retrieval, and launch-gate evidence.")
-    print("3. Redirect evidence output paths before reusing any generated artifacts for a client demonstration.")
+    print("3. Decide whether the generated overlay keeps the default reference runtime or swaps to another governed runtime profile.")
+    print("4. Redirect evidence output paths before reusing any generated artifacts for a client demonstration.")
     return 0
 
 

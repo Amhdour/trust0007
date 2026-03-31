@@ -42,7 +42,15 @@ The client overview is intentionally lighter than the technical dashboard. It ex
 
 ## Client Template Mode
 
-This repository can now act as a reusable client template, not just a single working project.
+This repository can now act as a reusable client delivery template for AI Trust & Security Readiness engagements, not just a single working project.
+
+It supports three repeatable engagement tracks:
+
+- Layer Retrofit
+- Secure Starter Kit
+- Launch Gate
+
+Onyx remains the default reference runtime used in this repo, but the client-template model is meant to support other governed RAG or agent runtimes as well.
 
 - template guide: [docs/client-template-kit.md](/workspaces/beta011/docs/client-template-kit.md)
 - engagement tracks: [docs/client-engagement-tracks.md](/workspaces/beta011/docs/client-engagement-tracks.md)
@@ -55,7 +63,11 @@ Materialize a client-ready overlay scaffold:
 make init-client-template CLIENT_NAME="Acme Health" CLIENT_SLUG=acme-health ENGAGEMENT_TRACK=layer-retrofit PRIMARY_RUNTIME=Onyx
 ```
 
-That generates `overlays/client-acme-health/` with tokenized client profile, policy, retrieval, secrets, readiness, runtime, and observability scaffolds. It does not overwrite the current `myStarterKit` baseline or pretend demo artifacts are client proof.
+That generates `overlays/client-acme-health/` with tokenized client profile, policy, retrieval, identity, secrets, runtime, observability, and launch-gate scaffolds.
+
+It scaffolds governance structure and placeholders only. It does not overwrite the current `myStarterKit` baseline, reuse prior client evidence, or claim live readiness by default.
+
+The intended client-facing outputs are a technical review dashboard, a lighter client overview, an evidence bundle, and launch-gate artifacts that can be regenerated per engagement.
 
 ## Passing Strict Live Flow
 

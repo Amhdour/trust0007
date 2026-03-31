@@ -1,6 +1,6 @@
 # Client Engagement Tracks
 
-This template is best reused through three primary engagement tracks.
+This AI Trust & Security Readiness Starter Kit is best reused through three primary engagement tracks. Each track keeps the control-plane model stable while changing what gets customized first and what deliverables are emphasized.
 
 ## 1. Layer Retrofit
 
