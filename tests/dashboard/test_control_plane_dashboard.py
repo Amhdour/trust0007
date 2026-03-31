@@ -35,12 +35,15 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
 
     assert 'id="hero-title"' in html
     assert 'id="hero-copy"' in html
+    assert 'id="hero-eyebrow"' in html
     assert 'id="briefing-root"' in html
     assert 'id="mode-banner-root"' in html
     assert 'id="incident-banner-root"' in html
     assert 'id="risk-strip-root"' in html
     assert 'id="next-action-root"' in html
+    assert 'id="walkthrough-root"' in html
     assert 'id="proof-pipeline-root"' in html
+    assert 'id="client-overview-link"' in html
     assert 'id="presentation-mode-button"' in html
     assert 'id="reading-guide-root"' in html
     assert "payload.title" in js
@@ -50,8 +53,11 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "incident_banner" in js
     assert "risk_strip" in js
     assert "next_action" in js
+    assert "walkthrough" in js
     assert "proof_pipeline" in js
     assert "presentation-mode" in js
+    assert "live-log-source-filter" in js
+    assert "data-live-log-status" in js
     assert "payload.reading_guide" in js
     assert "payload.audience_paths" in js
     assert "block.collapsed" in js
@@ -115,6 +121,9 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     assert payload["command_center"]["next_action"]["title"]
     assert payload["command_center"]["next_action"]["primary_action"]["label"]
     assert payload["command_center"]["next_action"]["steps"]
+    assert payload["command_center"]["next_action"]["change"]["label"]
+    assert len(payload["command_center"]["walkthrough"]) == 4
+    assert payload["command_center"]["walkthrough"][0]["label"] == "Start with posture"
     assert len(payload["command_center"]["proof_pipeline"]["steps"]) == 6
     assert payload["command_center"]["proof_pipeline"]["meta_badges"]
     assert payload["command_center"]["proof_pipeline"]["steps"][0]["meta_badges"]

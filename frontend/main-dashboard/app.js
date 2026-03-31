@@ -1,5 +1,6 @@
 const root = document.getElementById("dashboard-root");
 const tabStrip = document.getElementById("tab-strip");
+const heroEyebrow = document.getElementById("hero-eyebrow");
 const heroTitle = document.getElementById("hero-title");
 const heroCopy = document.getElementById("hero-copy");
 const heroMeta = document.getElementById("hero-meta");
@@ -8,12 +9,14 @@ const modeBannerRoot = document.getElementById("mode-banner-root");
 const incidentBannerRoot = document.getElementById("incident-banner-root");
 const riskStripRoot = document.getElementById("risk-strip-root");
 const nextActionRoot = document.getElementById("next-action-root");
+const walkthroughRoot = document.getElementById("walkthrough-root");
 const briefingRoot = document.getElementById("briefing-root");
 const proofPipelineRoot = document.getElementById("proof-pipeline-root");
 const readingGuideRoot = document.getElementById("reading-guide-root");
 const kpiRoot = document.getElementById("kpi-root");
 const sourcesRoot = document.getElementById("sources");
 const liveLogRoot = document.getElementById("live-log-root");
+const clientOverviewLink = document.getElementById("client-overview-link");
 const presentationModeButton = document.getElementById("presentation-mode-button");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
 
@@ -26,6 +29,10 @@ let activeTabTarget = "";
 let activeTabSyncFrame = 0;
 let tabStripScrollBound = false;
 let presentationModeEnabled = false;
+let lastOverviewPayload = null;
+let lastLiveLogPayload = null;
+let liveLogStatusFilter = "all";
+let liveLogSourceFilter = "all";
 
 function escapeHtml(value) {
   return String(value)
@@ -124,7 +131,7 @@ function renderMetaBadges(items, className = "evidence-meta-row") {
   `;
 }
 
-function renderTrendSummary(trend) {
+function renderTrendSummary(trend, label = "Changed since last refresh") {
   if (!trend?.label) {
     return "";
   }
@@ -132,7 +139,7 @@ function renderTrendSummary(trend) {
   const status = trend.status || "neutral";
   return `
     <div class="trend-summary trend-summary-${escapeHtml(status)}">
-      <span class="trend-summary-label">Trend</span>
+      <span class="trend-summary-label">${escapeHtml(label)}</span>
       <strong>${escapeHtml(trend.label)}</strong>
       ${trend.detail ? `<p>${escapeHtml(trend.detail)}</p>` : ""}
     </div>
@@ -176,27 +183,49 @@ function setPresentationMode(enabled) {
     // Ignore storage failures and keep the in-memory toggle working.
   }
 
+  if (lastOverviewPayload) {
+    renderHero(lastOverviewPayload);
+  }
   scheduleActiveTabSync();
 }
 
 function renderHero(payload) {
+  const defaultTitle = payload.title || "AI Trust & Security Stack Control Plane";
+  const defaultCopy = `${payload.subtitle ? `${payload.subtitle} ` : ""}${payload.hero_copy || ""}`.trim();
+  const presenterTitle = "AI Trust & Security Review Brief";
+  const presenterCopy =
+    "Use this audience-facing view to explain the current posture, main blocker, and strongest governed proof without the operator-only drill-down.";
+
+  if (heroEyebrow) {
+    heroEyebrow.textContent = presentationModeEnabled ? "Executive review mode" : "Trust & Security Operations Dashboard";
+  }
+
   if (heroTitle) {
-    heroTitle.textContent = payload.title || "AI Trust & Security Stack Control Plane";
+    heroTitle.textContent = presentationModeEnabled ? presenterTitle : defaultTitle;
   }
 
   if (heroCopy) {
-    const subtitle = payload.subtitle ? `${payload.subtitle} ` : "";
-    heroCopy.textContent = `${subtitle}${payload.hero_copy || ""}`.trim();
+    heroCopy.textContent = presentationModeEnabled ? presenterCopy : defaultCopy;
   }
 
   const mode = payload.data_mode || {};
   heroMeta.innerHTML = `
+    ${presentationModeEnabled ? '<span class="chip">Presentation view</span>' : ""}
     <span class="chip">${escapeHtml(payload.runtime_module || "Governed runtime")}</span>
     <span class="${statusClass(mode.status || "neutral")}" title="${escapeHtml(mode.label || "Dashboard mode")}">${escapeHtml(mode.display_label || mode.label || "Dashboard mode")}</span>
     <span class="chip">Generated ${escapeHtml(formatTimestamp(payload.generated_at))}</span>
   `;
 
-  const landingSteps = Array.isArray(payload.landing_steps) ? payload.landing_steps : [];
+  const landingSteps = presentationModeEnabled
+    ? [
+        "Start with the posture banner.",
+        "Use the guided walkthrough to tell the story.",
+        "Open blocked or approved proof as needed.",
+        "Return to full view for operator detail.",
+      ]
+    : Array.isArray(payload.landing_steps)
+      ? payload.landing_steps
+      : [];
   heroSteps.innerHTML = landingSteps
     .map(
       (label, index) => `
@@ -444,6 +473,7 @@ function renderNextAction(nextAction) {
             ${renderStatusPill(status)}
           </div>
           <p class="next-action-summary">${escapeHtml(nextAction.summary || "")}</p>
+          ${renderTrendSummary(nextAction.change, "What changed since last refresh")}
           <div class="next-action-actions">
             ${
               primaryAction
@@ -477,6 +507,45 @@ function renderNextAction(nextAction) {
             `
             : ""
         }
+      </div>
+    </section>
+  `;
+}
+
+function renderWalkthrough(walkthrough) {
+  if (!walkthroughRoot) {
+    return;
+  }
+
+  const steps = Array.isArray(walkthrough) ? walkthrough.filter((item) => item && item.href) : [];
+  if (!steps.length) {
+    walkthroughRoot.innerHTML = "";
+    return;
+  }
+
+  walkthroughRoot.innerHTML = `
+    <section class="walkthrough-card">
+      <div class="support-card-head">
+        <div>
+          <p class="eyebrow">Guided walkthrough</p>
+          <h3>Tell the story in four steps</h3>
+        </div>
+      </div>
+      <p class="record-detail">Use these shortcuts when you need a clean review flow instead of a full free-form scan.</p>
+      <div class="walkthrough-grid">
+        ${steps
+          .map(
+            (step, index) => `
+              <a class="walkthrough-step-card walkthrough-step-${escapeHtml(step.status || "neutral")}"${linkAttributes(step.href)}>
+                <span class="walkthrough-step-index">${index + 1}</span>
+                <div class="walkthrough-step-copy">
+                  <p class="walkthrough-step-title">${escapeHtml(step.display_label || step.label || "")}</p>
+                  <p class="walkthrough-step-description">${escapeHtml(step.display_description || step.description || "")}</p>
+                </div>
+              </a>
+            `,
+          )
+          .join("")}
       </div>
     </section>
   `;
@@ -1001,12 +1070,40 @@ function renderSources(sources) {
     .join("");
 }
 
+function liveLogNormalizedStatus(entry) {
+  const status = String(entry?.status || "").toLowerCase();
+  if (status) {
+    return status;
+  }
+
+  const severity = String(entry?.severity || "").toLowerCase();
+  if (severity === "critical" || severity === "error") {
+    return "critical";
+  }
+  if (severity === "warning" || severity === "warn") {
+    return "warning";
+  }
+  return "neutral";
+}
+
+function liveLogMatchesFilters(entry) {
+  const matchesStatus = liveLogStatusFilter === "all" || liveLogNormalizedStatus(entry) === liveLogStatusFilter;
+  const matchesSource = liveLogSourceFilter === "all" || String(entry?.source_label || "") === liveLogSourceFilter;
+  return matchesStatus && matchesSource;
+}
+
 function renderLiveLog(payload) {
   if (!liveLogRoot) {
     return;
   }
 
+  lastLiveLogPayload = payload;
   const entries = Array.isArray(payload.entries) ? payload.entries : [];
+  const sources = [...new Set(entries.map((entry) => String(entry.source_label || "")).filter(Boolean))].sort();
+  if (liveLogSourceFilter !== "all" && !sources.includes(liveLogSourceFilter)) {
+    liveLogSourceFilter = "all";
+  }
+  const filteredEntries = entries.filter(liveLogMatchesFilters);
   const refreshedAt = formatTimestamp(payload.generated_at);
   const intervalSeconds = Math.max(1, Math.round((payload.poll_interval_ms || DEFAULT_LIVE_LOG_POLL_MS) / 1000));
 
@@ -1015,16 +1112,52 @@ function renderLiveLog(payload) {
       <div class="hero-meta">
         <span class="chip">Auto-refresh ${intervalSeconds}s</span>
         <span class="chip">Last updated ${escapeHtml(refreshedAt)}</span>
-        <span class="chip">${escapeHtml(String(entries.length))} recent items</span>
+        <span class="chip">Showing ${escapeHtml(String(filteredEntries.length))} of ${escapeHtml(String(entries.length))} recent items</span>
       </div>
       <a class="live-log-source"${linkAttributes(payload.source_href || "/api/control-plane/live-log?limit=50")}>
         Open activity feed
       </a>
     </div>
+    <div class="live-log-controls">
+      <div class="live-log-filter-group" role="toolbar" aria-label="Activity severity filters">
+        ${[
+          ["all", "All activity"],
+          ["critical", "Critical"],
+          ["warning", "Warnings"],
+          ["neutral", "Info"],
+        ]
+          .map(
+            ([value, label]) => `
+              <button
+                class="live-log-filter-button${liveLogStatusFilter === value ? " is-active" : ""}"
+                type="button"
+                data-live-log-status="${escapeHtml(value)}"
+                aria-pressed="${liveLogStatusFilter === value ? "true" : "false"}"
+              >
+                ${escapeHtml(label)}
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+      <label class="live-log-filter-select">
+        <span>Source</span>
+        <select id="live-log-source-filter">
+          <option value="all">All sources</option>
+          ${sources
+            .map(
+              (source) => `
+                <option value="${escapeHtml(source)}"${liveLogSourceFilter === source ? " selected" : ""}>${escapeHtml(source)}</option>
+              `,
+            )
+            .join("")}
+        </select>
+      </label>
+    </div>
     <div class="live-log-list">
       ${
-        entries.length
-          ? entries
+        filteredEntries.length
+          ? filteredEntries
               .map(
                 (entry) => `
                   <article class="live-log-entry">
@@ -1052,13 +1185,28 @@ function renderLiveLog(payload) {
               .join("")
           : `
             <article class="live-log-entry live-log-empty">
-              <h3>No recent activity yet</h3>
-              <p class="live-log-summary">New runtime and observability events will appear here.</p>
+              <h3>No matching activity right now</h3>
+              <p class="live-log-summary">Adjust the filters to widen the activity view, or wait for the next refresh.</p>
             </article>
           `
       }
     </div>
   `;
+
+  for (const button of liveLogRoot.querySelectorAll("[data-live-log-status]")) {
+    button.addEventListener("click", () => {
+      liveLogStatusFilter = button.dataset.liveLogStatus || "all";
+      renderLiveLog(lastLiveLogPayload || payload);
+    });
+  }
+
+  const sourceSelect = liveLogRoot.querySelector("#live-log-source-filter");
+  if (sourceSelect) {
+    sourceSelect.addEventListener("change", (event) => {
+      liveLogSourceFilter = event.target.value || "all";
+      renderLiveLog(lastLiveLogPayload || payload);
+    });
+  }
 }
 
 function renderLiveLogError(error) {
@@ -1104,11 +1252,13 @@ async function boot() {
     }
 
     const payload = await response.json();
+    lastOverviewPayload = payload;
     renderHero(payload);
     renderModeBanner(payload.mode_banner || {});
     renderIncidentBanner(payload.command_center?.incident_banner || {});
     renderRiskStrip(payload.command_center?.risk_strip || {});
     renderNextAction(payload.command_center?.next_action || {});
+    renderWalkthrough(payload.command_center?.walkthrough || []);
     renderBriefing(payload.command_center || {});
     renderProofPipeline(payload.command_center?.proof_pipeline || {});
     renderReadingGuide(payload.reading_guide || {});
@@ -1136,6 +1286,9 @@ async function boot() {
     }
     if (nextActionRoot) {
       nextActionRoot.innerHTML = "";
+    }
+    if (walkthroughRoot) {
+      walkthroughRoot.innerHTML = "";
     }
     if (proofPipelineRoot) {
       proofPipelineRoot.innerHTML = "";

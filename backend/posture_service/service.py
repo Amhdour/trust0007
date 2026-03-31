@@ -1429,6 +1429,17 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         baseline_label="runtime proof set",
         worse_status="warning",
     )
+    last_good_run_trend = _trend_summary(
+        sum(1 for item in recent_window if bool(item.get("handoff_allowed"))),
+        (
+            sum(1 for item in previous_window if bool(item.get("handoff_allowed")))
+            if previous_window
+            else None
+        ),
+        lower_is_better=False,
+        context="window",
+        baseline_label="5-request window",
+    )
     if last_good_run_timestamp:
         last_good_run_status, _ = _format_age_bucket(last_good_run_timestamp)
         last_good_run_value = _timestamp_display(last_good_run_timestamp)
@@ -1696,6 +1707,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             _link("Open approved example", _raw(INSPECTABLE_ALLOWED_FLOW), "Open the latest approved governed handoff proof path.", "healthy"),
         ]
     if not latest_handoff_allowed:
+        next_action_change = blocked_handoff_trend
         next_action = {
             "eyebrow": "Recommended next action",
             "title": "Review the blocker",
@@ -1711,8 +1723,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 "Check whether the deny matches the expected policy outcome.",
                 "Decide whether the missing proof needs remediation or the user should stay blocked.",
             ],
+            "change": next_action_change,
         }
     elif artifact_counts["stale"] or artifact_counts["missing"]:
+        next_action_change = proof_gap_trend
         next_action = {
             "eyebrow": "Recommended next action",
             "title": "Refresh the proof",
@@ -1728,8 +1742,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 "Run a fresh governed flow to regenerate runtime proof.",
                 "Re-check the proof-quality section after the refresh completes.",
             ],
+            "change": next_action_change,
         }
     elif incident_status == "warning":
+        next_action_change = failing_controls_trend
         next_action = {
             "eyebrow": "Recommended next action",
             "title": "Harden the remaining config gap",
@@ -1745,8 +1761,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 "Use the launch-gate section to confirm what still prevents a green state.",
                 "After hardening the gap, rerun the governed flow and check whether the banner turns green.",
             ],
+            "change": next_action_change,
         }
     else:
+        next_action_change = last_good_run_trend
         next_action = {
             "eyebrow": "Recommended next action",
             "title": "Inspect the approved flow",
@@ -1762,6 +1780,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 "Walk through the approved example to confirm the same story in raw proof.",
                 "Switch on presentation mode when you want a lighter external-facing walkthrough.",
             ],
+            "change": next_action_change,
         }
     flagship_proof = _spotlight(
         eyebrow="Flagship proof",
@@ -1951,17 +1970,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     last_good_run_detail,
                     "#governed-requests",
                     meta_badges=last_good_run_badges,
-                    trend=_trend_summary(
-                        sum(1 for item in recent_window if bool(item.get("handoff_allowed"))),
-                        (
-                            sum(1 for item in previous_window if bool(item.get("handoff_allowed")))
-                            if previous_window
-                            else None
-                        ),
-                        lower_is_better=False,
-                        context="window",
-                        baseline_label="5-request window",
-                    ),
+                    trend=last_good_run_trend,
                 ),
             ],
         },
@@ -1982,6 +1991,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "actions": incident_actions,
         },
         "next_action": next_action,
+        "walkthrough": [
+            _link("Start with posture", "#overview", "Jump to the plain-language state summary first.", "neutral", display_label="Start with posture", display_description="Open the main overview before you drill into examples or technical proof."),
+            _link("Show blocked example", flagship_denied["bundle_href"], "Open the clearest proof of the system refusing an unsafe or unauthorized handoff.", "critical", display_label="Show blocked example", display_description="Walk through the strongest blocked-access example when you need to explain why the system says no."),
+            _link("Show approved example", _raw(INSPECTABLE_ALLOWED_FLOW), "Open the governed handoff example where the checks passed end to end.", "healthy", display_label="Show approved example", display_description="Use the approved example to show what a healthy governed flow looks like."),
+            _link("Open technical proof", latest_governed_flow_href or "#audit-replay", "Inspect the newest governed-flow summary and trace-linked proof trail.", "neutral", display_label="Open technical proof", display_description="Use the latest technical summary when someone needs the raw proof behind the story."),
+        ],
         "proof_pipeline": {
             "title": "Latest governed path",
             "detail": "Follow the latest request through the checks that must line up before AI access is allowed.",
