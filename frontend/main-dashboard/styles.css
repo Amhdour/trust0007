@@ -222,6 +222,25 @@ h3 {
   border-color: rgba(15, 108, 94, 0.28);
 }
 
+.hero-action-button:focus-visible,
+.tab-button:focus-visible,
+.metric-card:focus-visible,
+.record-card:focus-visible,
+.link-card:focus-visible,
+.source-card:focus-visible,
+.pipeline-step-card:focus-visible,
+.action-pill:focus-visible,
+.audience-link-pill:focus-visible,
+.guide-question-card:focus-visible,
+.mode-banner-disclosure summary:focus-visible,
+.guide-disclosure summary:focus-visible,
+.tab-disclosure summary:focus-visible,
+.table-disclosure summary:focus-visible {
+  outline: 3px solid rgba(15, 108, 94, 0.28);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(15, 108, 94, 0.1);
+}
+
 .hero-action-button:disabled {
   opacity: 0.7;
   cursor: progress;
@@ -384,6 +403,66 @@ h3 {
 .dashboard-root {
   display: grid;
   gap: 18px;
+}
+
+.incident-banner {
+  margin-top: 18px;
+  padding: 20px 22px;
+  border-radius: 24px;
+  border: 1px solid rgba(157, 45, 45, 0.2);
+  background: linear-gradient(135deg, rgba(157, 45, 45, 0.1), rgba(255, 247, 244, 0.98));
+  box-shadow: inset 0 0 0 1px rgba(157, 45, 45, 0.08);
+}
+
+.incident-banner-warning {
+  border-color: rgba(173, 93, 22, 0.2);
+  background: linear-gradient(135deg, rgba(173, 93, 22, 0.12), rgba(255, 249, 242, 0.98));
+  box-shadow: inset 0 0 0 1px rgba(173, 93, 22, 0.08);
+}
+
+.incident-banner-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.incident-banner-summary {
+  margin: 14px 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.incident-banner-detail {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.incident-banner-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.incident-fact-card {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(16, 33, 45, 0.08);
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.incident-fact-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .command-secondary-grid {
@@ -830,6 +909,9 @@ h3 {
 
 .tab-strip {
   margin: 18px 0;
+  position: sticky;
+  top: 14px;
+  z-index: 22;
 }
 
 .tab-strip-shell {
@@ -901,6 +983,15 @@ h3 {
 .tab-button {
   cursor: pointer;
   color: var(--ink);
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.tab-button.is-active,
+.tab-button[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: rgba(15, 108, 94, 0.24);
+  background: linear-gradient(135deg, rgba(15, 108, 94, 0.16), rgba(255, 255, 255, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(15, 108, 94, 0.08);
 }
 
 .audience-lane {
@@ -910,6 +1001,7 @@ h3 {
 .dashboard-section {
   display: grid;
   gap: 18px;
+  scroll-margin-top: 160px;
 }
 
 .section-group-banner {
@@ -1171,6 +1263,7 @@ tbody tr:last-child td {
 
   .tab-strip {
     margin: 16px 0;
+    top: 10px;
   }
 }
 
@@ -1192,6 +1285,74 @@ tbody tr:last-child td {
   }
 }
 
+@media (max-width: 760px) {
+  .table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .table-wrap table,
+  .table-wrap thead,
+  .table-wrap tbody,
+  .table-wrap tr,
+  .table-wrap th,
+  .table-wrap td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-wrap table {
+    min-width: 0;
+  }
+
+  .table-wrap thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .table-wrap tr {
+    margin-top: 12px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.76);
+  }
+
+  .table-wrap tr:first-child {
+    margin-top: 0;
+  }
+
+  .table-wrap td {
+    display: grid;
+    grid-template-columns: minmax(110px, 42%) minmax(0, 1fr);
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(16, 33, 45, 0.08);
+  }
+
+  .table-wrap td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .table-wrap td:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+}
+
 @media (max-width: 640px) {
   h1 {
     max-width: 12ch;
@@ -1209,7 +1370,8 @@ tbody tr:last-child td {
   .mode-banner-chips,
   .readiness-spotlight-grid,
   .pipeline-step-grid,
-  .audience-path-grid {
+  .audience-path-grid,
+  .incident-banner-facts {
     grid-template-columns: 1fr;
   }
 }

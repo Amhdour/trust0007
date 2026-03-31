@@ -37,12 +37,14 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="hero-copy"' in html
     assert 'id="briefing-root"' in html
     assert 'id="mode-banner-root"' in html
+    assert 'id="incident-banner-root"' in html
     assert 'id="proof-pipeline-root"' in html
     assert 'id="reading-guide-root"' in html
     assert "payload.title" in js
     assert "payload.landing_steps" in js
     assert "payload.mode_banner" in js
     assert "payload.command_center" in js
+    assert "incident_banner" in js
     assert "proof_pipeline" in js
     assert "payload.reading_guide" in js
     assert "payload.audience_paths" in js
@@ -95,6 +97,8 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     }
     assert payload["command_center"]["latest_request"]["title"]
     assert payload["command_center"]["flagship_proof"]["title"] == "Denied /launch/onyx handoff"
+    assert payload["command_center"]["incident_banner"]["visible"] is True
+    assert payload["command_center"]["incident_banner"]["title"]
     assert len(payload["command_center"]["proof_pipeline"]["steps"]) == 6
     assert payload["mode_banner"]["consequences"]
     assert len(payload["audience_paths"]) == 2

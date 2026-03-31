@@ -1418,6 +1418,28 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             else f"The latest governed path was blocked with reason {_humanize_reason(latest_request_reason)}."
         )
     )
+    incident_status = "critical" if not latest_handoff_allowed else _status_from_launch(launch_summary["status"])
+    incident_visible = incident_status in {"critical", "warning"} and (
+        not latest_handoff_allowed or incident_status == "critical"
+    )
+    incident_main_blocker = (
+        f"Missing proof: {', '.join(latest_missing_evidence)}"
+        if latest_missing_evidence
+        else (
+            str(top_failing_control.get("summary", ""))
+            or _humanize_reason(latest_request_reason)
+        )
+    )
+    incident_summary = (
+        "The latest governed request did not reach the AI runtime because a mandatory proof or control failed."
+        if not latest_handoff_allowed
+        else "The governed path is showing a non-ready state and should not be treated as launch-ready until the blocker is fixed."
+    )
+    incident_title = (
+        "AI access is blocked right now"
+        if not latest_handoff_allowed
+        else "Safety posture needs attention right now"
+    )
     flagship_proof = _spotlight(
         eyebrow="Flagship proof",
         title="Denied /launch/onyx handoff",
@@ -1522,6 +1544,25 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         ),
         "flagship_proof": flagship_proof,
+        "incident_banner": {
+            "visible": incident_visible,
+            "status": incident_status,
+            "eyebrow": "Why the page is red right now",
+            "title": incident_title,
+            "summary": incident_summary,
+            "detail": incident_main_blocker,
+            "facts": [
+                {"label": "Latest access decision", "value": _allow_deny_display(latest_handoff_allowed)},
+                {"label": "Main blocker", "value": incident_main_blocker or "No primary blocker recorded"},
+                {"label": "Latest trace", "value": latest_trace_id or "Missing"},
+                {"label": "Proof mode", "value": "Live evidence" if live_evidence_mode else "Demo or local evidence"},
+            ],
+            "actions": [
+                _link("Open latest technical summary", latest_governed_flow_href, "Inspect the latest governed-flow summary tied to this blocked or degraded state.", incident_status),
+                _link("Open safety check", "#launch-gate", "Jump straight to the launch and readiness evidence.", incident_status),
+                _link("Open blocked example", flagship_denied["bundle_href"], "Open the strongest blocked-access proof path.", "critical"),
+            ],
+        },
         "proof_pipeline": {
             "title": "Latest governed path",
             "detail": "Follow the latest request through the mandatory checks that must line up before the AI runtime is allowed.",

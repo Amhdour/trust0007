@@ -5,6 +5,7 @@ const heroCopy = document.getElementById("hero-copy");
 const heroMeta = document.getElementById("hero-meta");
 const heroSteps = document.getElementById("hero-steps");
 const modeBannerRoot = document.getElementById("mode-banner-root");
+const incidentBannerRoot = document.getElementById("incident-banner-root");
 const briefingRoot = document.getElementById("briefing-root");
 const proofPipelineRoot = document.getElementById("proof-pipeline-root");
 const readingGuideRoot = document.getElementById("reading-guide-root");
@@ -15,7 +16,11 @@ const refreshDashboardButton = document.getElementById("refresh-dashboard-button
 
 const LIVE_LOG_LIMIT = 6;
 const DEFAULT_LIVE_LOG_POLL_MS = 5000;
+const SECTION_SCROLL_OFFSET_PX = 152;
 let liveLogTimer = 0;
+let activeTabTarget = "";
+let activeTabSyncFrame = 0;
+let tabStripScrollBound = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -230,6 +235,46 @@ function renderBriefing(commandCenter) {
   `;
 }
 
+function renderIncidentBanner(banner) {
+  if (!incidentBannerRoot) {
+    return;
+  }
+
+  if (!banner?.visible) {
+    incidentBannerRoot.innerHTML = "";
+    return;
+  }
+
+  const facts = Array.isArray(banner.facts) ? banner.facts : [];
+  const actions = Array.isArray(banner.actions) ? banner.actions : [];
+  incidentBannerRoot.innerHTML = `
+    <section class="incident-banner incident-banner-${escapeHtml(banner.status || "warning")}">
+      <div class="incident-banner-head">
+        <div>
+          <p class="eyebrow">${escapeHtml(banner.eyebrow || "Current blocker")}</p>
+          <h3>${escapeHtml(banner.title || "Attention needed")}</h3>
+        </div>
+        ${renderStatusPill(banner.status || "warning")}
+      </div>
+      <p class="incident-banner-summary">${escapeHtml(banner.summary || "")}</p>
+      <p class="incident-banner-detail">${escapeHtml(banner.detail || "")}</p>
+      <div class="incident-banner-facts">
+        ${facts
+          .map(
+            (fact) => `
+              <article class="incident-fact-card">
+                <span class="incident-fact-label">${escapeHtml(fact.label || "")}</span>
+                <strong>${escapeHtml(fact.value || "")}</strong>
+              </article>
+            `,
+          )
+          .join("")}
+      </div>
+      ${actions.length ? renderActionPills(actions) : ""}
+    </section>
+  `;
+}
+
 function pipelineStatusLabel(step) {
   return (
     step.badge_label
@@ -411,7 +456,13 @@ function renderTable(block) {
             .map(
               (row) => `
                 <tr>
-                  ${(block.columns || []).map((column) => `<td>${escapeHtml(row[column.key] ?? "")}</td>`).join("")}
+                  ${(block.columns || [])
+                    .map(
+                      (column) => `
+                        <td data-label="${escapeHtml(column.label)}">${escapeHtml(row[column.key] ?? "")}</td>
+                      `,
+                    )
+                    .join("")}
                 </tr>
               `,
             )
@@ -573,6 +624,64 @@ function renderSections(sections) {
     .join("");
 }
 
+function setActiveTab(targetId) {
+  if (!tabStrip) {
+    return;
+  }
+
+  activeTabTarget = targetId || "";
+  for (const button of tabStrip.querySelectorAll("button[data-target]")) {
+    const isActive = button.dataset.target === activeTabTarget;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  }
+}
+
+function syncActiveTabFromScroll() {
+  const sections = Array.from(root.querySelectorAll(".dashboard-section[id]"));
+  if (!sections.length) {
+    return;
+  }
+
+  let nextActive = sections[0].id;
+  for (const section of sections) {
+    const top = section.getBoundingClientRect().top;
+    if (top - SECTION_SCROLL_OFFSET_PX <= 0) {
+      nextActive = section.id;
+      continue;
+    }
+    break;
+  }
+
+  setActiveTab(nextActive);
+}
+
+function scheduleActiveTabSync() {
+  window.cancelAnimationFrame(activeTabSyncFrame);
+  activeTabSyncFrame = window.requestAnimationFrame(syncActiveTabFromScroll);
+}
+
+function bindTabStripScrollListeners() {
+  if (tabStripScrollBound) {
+    return;
+  }
+
+  window.addEventListener("scroll", scheduleActiveTabSync, { passive: true });
+  window.addEventListener("resize", scheduleActiveTabSync);
+  tabStripScrollBound = true;
+}
+
+function scrollToSection(targetId) {
+  const target = document.getElementById(targetId);
+  if (!target) {
+    return;
+  }
+
+  const absoluteTop = window.scrollY + target.getBoundingClientRect().top - SECTION_SCROLL_OFFSET_PX;
+  window.scrollTo({ top: Math.max(0, absoluteTop), behavior: "smooth" });
+  setActiveTab(targetId);
+}
+
 function renderTabs(tabs) {
   const groups = new Map();
   const allTabs = Array.isArray(tabs) ? tabs : [];
@@ -598,7 +707,7 @@ function renderTabs(tabs) {
         ${primaryTabs
           .map(
             (tab) => `
-              <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}">
+              <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" aria-pressed="false">
                 ${escapeHtml(tab.label || "")}
               </button>
             `,
@@ -617,7 +726,7 @@ function renderTabs(tabs) {
                     ${groupTabs
                       .map(
                         (tab) => `
-                          <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}">
+                          <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" aria-pressed="false">
                             ${escapeHtml(tab.label || "")}
                           </button>
                         `,
@@ -635,10 +744,7 @@ function renderTabs(tabs) {
 
   for (const button of tabStrip.querySelectorAll("button")) {
     button.addEventListener("click", () => {
-      const target = document.getElementById(button.dataset.target);
-      if (target) {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+      scrollToSection(button.dataset.target);
 
       const disclosure = button.closest(".tab-strip-shell")?.querySelector(".tab-disclosure");
       if (disclosure?.open) {
@@ -646,6 +752,10 @@ function renderTabs(tabs) {
       }
     });
   }
+
+  bindTabStripScrollListeners();
+  setActiveTab(activeTabTarget || primaryTabs[0]?.id || allTabs[0]?.id || "");
+  scheduleActiveTabSync();
 }
 
 function renderSources(sources) {
@@ -770,12 +880,13 @@ async function boot() {
     const payload = await response.json();
     renderHero(payload);
     renderModeBanner(payload.mode_banner || {});
+    renderIncidentBanner(payload.command_center?.incident_banner || {});
     renderBriefing(payload.command_center || {});
     renderProofPipeline(payload.command_center?.proof_pipeline || {});
     renderReadingGuide(payload.reading_guide || {});
     renderKpis(payload.audience_paths || []);
-    renderTabs(payload.tabs);
     renderSections(payload.sections);
+    renderTabs(payload.tabs);
     renderSources(payload.sources);
   } catch (error) {
     const message = escapeHtml(error.message || "Unknown error");
@@ -789,6 +900,9 @@ async function boot() {
     if (briefingRoot) {
       briefingRoot.innerHTML = "";
     }
+    if (incidentBannerRoot) {
+      incidentBannerRoot.innerHTML = "";
+    }
     if (proofPipelineRoot) {
       proofPipelineRoot.innerHTML = "";
     }
@@ -800,6 +914,9 @@ async function boot() {
     }
     if (modeBannerRoot) {
       modeBannerRoot.innerHTML = "";
+    }
+    if (tabStrip) {
+      tabStrip.innerHTML = "";
     }
   }
 }
