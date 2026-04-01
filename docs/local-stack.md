@@ -104,6 +104,8 @@ docker compose --env-file compose/.env -f compose/docker-compose.yml down -v
 - Onyx is the governed runtime target, but it is started separately from the default compose stack.
 - Use `mode=live` on governed endpoints only after Keycloak, OPA, Qdrant, and Vault are configured; live mode is fail-closed by design.
 - The governed live path is what is proven when `make smoke-live` passes. That is stronger than a general “the whole project is live” claim.
+- `make smoke-live-host` exercises the browser-equivalent dev live-session bootstrap from the host, while `make smoke-live` proves the strict live handoff from inside the control-plane network.
+- `make health-check` is the fastest honest project-health answer: it validates the stack, pings the dashboard, runs both live smoke paths, and executes the focused governed-flow pytest bundle.
 - Unauthenticated or non-live-token requests to `/launch/onyx` should still fail closed with `403`, even after the local live bootstrap succeeds.
 - The local Keycloak bootstrap uses a dev-only hardcoded tenant mapper for `tenant-dashboard`. It is a local single-tenant convenience, not a production tenant-claim design.
 - The local Keycloak smoke token must include `openid` scope. Without `openid`, Keycloak `userinfo` returns `403`, and the strict live handoff correctly denies access.

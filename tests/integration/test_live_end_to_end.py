@@ -66,10 +66,17 @@ class APIServer:
             env={**dict(os.environ), **env, **self.extra_env},
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            text=True,
         )
 
         # Wait for server to start
         for _ in range(30):  # 30 seconds timeout
+            if self.process.poll() is not None:
+                stdout, stderr = self.process.communicate(timeout=5)
+                combined = "\n".join(part for part in (stdout, stderr) if part).strip()
+                if "PermissionError: [Errno 1] Operation not permitted" in combined:
+                    pytest.skip("Local socket binding is not permitted in this environment.")
+                raise RuntimeError(f"Server exited before becoming healthy: {combined or 'no output'}")
             try:
                 response = http_get(f"http://127.0.0.1:{self.port}/api/health", timeout=1)
                 if response.status_code == 200:
@@ -77,6 +84,13 @@ class APIServer:
             except URLError:
                 pass
             time.sleep(1)
+
+        if self.process.poll() is not None:
+            stdout, stderr = self.process.communicate(timeout=5)
+            combined = "\n".join(part for part in (stdout, stderr) if part).strip()
+            if "PermissionError: [Errno 1] Operation not permitted" in combined:
+                pytest.skip("Local socket binding is not permitted in this environment.")
+            raise RuntimeError(f"Server exited before becoming healthy: {combined or 'no output'}")
 
         raise RuntimeError("Server failed to start within 30 seconds")
 

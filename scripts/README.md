@@ -7,7 +7,8 @@ Helper scripts for demo, vendored upstream source management, and local control-
 - `test-onyx-target.sh`: validates that the repo is still wired around Onyx as the primary runtime target.
 - `start-control-plane.sh`: serves the local dashboard API/UI shell.
 - `bootstrap-live-governed-path.sh`: starts the local live dependency set, seeds Keycloak/Qdrant/Vault, and brings the compose control plane up in `live` mode.
-- `smoke-live-onyx-handoff.py`: mints a Keycloak token with the required `openid` scope and verifies that `/launch/onyx?path=/app&mode=live` passes with live dashboard evidence. `make smoke-live` runs it from the control-plane container so the Keycloak validation path matches the governed live handoff.
+- `smoke-live-onyx-handoff.py`: verifies the governed live Onyx handoff. `--auth-mode direct` mints a Keycloak token and is what `make smoke-live` runs from inside the control-plane container so the Keycloak validation path matches the governed handoff. `--auth-mode bootstrap` exercises the browser-equivalent dev live-session bootstrap from the host via `make smoke-live-host`.
+- `check-project-health.sh`: prints stack status, verifies the dashboard health endpoint, runs both live smoke paths, and executes a focused pytest bundle for the most important governed dashboard/runtime flows.
 - `bootstrap-submodules.sh`: declares missing managed overlay submodules that are still intentionally linked.
 - `update-submodules.sh`: syncs and refreshes the managed overlay submodule working trees.
 - `validate-upstream-state.py`: checks that vendored upstream paths, the upstream lock manifest, and the dashboard inventory remain consistent.
