@@ -58,6 +58,7 @@ let activeTabSyncFrame = 0;
 let tabStripScrollBound = false;
 let presentationModeEnabled = false;
 let dashboardViewMode = "operator";
+let dashboardSectionQuery = "";
 let lastOverviewPayload = null;
 let lastLiveLogPayload = null;
 let lastLiveSessionPayload = null;
@@ -66,6 +67,7 @@ let liveLogSourceFilter = "all";
 let dashboardFingerprints = new Map();
 let changedDashboardKeys = new Set();
 let changeHighlightTimer = 0;
+let sectionDisclosureState = new Map();
 
 function escapeHtml(value) {
   return String(value)
@@ -208,6 +210,71 @@ function normalizeKeyFragment(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function humanizeLabel(value) {
+  const normalized = String(value || "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized.replace(/\b[a-z]/g, (match) => match.toUpperCase());
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function searchTokens(value) {
+  return normalizeSearchText(value).split(" ").filter(Boolean);
+}
+
+function collectSearchableText(value, bucket = []) {
+  if (value === null || value === undefined) {
+    return bucket;
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    bucket.push(String(value));
+    return bucket;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectSearchableText(item, bucket);
+    }
+    return bucket;
+  }
+
+  if (typeof value === "object") {
+    for (const item of Object.values(value)) {
+      collectSearchableText(item, bucket);
+    }
+  }
+
+  return bucket;
+}
+
+function matchesSearchQuery(value, query) {
+  const tokens = searchTokens(query);
+  if (!tokens.length) {
+    return true;
+  }
+
+  const haystack = normalizeSearchText(Array.isArray(value) ? value.join(" ") : value);
+  return tokens.every((token) => haystack.includes(token));
+}
+
+function pluralize(count, singular, pluralForm = `${singular}s`) {
+  return count === 1 ? singular : pluralForm;
 }
 
 function fingerprintValue(value) {
@@ -423,6 +490,23 @@ function visibleSectionsForView(sections) {
   return items;
 }
 
+function sectionSearchText(section) {
+  return collectSearchableText({
+    id: section?.id,
+    title: section?.title,
+    description: section?.description,
+    blocks: section?.blocks,
+  }).join(" ");
+}
+
+function sectionMatchesDashboardQuery(section) {
+  return matchesSearchQuery(sectionSearchText(section), dashboardSectionQuery);
+}
+
+function filteredSectionsForView(sections) {
+  return visibleSectionsForView(sections).filter(sectionMatchesDashboardQuery);
+}
+
 function visibleTabsForView(tabs) {
   const items = Array.isArray(tabs) ? tabs : [];
   if (isExecutiveView()) {
@@ -432,6 +516,170 @@ function visibleTabsForView(tabs) {
     return items.filter((tab) => RUNTIME_SECTION_IDS.has(tab.id));
   }
   return items;
+}
+
+function filteredTabsForView(tabs, sections = []) {
+  const items = visibleTabsForView(tabs);
+  const query = dashboardSectionQuery.trim();
+  if (!query) {
+    return items;
+  }
+
+  const visibleSectionIds = new Set(filteredSectionsForView(sections).map((section) => section.id));
+  return items.filter((tab) => {
+    if (visibleSectionIds.has(tab.id)) {
+      return true;
+    }
+
+    return matchesSearchQuery([tab.id, tab.label, tab.group, tab.group_label], query);
+  });
+}
+
+function buildSectionSummaryPills(section) {
+  const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
+  const counts = blocks.reduce((map, block) => {
+    const type = block?.type || "other";
+    map[type] = (map[type] || 0) + 1;
+    return map;
+  }, {});
+
+  let drilldownLinks = 0;
+  for (const block of blocks) {
+    if (Array.isArray(block?.items)) {
+      drilldownLinks += block.items.filter((item) => item?.href).length;
+    }
+  }
+
+  const pills = [
+    section?.group === "reviewer" ? "Plain-language lane" : "Technical lane",
+    `${blocks.length} ${pluralize(blocks.length, "panel")}`,
+  ];
+
+  if (counts.cards) {
+    pills.push(`${counts.cards} ${pluralize(counts.cards, "snapshot")}`);
+  }
+  if (counts.records) {
+    pills.push(`${counts.records} ${pluralize(counts.records, "evidence log", "evidence logs")}`);
+  }
+  if (counts.table) {
+    pills.push(`${counts.table} ${pluralize(counts.table, "reference table")}`);
+  }
+  if (drilldownLinks) {
+    pills.push(`${drilldownLinks} ${pluralize(drilldownLinks, "drilldown link")}`);
+  }
+
+  return pills.slice(0, 4);
+}
+
+function renderSectionSummaryPills(section) {
+  const pills = buildSectionSummaryPills(section);
+  if (!pills.length) {
+    return "";
+  }
+
+  return `
+    <div class="section-summary-pills">
+      ${pills.map((pill) => `<span class="section-summary-pill">${escapeHtml(pill)}</span>`).join("")}
+    </div>
+  `;
+}
+
+function defaultSectionOpen(section) {
+  if (dashboardSectionQuery.trim()) {
+    return true;
+  }
+
+  if (isExecutiveView() || isRuntimeView()) {
+    return true;
+  }
+
+  return section?.group !== "operator";
+}
+
+function isSectionOpen(section) {
+  if (dashboardSectionQuery.trim()) {
+    return true;
+  }
+
+  if (section?.id && sectionDisclosureState.has(section.id)) {
+    return sectionDisclosureState.get(section.id);
+  }
+
+  return defaultSectionOpen(section);
+}
+
+function updateSectionToggleLabel(details) {
+  const label = details?.querySelector("[data-section-toggle-label]");
+  if (!label) {
+    return;
+  }
+
+  label.textContent = details.open ? "Hide detail" : "Show detail";
+}
+
+function bindSectionDisclosureListeners() {
+  for (const details of root.querySelectorAll("[data-section-shell]")) {
+    updateSectionToggleLabel(details);
+    details.addEventListener("toggle", () => {
+      const sectionId = details.dataset.sectionShell || "";
+      if (sectionId) {
+        sectionDisclosureState.set(sectionId, details.open);
+      }
+      updateSectionToggleLabel(details);
+      scheduleActiveTabSync();
+    });
+  }
+}
+
+function setDashboardSectionQuery(query) {
+  const nextQuery = String(query || "");
+  if (dashboardSectionQuery === nextQuery) {
+    return;
+  }
+
+  dashboardSectionQuery = nextQuery;
+  if (lastOverviewPayload) {
+    renderDashboardPayload(lastOverviewPayload);
+  }
+}
+
+function bindDashboardFilterControls(container = document) {
+  const searchInput = container.querySelector("#dashboard-section-filter");
+  if (searchInput) {
+    searchInput.addEventListener("input", (event) => {
+      setDashboardSectionQuery(event.target.value || "");
+    });
+  }
+
+  for (const button of container.querySelectorAll("[data-dashboard-filter-clear]")) {
+    button.addEventListener("click", () => {
+      setDashboardSectionQuery("");
+    });
+  }
+}
+
+function ensureSectionOpen(targetId) {
+  const section = document.getElementById(targetId);
+  const details = section?.querySelector("[data-section-shell]");
+  if (details && !details.open) {
+    details.open = true;
+  }
+}
+
+function renderSectionsEmptyState() {
+  root.innerHTML = `
+    <section class="dashboard-empty-state">
+      <p class="eyebrow">No matches</p>
+      <h2>No sections match this filter</h2>
+      <p>Try a broader term like runtime, evidence, policy, launch, or trace.</p>
+      ${
+        dashboardSectionQuery.trim()
+          ? '<button class="summary-sheet-button dashboard-filter-reset" type="button" data-dashboard-filter-clear>Clear filter</button>'
+          : ""
+      }
+    </section>
+  `;
+  bindDashboardFilterControls(root);
 }
 
 function renderHero(payload) {
@@ -1590,10 +1838,16 @@ function renderBlocks(blocks) {
 
 function renderSections(sections) {
   let activeGroup = "";
-  const filteredSections = visibleSectionsForView(sections);
+  const filteredSections = filteredSectionsForView(sections);
+  if (!filteredSections.length) {
+    renderSectionsEmptyState();
+    return;
+  }
+
   root.innerHTML = filteredSections
     .map((section) => {
       const nextGroup = section.group || "";
+      const sectionOpen = isSectionOpen(section);
       const groupBanner =
         nextGroup && nextGroup !== activeGroup
           ? `
@@ -1613,16 +1867,30 @@ function renderSections(sections) {
       return `
         ${groupBanner}
         <section class="dashboard-section section-${escapeHtml(section.id || "")}" data-section="${escapeHtml(section.id || "")}" data-group="${escapeHtml(section.group || "")}" id="${escapeHtml(section.id || "")}">
-          <div class="section-head">
-            <p class="eyebrow">${escapeHtml(section.id || "")}</p>
-            <h2>${escapeHtml(section.title || "")}</h2>
-            <p class="section-description">${escapeHtml(compactSectionDescription(section))}</p>
-          </div>
-          ${renderBlocks(section.blocks)}
+          <details class="dashboard-section-shell" data-section-shell="${escapeHtml(section.id || "")}"${sectionOpen ? " open" : ""}>
+            <summary class="dashboard-section-summary">
+              <div class="section-summary-copy">
+                <div class="section-head">
+                  <p class="eyebrow">${escapeHtml(humanizeLabel(section.id || section.title || "Section"))}</p>
+                  <h2>${escapeHtml(section.title || "")}</h2>
+                  <p class="section-description">${escapeHtml(compactSectionDescription(section))}</p>
+                </div>
+                ${renderSectionSummaryPills(section)}
+              </div>
+              <div class="section-summary-aside">
+                <span class="section-toggle-hint" data-section-toggle-label>${sectionOpen ? "Hide detail" : "Show detail"}</span>
+              </div>
+            </summary>
+            <div class="section-body">
+              ${renderBlocks(section.blocks)}
+            </div>
+          </details>
         </section>
       `;
     })
     .join("");
+
+  bindSectionDisclosureListeners();
 }
 
 function setActiveTab(targetId) {
@@ -1678,8 +1946,11 @@ function scrollToSection(targetId) {
     return;
   }
 
-  const absoluteTop = window.scrollY + target.getBoundingClientRect().top - SECTION_SCROLL_OFFSET_PX;
-  window.scrollTo({ top: Math.max(0, absoluteTop), behavior: "smooth" });
+  ensureSectionOpen(targetId);
+  window.requestAnimationFrame(() => {
+    const absoluteTop = window.scrollY + target.getBoundingClientRect().top - SECTION_SCROLL_OFFSET_PX;
+    window.scrollTo({ top: Math.max(0, absoluteTop), behavior: "smooth" });
+  });
   setActiveTab(targetId);
 }
 
@@ -1710,7 +1981,10 @@ function renderFreshnessStrip(bar) {
 
 function renderTabs(tabs, freshnessBar = {}) {
   const groups = new Map();
-  const allTabs = visibleTabsForView(tabs);
+  const allSections = Array.isArray(lastOverviewPayload?.sections) ? lastOverviewPayload.sections : [];
+  const allVisibleSections = visibleSectionsForView(allSections);
+  const matchingSections = filteredSectionsForView(allSections);
+  const allTabs = filteredTabsForView(tabs, allSections);
   for (const tab of allTabs) {
     const groupLabel = tab.group_label || "Sections";
     if (!groups.has(groupLabel)) {
@@ -1719,67 +1993,107 @@ function renderTabs(tabs, freshnessBar = {}) {
     groups.get(groupLabel).push(tab);
   }
 
-  const primaryTabs = (
+  const preferredPrimaryTabs = (
     isRuntimeView()
       ? allTabs
       : isExecutiveView()
         ? allTabs.filter((tab) => tab.group === "reviewer")
         : allTabs.filter((tab) => tab.group === "reviewer")
   ).slice(0, 6);
+  const primaryTabs = preferredPrimaryTabs.length ? preferredPrimaryTabs : allTabs.slice(0, 6);
   const quickJumpTitle = isRuntimeView() ? "Live runtime jump" : "Quick jump";
   const quickJumpDescription = isRuntimeView()
     ? "Use the short row for the current workspace path, handoff proof, and technical runtime checks."
     : "Use the short row for the main story. Open the full list only for deeper drill-down.";
+  const viewLabel = DASHBOARD_VIEW_MODES[dashboardViewMode]?.label || "Operator";
+  const sectionCountLabel = `${matchingSections.length} of ${allVisibleSections.length || 0} sections`;
 
   tabStrip.innerHTML = `
     <section class="tab-strip-shell">
-      <div class="tab-strip-head">
-        <div>
-          <p class="eyebrow">${escapeHtml(quickJumpTitle)}</p>
-          <p class="section-description">${escapeHtml(quickJumpDescription)}</p>
+      <div class="tab-strip-topline">
+        <div class="tab-strip-head">
+          <div>
+            <p class="eyebrow">${escapeHtml(quickJumpTitle)}</p>
+            <p class="section-description">${escapeHtml(quickJumpDescription)}</p>
+          </div>
+          <div class="tab-strip-meta">
+            <span class="chip">View ${escapeHtml(viewLabel)}</span>
+            <span class="chip">${escapeHtml(sectionCountLabel)}</span>
+          </div>
+        </div>
+        <div class="tab-strip-utility">
+          <label class="section-filter-field" for="dashboard-section-filter">
+            <span>Find a section</span>
+            <input
+              id="dashboard-section-filter"
+              class="section-filter-input"
+              type="search"
+              placeholder="Search sections, proof, trace, launch..."
+              value="${escapeHtml(dashboardSectionQuery)}"
+            />
+          </label>
+          ${
+            dashboardSectionQuery.trim()
+              ? `
+                <button class="tab-strip-clear-button" type="button" data-dashboard-filter-clear>
+                  Clear filter
+                </button>
+              `
+              : ""
+          }
         </div>
       </div>
       ${renderFreshnessStrip(freshnessBar)}
-      <div class="tab-group-row tab-primary-row">
-        ${primaryTabs
-          .map(
-            (tab) => `
-              <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" data-tab-group="${escapeHtml(tab.group || "")}" aria-pressed="false">
-                ${escapeHtml(tab.label || "")}
-              </button>
-            `,
-          )
-          .join("")}
-      </div>
-      <details class="tab-disclosure">
-        <summary>Show all sections</summary>
-        <div class="tab-disclosure-body">
-          ${Array.from(groups.entries())
-            .map(
-              ([groupLabel, groupTabs]) => `
-                <section class="tab-group" data-tab-group="${escapeHtml(groupTabs[0]?.group || "")}">
-                  <p class="eyebrow">${escapeHtml(groupLabel)}</p>
-                  <div class="tab-group-row">
-                    ${groupTabs
-                      .map(
-                        (tab) => `
-                          <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" data-tab-group="${escapeHtml(tab.group || "")}" aria-pressed="false">
-                            ${escapeHtml(tab.label || "")}
-                          </button>
-                        `,
-                      )
-                      .join("")}
-                  </div>
-                </section>
-              `,
-            )
-            .join("")}
-        </div>
-      </details>
+      ${
+        allTabs.length
+          ? `
+            <div class="tab-group-row tab-primary-row">
+              ${primaryTabs
+                .map(
+                  (tab) => `
+                    <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" data-tab-group="${escapeHtml(tab.group || "")}" aria-pressed="false">
+                      ${escapeHtml(tab.label || "")}
+                    </button>
+                  `,
+                )
+                .join("")}
+            </div>
+            <details class="tab-disclosure">
+              <summary>Show all sections</summary>
+              <div class="tab-disclosure-body">
+                ${Array.from(groups.entries())
+                  .map(
+                    ([groupLabel, groupTabs]) => `
+                      <section class="tab-group" data-tab-group="${escapeHtml(groupTabs[0]?.group || "")}">
+                        <p class="eyebrow">${escapeHtml(groupLabel)}</p>
+                        <div class="tab-group-row">
+                          ${groupTabs
+                            .map(
+                              (tab) => `
+                                <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" data-tab-group="${escapeHtml(tab.group || "")}" aria-pressed="false">
+                                  ${escapeHtml(tab.label || "")}
+                                </button>
+                              `,
+                            )
+                            .join("")}
+                        </div>
+                      </section>
+                    `,
+                  )
+                  .join("")}
+              </div>
+            </details>
+          `
+          : `
+            <div class="tab-empty-state">
+              <p>No quick-jump sections match the current filter.</p>
+            </div>
+          `
+      }
     </section>
   `;
 
-  for (const button of tabStrip.querySelectorAll("button")) {
+  for (const button of tabStrip.querySelectorAll("button[data-target]")) {
     button.addEventListener("click", () => {
       scrollToSection(button.dataset.target);
 
@@ -1790,8 +2104,13 @@ function renderTabs(tabs, freshnessBar = {}) {
     });
   }
 
+  bindDashboardFilterControls(tabStrip);
+
   bindTabStripScrollListeners();
-  setActiveTab(activeTabTarget || primaryTabs[0]?.id || allTabs[0]?.id || "");
+  const nextActiveTab = allTabs.some((tab) => tab.id === activeTabTarget)
+    ? activeTabTarget
+    : primaryTabs[0]?.id || allTabs[0]?.id || "";
+  setActiveTab(nextActiveTab);
   scheduleActiveTabSync();
 }
 
