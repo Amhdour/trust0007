@@ -5,22 +5,49 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/compose/.env}"
 COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/compose/docker-compose.yml}"
 
-if [[ -f "$ENV_FILE" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
-  set +a
-fi
+read_env_value() {
+  local key="$1"
+  python - "$ENV_FILE" "$key" <<'PY'
+from pathlib import Path
+import sys
 
+env_path = Path(sys.argv[1])
+target = sys.argv[2]
+
+if not env_path.exists():
+    raise SystemExit(0)
+
+for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+    stripped = raw_line.strip()
+    if not stripped or stripped.startswith("#") or "=" not in raw_line:
+        continue
+    key, value = raw_line.split("=", 1)
+    if key.strip() != target:
+        continue
+    print(value.strip())
+    raise SystemExit(0)
+PY
+}
+
+KEYCLOAK_ADMIN="${KEYCLOAK_ADMIN:-$(read_env_value KEYCLOAK_ADMIN)}"
 KEYCLOAK_ADMIN="${KEYCLOAK_ADMIN:-admin}"
+KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-$(read_env_value KEYCLOAK_ADMIN_PASSWORD)}"
 KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-change-me}"
+KEYCLOAK_HOST_PORT="${KEYCLOAK_HOST_PORT:-$(read_env_value KEYCLOAK_HOST_PORT)}"
 KEYCLOAK_HOST_PORT="${KEYCLOAK_HOST_PORT:-18080}"
+KEYCLOAK_REALM="${KEYCLOAK_REALM:-$(read_env_value KEYCLOAK_REALM)}"
 KEYCLOAK_REALM="${KEYCLOAK_REALM:-umbrella-dev}"
+KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID:-$(read_env_value KEYCLOAK_CLIENT_ID)}"
 KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID:-dev-web-app}"
+LIVE_USERNAME="${LIVE_USERNAME:-$(read_env_value LIVE_USERNAME)}"
 LIVE_USERNAME="${LIVE_USERNAME:-live-tenant-admin}"
+LIVE_PASSWORD="${LIVE_PASSWORD:-$(read_env_value LIVE_PASSWORD)}"
 LIVE_PASSWORD="${LIVE_PASSWORD:-change-me}"
+VAULT_DEV_ROOT_TOKEN_ID="${VAULT_DEV_ROOT_TOKEN_ID:-$(read_env_value VAULT_DEV_ROOT_TOKEN_ID)}"
 VAULT_TOKEN="${VAULT_TOKEN:-${VAULT_DEV_ROOT_TOKEN_ID:-dev-root-token}}"
+QDRANT_COLLECTION="${QDRANT_COLLECTION:-$(read_env_value QDRANT_COLLECTION)}"
 QDRANT_COLLECTION="${QDRANT_COLLECTION:-governed_docs}"
+TENANT_ID="${TENANT_ID:-$(read_env_value TENANT_ID)}"
 TENANT_ID="${TENANT_ID:-tenant-dashboard}"
 
 REALM_FILE="${REALM_FILE:-$ROOT_DIR/adapters/identity/realm-dev-template.json}"
@@ -125,6 +152,7 @@ compose up -d --no-deps control_plane
 echo "Seeding tenant-scoped Qdrant content..."
 compose exec -T control_plane python - <<PY
 import json
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 base = "http://qdrant:6333"
@@ -137,8 +165,12 @@ create_req = Request(
     headers={"Content-Type": "application/json", "Accept": "application/json"},
     method="PUT",
 )
-with urlopen(create_req, timeout=10) as response:
-    response.read()
+try:
+    with urlopen(create_req, timeout=10) as response:
+        response.read()
+except HTTPError as exc:
+    if exc.code != 409:
+        raise
 
 points_req = Request(
     f"{base}/collections/{collection}/points?wait=true",
