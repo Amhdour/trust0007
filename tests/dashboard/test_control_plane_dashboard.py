@@ -36,11 +36,14 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="hero-title"' in html
     assert 'id="hero-copy"' in html
     assert 'id="hero-eyebrow"' in html
+    assert 'id="dashboard-view-root"' in html
     assert 'id="summary-sheet-root"' in html
     assert 'id="briefing-root"' in html
     assert 'id="mode-banner-root"' in html
     assert 'id="live-runtime-link"' in html
     assert 'id="live-session-root"' in html
+    assert 'id="runtime-summary-root"' in html
+    assert 'id="stack-health-root"' in html
     assert "Start dev live workspace" in html
     assert "/auth/live-session/start?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded" in html
     assert 'id="incident-banner-root"' in html
@@ -50,21 +53,23 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="compare-root"' in html
     assert 'id="proof-pipeline-root"' in html
     assert 'id="client-overview-link"' in html
-    assert 'id="presentation-mode-button"' in html
     assert 'id="reading-guide-root"' in html
     assert "payload.title" in js
     assert "payload.landing_steps" in js
     assert "payload.mode_banner" in js
     assert "payload.command_center" in js
+    assert "payload.stack_health" in js
     assert "incident_banner" in js
     assert "risk_strip" in js
     assert "next_action" in js
     assert "walkthrough" in js
     assert "example_compare" in js
     assert "presentation_summary" in js
+    assert "runtime_summary" in js
     assert "freshness-strip" in js
     assert "proof_pipeline" in js
-    assert "presentation-mode" in js
+    assert "dashboardViewMode" in js
+    assert "dashboard-view" in js
     assert "live-log-source-filter" in js
     assert "data-live-log-status" in js
     assert "payload.reading_guide" in js
@@ -158,6 +163,22 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     assert len(payload["kpis"]) >= 10
     assert payload["readiness_panel"]["status_label"] in {"GO", "CONDITIONAL", "NO-GO"}
     assert payload["data_mode"]["label"]
+
+
+def test_dashboard_payload_includes_runtime_summary_and_stack_health() -> None:
+    payload = build_control_plane_dashboard()
+
+    runtime_summary = payload["command_center"]["runtime_summary"]
+    stack_health = payload["stack_health"]
+
+    assert runtime_summary["title"] == "Onyx runtime status"
+    assert runtime_summary["actions"]
+    assert any(item["label"] == "Reachability" for item in runtime_summary["items"])
+    assert any(item["label"] == "Continuity" for item in runtime_summary["items"])
+    assert stack_health["label"]
+    assert stack_health["groups"]
+    assert any(group["title"] == "Core governed path" for group in stack_health["groups"])
+    assert stack_health["action"]["href"] == "/raw/scripts/check-project-health.sh"
 
 
 def test_dashboard_tabs_and_sections_have_reviewer_operator_grouping() -> None:

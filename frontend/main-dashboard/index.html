@@ -29,15 +29,21 @@
               Start dev live workspace
             </a>
             <a class="hero-action-button" id="client-overview-link" href="/client-overview">Open client overview</a>
-            <button class="hero-action-button" id="presentation-mode-button" type="button" aria-pressed="false">
-              Presentation mode
-            </button>
             <button class="hero-action-button" id="refresh-dashboard-button" type="button">
               Refresh evidence
             </button>
           </div>
         </div>
-        <div class="live-session-root" id="live-session-root"></div>
+        <div class="dashboard-view-root" id="dashboard-view-root"></div>
+        <div class="hero-support-grid">
+          <div class="hero-support-column">
+            <div class="live-session-root" id="live-session-root"></div>
+            <div id="runtime-summary-root"></div>
+          </div>
+          <div class="hero-support-column hero-support-column-compact">
+            <div id="stack-health-root"></div>
+          </div>
+        </div>
         <div class="hero-steps" id="hero-steps"></div>
       </header>
 

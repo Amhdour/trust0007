@@ -18,6 +18,20 @@ DOCKER_SOCKET_PATH = "/var/run/docker.sock"
 DOCKER_API_PREFIX = "/v1.41"
 LANGFUSE_BASE_URL = "http://langfuse:3000"
 DEFAULT_ACTIVITY_LIMIT = 12
+STACK_HEALTH_CORE_SERVICES = (
+    "control_plane",
+    "db",
+    "keycloak",
+    "opa",
+    "qdrant",
+    "vault",
+    "langfuse",
+)
+STACK_HEALTH_OPTIONAL_SERVICES = (
+    "envoy",
+    "grafana",
+    "superset",
+)
 
 ONYX_CONTAINERS = (
     {
@@ -192,6 +206,75 @@ def _docker_container_ids() -> dict[str, str]:
         for name in names:
             by_name[name] = str(container.get("Id", ""))
     return by_name
+
+
+def _docker_compose_service_snapshot() -> tuple[dict[str, dict[str, str]], str]:
+    if not Path(DOCKER_SOCKET_PATH).exists():
+        return {}, "docker socket unavailable"
+
+    try:
+        containers = _docker_api_json("/containers/json?all=1", timeout=6.0)
+    except (OSError, PermissionError, RuntimeError, json.JSONDecodeError) as exc:
+        return {}, f"docker unavailable: {exc}"
+
+    by_service: dict[str, dict[str, str]] = {}
+    for container in containers:
+        labels = container.get("Labels", {})
+        if not isinstance(labels, dict):
+            labels = {}
+        service_name = str(labels.get("com.docker.compose.service", "")).strip()
+        if not service_name:
+            continue
+
+        names = [str(name).lstrip("/") for name in container.get("Names", []) if str(name).strip()]
+        snapshot = {
+            "service": service_name,
+            "container_name": names[0] if names else "",
+            "state": str(container.get("State", "")).strip().lower(),
+            "status_text": str(container.get("Status", "")).strip(),
+        }
+        previous = by_service.get(service_name)
+        if previous is None or (previous.get("state") != "running" and snapshot["state"] == "running"):
+            by_service[service_name] = snapshot
+
+    return by_service, "docker runtime"
+
+
+def _stack_service_status(category: str, service: str, snapshot: dict[str, str] | None) -> dict[str, str]:
+    severity_if_missing = "critical" if category == "core" else "warning"
+    if not snapshot:
+        return {
+            "service": service,
+            "label": service.replace("_", " ").title(),
+            "category": category,
+            "status": severity_if_missing,
+            "state": "missing",
+            "detail": "No container was discovered for this service.",
+        }
+
+    state = str(snapshot.get("state", "")).lower()
+    status_text = str(snapshot.get("status_text", "")).strip()
+    if state == "running" and "unhealthy" not in status_text.lower():
+        status = "healthy"
+        detail = status_text or "Running"
+    elif state == "restarting":
+        status = severity_if_missing
+        detail = status_text or "Restarting"
+    elif state in {"exited", "dead", "created"}:
+        status = severity_if_missing
+        detail = status_text or state.title()
+    else:
+        status = "warning" if category == "optional" else "critical"
+        detail = status_text or (state.title() if state else "Unavailable")
+
+    return {
+        "service": service,
+        "label": service.replace("_", " ").title(),
+        "category": category,
+        "status": status,
+        "state": state or "unknown",
+        "detail": detail,
+    }
 
 
 def _parse_docker_timestamped_line(line: str) -> tuple[datetime | None, str]:
@@ -410,6 +493,83 @@ def build_activity_snapshot(root: Path, limit: int = DEFAULT_ACTIVITY_LIMIT) -> 
         "sources": {
             "onyx": onyx_status,
             "langfuse": langfuse_status,
+        },
+    }
+
+
+def build_stack_health_snapshot(
+    root: Path,
+    *,
+    service_snapshot: dict[str, dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    del root
+    snapshot, source_label = (
+        (service_snapshot, "fixture")
+        if service_snapshot is not None
+        else _docker_compose_service_snapshot()
+    )
+    snapshot = snapshot or {}
+
+    core_services = [_stack_service_status("core", service, snapshot.get(service)) for service in STACK_HEALTH_CORE_SERVICES]
+    optional_services = [
+        _stack_service_status("optional", service, snapshot.get(service))
+        for service in STACK_HEALTH_OPTIONAL_SERVICES
+    ]
+
+    core_healthy = sum(1 for item in core_services if item["status"] == "healthy")
+    optional_healthy = sum(1 for item in optional_services if item["status"] == "healthy")
+    optional_degraded = [item["label"] for item in optional_services if item["status"] != "healthy"]
+
+    if core_healthy == len(core_services) and not optional_degraded:
+        status = "healthy"
+        label = "Core and sidecar services are healthy"
+        summary = "The governed local stack is fully up, including the optional observability sidecars."
+    elif core_healthy == len(core_services):
+        status = "warning"
+        label = "Core governed stack is healthy"
+        summary = (
+            f"All {len(core_services)}/{len(core_services)} core services are up. "
+            f"Optional sidecars need attention: {', '.join(optional_degraded)}."
+        )
+    else:
+        status = "critical"
+        label = "Core governed stack needs attention"
+        degraded_core = [item["label"] for item in core_services if item["status"] != "healthy"]
+        summary = (
+            f"{core_healthy}/{len(core_services)} core services are currently healthy. "
+            f"Check: {', '.join(degraded_core)}."
+        )
+
+    detail = (
+        "Use `make health-check` for the full contract: stack state, dashboard health, host bootstrap smoke, "
+        "in-network live smoke, and the focused governed pytest bundle."
+    )
+
+    return {
+        "generated_at": _now_iso(),
+        "status": status,
+        "label": label,
+        "summary": summary,
+        "detail": detail,
+        "source": source_label,
+        "counts": {
+            "core_healthy": core_healthy,
+            "core_total": len(core_services),
+            "optional_healthy": optional_healthy,
+            "optional_total": len(optional_services),
+        },
+        "badges": [
+            {"label": "Core services", "value": f"{core_healthy}/{len(core_services)}", "status": "healthy" if core_healthy == len(core_services) else "critical"},
+            {"label": "Optional sidecars", "value": f"{optional_healthy}/{len(optional_services)}", "status": "healthy" if optional_healthy == len(optional_services) else "warning"},
+            {"label": "Source", "value": source_label, "status": "neutral"},
+        ],
+        "groups": [
+            {"title": "Core governed path", "items": core_services},
+            {"title": "Optional sidecars", "items": optional_services},
+        ],
+        "action": {
+            "label": "Open health-check script",
+            "href": "/raw/scripts/check-project-health.sh",
         },
     }
 

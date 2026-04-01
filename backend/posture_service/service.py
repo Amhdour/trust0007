@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from backend.activity_service.service import build_activity_snapshot, build_onyx_runtime_proof
+from backend.activity_service.service import build_activity_snapshot, build_onyx_runtime_proof, build_stack_health_snapshot
 from backend.evidence_service.service import build_evidence_pack_summary
 from backend.integration_adapter.repository import (
     AUDIT_RECORDS_PATH,
@@ -1283,6 +1283,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     eval_summaries = load_eval_summaries(resolved_root)
     latest_eval = eval_summaries[-1] if eval_summaries else {}
     activity_snapshot = build_activity_snapshot(resolved_root, limit=12)
+    stack_health = build_stack_health_snapshot(resolved_root)
     artifact_inventory, artifact_counts = _build_artifact_inventory(resolved_root)
     denied_flow = read_json(resolved_root / INSPECTABLE_DENIED_FLOW)
     allowed_flow = read_json(resolved_root / INSPECTABLE_ALLOWED_FLOW)
@@ -1558,8 +1559,14 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     runtime_readiness_status = _onyx_runtime_readiness_status(onyx_runtime_proof)
     runtime_proof_status = _combine_statuses(runtime_continuity_status, runtime_readiness_status)
     onyx_governed_entry_url = _launch_handoff_url(latest_requested_path)
+    onyx_live_workspace_url = _launch_handoff_path(latest_requested_path, mode="live", view="embedded")
     onyx_runtime_public_url = str(runtime_readiness.get("public_url", "")).strip() or _public_service_url(3010, latest_requested_path)
     onyx_runtime_local_url = str(runtime_readiness.get("local_url", "")).strip() or f"http://127.0.0.1:3010{latest_requested_path}"
+    runtime_activity_href = (
+        f"/api/control-plane/onyx-activity?path={quote(latest_requested_path, safe='/?=&')}"
+        f"&trace_id={quote(latest_trace_id, safe='')}"
+        f"&session_id={quote(latest_session_id, safe='')}"
+    )
     top_failing_control = failing_controls[0] if failing_controls else {}
     governed_flow_generated_at = str(governed_flow_summary.get("generated_at", ""))
     latest_request_timestamp = str(latest_request.get("timestamp") or governed_flow_generated_at or "")
@@ -2144,6 +2151,62 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ]
         ),
     }
+    runtime_summary = {
+        "eyebrow": "Live runtime",
+        "title": "Onyx runtime status",
+        "summary": (
+            "The governed runtime looks ready for the current workspace path."
+            if runtime_proof_status == "healthy"
+            else (
+                "The governed runtime is partially visible, but continuity or reachability still needs attention."
+                if runtime_proof_status == "warning"
+                else "The governed runtime still needs attention before you treat the live path as healthy."
+            )
+        ),
+        "detail": (
+            f"Workspace path {latest_requested_path}. Reachability: {runtime_readiness_label}. "
+            f"Continuity: {runtime_continuity_label}. Latest runtime signal: {runtime_latest_activity_summary}"
+        ),
+        "status": runtime_proof_status,
+        "meta_badges": _timestamp_badges(
+            timestamp=handoff_timestamp,
+            evidence_mode="live" if live_evidence_mode else "demo",
+            provenance="runtime-generated",
+            label="Runtime proof",
+        ),
+        "items": [
+            _card("Reachability", runtime_readiness_label, runtime_readiness_status, str(runtime_readiness.get("detail", ""))),
+            _card("Continuity", runtime_continuity_label, runtime_continuity_status, str(runtime_continuity.get("detail", ""))),
+            _card("Current path", latest_requested_path, "neutral", "The runtime path the current governed workspace targets."),
+            _card("Public runtime", onyx_runtime_public_url, "neutral", "Publicly visible runtime target when the Onyx surface is reachable."),
+        ],
+        "actions": [
+            _link(
+                "Open live workspace",
+                onyx_live_workspace_url,
+                "Open the governed embedded workspace for the current Onyx path.",
+                runtime_proof_status,
+                display_label="Open live workspace",
+                display_description="Jump into the governed Onyx workspace with the current path and live controls.",
+            ),
+            _link(
+                "Open runtime proof",
+                runtime_proof_href,
+                "Inspect the runtime reachability and continuity proof for the latest governed handoff.",
+                runtime_proof_status,
+                display_label="Open runtime proof",
+                display_description="Inspect the technical runtime proof tied to the latest governed handoff.",
+            ),
+            _link(
+                "Open runtime activity",
+                runtime_activity_href,
+                "Inspect the current Onyx activity feed filtered to this governed workspace path.",
+                "neutral",
+                display_label="Open runtime activity",
+                display_description="Inspect current Onyx activity filtered to the governed workspace path.",
+            ),
+        ],
+    }
     command_center = {
         "cards": [
             _card(
@@ -2366,6 +2429,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         "presentation_summary": presentation_summary,
+        "runtime_summary": runtime_summary,
         "proof_pipeline": {
             "title": "Latest governed path",
             "detail": "Follow the latest request through the checks that must line up before AI access is allowed.",
@@ -3492,6 +3556,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "mode_banner": mode_banner,
         "reading_guide": reading_guide,
         "command_center": command_center,
+        "stack_health": stack_health,
         "audience_paths": audience_paths,
         "operator_briefing": quick_answers,
         "kpis": kpis,

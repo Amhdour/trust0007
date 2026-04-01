@@ -4,7 +4,10 @@ const heroEyebrow = document.getElementById("hero-eyebrow");
 const heroTitle = document.getElementById("hero-title");
 const heroCopy = document.getElementById("hero-copy");
 const heroMeta = document.getElementById("hero-meta");
+const dashboardViewRoot = document.getElementById("dashboard-view-root");
 const liveSessionRoot = document.getElementById("live-session-root");
+const runtimeSummaryRoot = document.getElementById("runtime-summary-root");
+const stackHealthRoot = document.getElementById("stack-health-root");
 const heroSteps = document.getElementById("hero-steps");
 const summarySheetRoot = document.getElementById("summary-sheet-root");
 const modeBannerRoot = document.getElementById("mode-banner-root");
@@ -21,18 +24,40 @@ const sourcesRoot = document.getElementById("sources");
 const liveLogRoot = document.getElementById("live-log-root");
 const liveRuntimeLink = document.getElementById("live-runtime-link");
 const clientOverviewLink = document.getElementById("client-overview-link");
-const presentationModeButton = document.getElementById("presentation-mode-button");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
 
 const LIVE_LOG_LIMIT = 6;
 const DEFAULT_LIVE_LOG_POLL_MS = 5000;
 const SECTION_SCROLL_OFFSET_PX = 152;
-const PRESENTATION_MODE_STORAGE_KEY = "controlPlanePresentationMode";
+const DASHBOARD_VIEW_STORAGE_KEY = "controlPlaneDashboardView";
+const DASHBOARD_VIEW_MODES = {
+  executive: {
+    label: "Executive",
+    description: "Posture, blocker, next step, and reviewer-friendly proof only.",
+  },
+  operator: {
+    label: "Operator",
+    description: "Full control-plane briefing with reviewer and technical lanes.",
+  },
+  runtime: {
+    label: "Live Runtime",
+    description: "Focus on the live workspace path, runtime proof, and current activity.",
+  },
+};
+const RUNTIME_SECTION_IDS = new Set([
+  "entry-points",
+  "governed-requests",
+  "identity-session",
+  "audit-replay",
+  "trace-correlation",
+  "policy-enforcement",
+]);
 let liveLogTimer = 0;
 let activeTabTarget = "";
 let activeTabSyncFrame = 0;
 let tabStripScrollBound = false;
 let presentationModeEnabled = false;
+let dashboardViewMode = "operator";
 let lastOverviewPayload = null;
 let lastLiveLogPayload = null;
 let lastLiveSessionPayload = null;
@@ -295,48 +320,118 @@ function applyChangeHighlights() {
   }, 4200);
 }
 
-function resolveInitialPresentationMode() {
+function resolveInitialDashboardViewMode() {
   const params = new URLSearchParams(window.location.search);
   const view = params.get("view");
   if (view === "presentation") {
-    return true;
+    return "executive";
   }
   if (view === "full") {
-    return false;
+    return "operator";
+  }
+  if (view && DASHBOARD_VIEW_MODES[view]) {
+    return view;
   }
 
   try {
-    return window.localStorage.getItem(PRESENTATION_MODE_STORAGE_KEY) === "1";
+    const stored = window.localStorage.getItem(DASHBOARD_VIEW_STORAGE_KEY);
+    if (stored && DASHBOARD_VIEW_MODES[stored]) {
+      return stored;
+    }
   } catch {
-    return false;
+    return "operator";
   }
+  return "operator";
 }
 
-function updatePresentationModeButton() {
-  if (!presentationModeButton) {
+function renderDashboardViewModes() {
+  if (!dashboardViewRoot) {
     return;
   }
 
-  presentationModeButton.textContent = presentationModeEnabled ? "Show full technical view" : "Presentation mode";
-  presentationModeButton.setAttribute("aria-pressed", presentationModeEnabled ? "true" : "false");
+  dashboardViewRoot.innerHTML = `
+    <section class="dashboard-view-card">
+      <div class="dashboard-view-head">
+        <div>
+          <p class="eyebrow">View mode</p>
+          <h2>Choose the lens</h2>
+        </div>
+      </div>
+      <div class="dashboard-view-switch" role="tablist" aria-label="Dashboard view modes">
+        ${Object.entries(DASHBOARD_VIEW_MODES)
+          .map(
+            ([mode, config]) => `
+              <button
+                class="dashboard-view-button${dashboardViewMode === mode ? " is-active" : ""}"
+                type="button"
+                role="tab"
+                aria-selected="${dashboardViewMode === mode ? "true" : "false"}"
+                data-dashboard-view="${escapeHtml(mode)}"
+              >
+                <strong>${escapeHtml(config.label)}</strong>
+                <span>${escapeHtml(config.description)}</span>
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+
+  for (const button of dashboardViewRoot.querySelectorAll("[data-dashboard-view]")) {
+    button.addEventListener("click", () => {
+      setDashboardViewMode(button.dataset.dashboardView || "operator");
+    });
+  }
 }
 
-function setPresentationMode(enabled) {
-  presentationModeEnabled = Boolean(enabled);
+function setDashboardViewMode(mode) {
+  dashboardViewMode = DASHBOARD_VIEW_MODES[mode] ? mode : "operator";
+  presentationModeEnabled = dashboardViewMode === "executive";
   document.body.classList.toggle("presentation-mode", presentationModeEnabled);
-  updatePresentationModeButton();
+  document.body.dataset.dashboardView = dashboardViewMode;
+  renderDashboardViewModes();
 
   try {
-    window.localStorage.setItem(PRESENTATION_MODE_STORAGE_KEY, presentationModeEnabled ? "1" : "0");
+    window.localStorage.setItem(DASHBOARD_VIEW_STORAGE_KEY, dashboardViewMode);
   } catch {
     // Ignore storage failures and keep the in-memory toggle working.
   }
 
   if (lastOverviewPayload) {
-    renderHero(lastOverviewPayload);
-    renderSummarySheet(lastOverviewPayload.command_center?.presentation_summary || {});
+    renderDashboardPayload(lastOverviewPayload);
   }
   scheduleActiveTabSync();
+}
+
+function isExecutiveView() {
+  return dashboardViewMode === "executive";
+}
+
+function isRuntimeView() {
+  return dashboardViewMode === "runtime";
+}
+
+function visibleSectionsForView(sections) {
+  const items = Array.isArray(sections) ? sections : [];
+  if (isExecutiveView()) {
+    return items.filter((section) => section.group === "reviewer" && section.id !== "upstream-posture");
+  }
+  if (isRuntimeView()) {
+    return items.filter((section) => RUNTIME_SECTION_IDS.has(section.id));
+  }
+  return items;
+}
+
+function visibleTabsForView(tabs) {
+  const items = Array.isArray(tabs) ? tabs : [];
+  if (isExecutiveView()) {
+    return items.filter((tab) => tab.group === "reviewer" && tab.id !== "upstream-posture");
+  }
+  if (isRuntimeView()) {
+    return items.filter((tab) => RUNTIME_SECTION_IDS.has(tab.id));
+  }
+  return items;
 }
 
 function renderHero(payload) {
@@ -345,34 +440,49 @@ function renderHero(payload) {
   const presenterTitle = "AI Trust & Security Review Brief";
   const presenterCopy =
     "Use this audience-facing view to explain the current posture, main blocker, and strongest governed proof without the operator-only drill-down.";
+  const runtimeTitle = "Governed Live Runtime Workspace";
+  const runtimeCopy =
+    "Focus on the current Onyx path, runtime proof, live session state, and the activity that confirms the governed handoff is doing real work.";
 
   if (heroEyebrow) {
-    heroEyebrow.textContent = presentationModeEnabled ? "Executive review mode" : "Trust & Security Operations Dashboard";
+    heroEyebrow.textContent = isExecutiveView()
+      ? "Executive review mode"
+      : isRuntimeView()
+        ? "Live runtime focus"
+        : "Trust & Security Operations Dashboard";
   }
 
   if (heroTitle) {
-    heroTitle.textContent = presentationModeEnabled ? presenterTitle : defaultTitle;
+    heroTitle.textContent = isExecutiveView() ? presenterTitle : isRuntimeView() ? runtimeTitle : defaultTitle;
   }
 
   if (heroCopy) {
-    heroCopy.textContent = presentationModeEnabled ? presenterCopy : defaultCopy;
+    heroCopy.textContent = isExecutiveView() ? presenterCopy : isRuntimeView() ? runtimeCopy : defaultCopy;
   }
 
   const mode = payload.data_mode || {};
   heroMeta.innerHTML = `
-    ${presentationModeEnabled ? '<span class="chip">Presentation view</span>' : ""}
+    ${isExecutiveView() ? '<span class="chip">Executive view</span>' : ""}
+    ${isRuntimeView() ? '<span class="chip">Live runtime view</span>' : ""}
     <span class="chip">${escapeHtml(payload.runtime_module || "Governed runtime")}</span>
     <span class="${statusClass(mode.status || "neutral")}" title="${escapeHtml(mode.label || "Dashboard mode")}">${escapeHtml(mode.display_label || mode.label || "Dashboard mode")}</span>
     <span class="chip">Generated ${escapeHtml(formatTimestamp(payload.generated_at))}</span>
   `;
 
-  const landingSteps = presentationModeEnabled
+  const landingSteps = isExecutiveView()
     ? [
         "Start with the posture banner.",
         "Use the guided walkthrough to tell the story.",
         "Open blocked or approved proof as needed.",
         "Return to full view for operator detail.",
       ]
+    : isRuntimeView()
+      ? [
+          "Confirm the live session and stack state.",
+          "Open the embedded runtime workspace.",
+          "Watch current Onyx activity and trace continuity.",
+          "Drop into technical sections only when runtime proof looks off.",
+        ]
     : Array.isArray(payload.landing_steps)
       ? payload.landing_steps
       : [];
@@ -517,6 +627,126 @@ function renderLiveSessionError(error) {
   `;
 }
 
+function renderRuntimeSummary(summary) {
+  if (!runtimeSummaryRoot) {
+    return;
+  }
+
+  if (!summary?.title) {
+    runtimeSummaryRoot.innerHTML = "";
+    return;
+  }
+
+  const items = Array.isArray(summary.items) ? summary.items : [];
+  const actions = Array.isArray(summary.actions) ? summary.actions : [];
+  runtimeSummaryRoot.innerHTML = `
+    <section class="hero-runtime-card hero-runtime-${escapeHtml(summary.status || "neutral")}">
+      <div class="hero-runtime-head">
+        <div>
+          <p class="eyebrow">${escapeHtml(summary.eyebrow || "Live runtime")}</p>
+          <h2 class="hero-runtime-title">${escapeHtml(summary.title || "Runtime status")}</h2>
+          <p class="hero-runtime-summary">${escapeHtml(summary.summary || "")}</p>
+        </div>
+        ${renderStatusPill(summary.status || "neutral")}
+      </div>
+      ${renderMetaBadges(summary.meta_badges || [], "hero-runtime-meta")}
+      <p class="hero-runtime-detail">${escapeHtml(summary.detail || "")}</p>
+      <div class="hero-runtime-grid">
+        ${items
+          .map(
+            (item) => `
+              <article class="hero-runtime-stat hero-runtime-stat-${escapeHtml(item.status || "neutral")}">
+                <span class="hero-runtime-stat-label">${escapeHtml(item.display_label || item.label || "")}</span>
+                <strong>${escapeHtml(item.display_value || item.value || "")}</strong>
+                <p>${escapeHtml(item.display_detail || item.detail || "")}</p>
+              </article>
+            `,
+          )
+          .join("")}
+      </div>
+      ${
+        actions.length
+          ? `
+            <div class="hero-runtime-actions">
+              ${actions
+                .map(
+                  (action) => `
+                    <a class="audience-link-pill"${linkAttributes(action.href)}>
+                      ${escapeHtml(action.display_label || action.label || "")}
+                    </a>
+                  `,
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderStackHealth(payload) {
+  if (!stackHealthRoot) {
+    return;
+  }
+
+  if (!payload?.label) {
+    stackHealthRoot.innerHTML = "";
+    return;
+  }
+
+  const groups = Array.isArray(payload.groups) ? payload.groups : [];
+  stackHealthRoot.innerHTML = `
+    <section class="stack-health-card stack-health-${escapeHtml(payload.status || "neutral")}">
+      <div class="stack-health-head">
+        <div>
+          <p class="eyebrow">Stack health</p>
+          <h2>${escapeHtml(payload.label || "Stack status")}</h2>
+          <p class="stack-health-summary">${escapeHtml(payload.summary || "")}</p>
+        </div>
+        ${renderStatusPill(payload.status || "neutral")}
+      </div>
+      ${renderMetaBadges(payload.badges || [], "stack-health-meta")}
+      <p class="stack-health-detail">${escapeHtml(payload.detail || "")}</p>
+      <details class="stack-health-disclosure"${isRuntimeView() ? " open" : ""}>
+        <summary>Show service breakdown</summary>
+        <div class="stack-health-groups">
+          ${groups
+            .map(
+              (group) => `
+                <section class="stack-health-group">
+                  <p class="eyebrow">${escapeHtml(group.title || "Services")}</p>
+                  <div class="stack-health-service-grid">
+                    ${(Array.isArray(group.items) ? group.items : [])
+                      .map(
+                        (item) => `
+                          <article class="stack-health-service stack-health-service-${escapeHtml(item.status || "neutral")}">
+                            <div class="card-topline">
+                              <span class="metric-label">${escapeHtml(item.label || item.service || "")}</span>
+                              ${renderStatusPill(item.status || "neutral", { hideNeutral: true })}
+                            </div>
+                            <strong>${escapeHtml(item.state || "unknown")}</strong>
+                            <p>${escapeHtml(item.detail || "")}</p>
+                          </article>
+                        `,
+                      )
+                      .join("")}
+                  </div>
+                </section>
+              `,
+            )
+            .join("")}
+        </div>
+      </details>
+      ${
+        payload.action?.href
+          ? `<a class="audience-link-pill stack-health-link"${linkAttributes(payload.action.href)}>${escapeHtml(payload.action.label || "Open runbook")}</a>`
+          : ""
+      }
+    </section>
+  `;
+}
+
 function renderModeBanner(modeBanner) {
   if (!modeBannerRoot) {
     return;
@@ -645,6 +875,11 @@ function renderBriefing(commandCenter) {
 
 function renderRiskStrip(strip) {
   if (!riskStripRoot) {
+    return;
+  }
+
+  if (isRuntimeView()) {
+    riskStripRoot.innerHTML = "";
     return;
   }
 
@@ -863,6 +1098,11 @@ function renderWalkthrough(walkthrough) {
     return;
   }
 
+  if (isRuntimeView()) {
+    walkthroughRoot.innerHTML = "";
+    return;
+  }
+
   const steps = Array.isArray(walkthrough) ? walkthrough.filter((item) => item && item.href) : [];
   if (!steps.length) {
     walkthroughRoot.innerHTML = "";
@@ -871,28 +1111,33 @@ function renderWalkthrough(walkthrough) {
 
   walkthroughRoot.innerHTML = `
     <section class="walkthrough-card"${changeAttributes("walkthrough")}>
-      <div class="support-card-head">
-        <div>
-          <p class="eyebrow">Guided walkthrough</p>
-          <h3>Tell the story in four steps</h3>
+      <details class="walkthrough-disclosure"${isExecutiveView() ? " open" : ""}>
+        <summary>
+          <span>
+            <span class="eyebrow">Guided walkthrough</span>
+            <strong>Tell the story in four steps</strong>
+          </span>
+          <span class="walkthrough-summary-note">${isExecutiveView() ? "Open in executive view" : "Open when you need a clean review flow"}</span>
+        </summary>
+        <div class="walkthrough-disclosure-body">
+          <p class="record-detail">Use these shortcuts when you need a clean review flow instead of a full free-form scan.</p>
+          <div class="walkthrough-grid">
+            ${steps
+              .map(
+                (step, index) => `
+                  <a class="walkthrough-step-card walkthrough-step-${escapeHtml(step.status || "neutral")}"${linkAttributes(step.href)}>
+                    <span class="walkthrough-step-index">${index + 1}</span>
+                    <div class="walkthrough-step-copy">
+                      <p class="walkthrough-step-title">${escapeHtml(step.display_label || step.label || "")}</p>
+                      <p class="walkthrough-step-description">${escapeHtml(step.display_description || step.description || "")}</p>
+                    </div>
+                  </a>
+                `,
+              )
+              .join("")}
+          </div>
         </div>
-      </div>
-      <p class="record-detail">Use these shortcuts when you need a clean review flow instead of a full free-form scan.</p>
-      <div class="walkthrough-grid">
-        ${steps
-          .map(
-            (step, index) => `
-              <a class="walkthrough-step-card walkthrough-step-${escapeHtml(step.status || "neutral")}"${linkAttributes(step.href)}>
-                <span class="walkthrough-step-index">${index + 1}</span>
-                <div class="walkthrough-step-copy">
-                  <p class="walkthrough-step-title">${escapeHtml(step.display_label || step.label || "")}</p>
-                  <p class="walkthrough-step-description">${escapeHtml(step.display_description || step.description || "")}</p>
-                </div>
-              </a>
-            `,
-          )
-          .join("")}
-      </div>
+      </details>
     </section>
   `;
 }
@@ -942,6 +1187,11 @@ function renderCompareExample(item, key) {
 
 function renderCompareView(compare) {
   if (!compareRoot) {
+    return;
+  }
+
+  if (isRuntimeView()) {
+    compareRoot.innerHTML = "";
     return;
   }
 
@@ -1096,6 +1346,11 @@ function renderKpis(paths) {
     return;
   }
 
+  if (isRuntimeView()) {
+    kpiRoot.innerHTML = "";
+    return;
+  }
+
   kpiRoot.innerHTML = `
     <section class="command-secondary-card support-panel">
       <div class="support-card-head">
@@ -1231,6 +1486,11 @@ function renderReadingGuide(guide) {
     return;
   }
 
+  if (isRuntimeView()) {
+    readingGuideRoot.innerHTML = "";
+    return;
+  }
+
   const statuses = Array.isArray(guide.statuses) ? guide.statuses : [];
   const questions = Array.isArray(guide.questions) ? guide.questions : [];
 
@@ -1322,7 +1582,8 @@ function renderBlocks(blocks) {
 
 function renderSections(sections) {
   let activeGroup = "";
-  root.innerHTML = (Array.isArray(sections) ? sections : [])
+  const filteredSections = visibleSectionsForView(sections);
+  root.innerHTML = filteredSections
     .map((section) => {
       const nextGroup = section.group || "";
       const groupBanner =
@@ -1441,7 +1702,7 @@ function renderFreshnessStrip(bar) {
 
 function renderTabs(tabs, freshnessBar = {}) {
   const groups = new Map();
-  const allTabs = Array.isArray(tabs) ? tabs : [];
+  const allTabs = visibleTabsForView(tabs);
   for (const tab of allTabs) {
     const groupLabel = tab.group_label || "Sections";
     if (!groups.has(groupLabel)) {
@@ -1450,14 +1711,24 @@ function renderTabs(tabs, freshnessBar = {}) {
     groups.get(groupLabel).push(tab);
   }
 
-  const primaryTabs = allTabs.filter((tab) => tab.group === "reviewer").slice(0, 5);
+  const primaryTabs = (
+    isRuntimeView()
+      ? allTabs
+      : isExecutiveView()
+        ? allTabs.filter((tab) => tab.group === "reviewer")
+        : allTabs.filter((tab) => tab.group === "reviewer")
+  ).slice(0, 6);
+  const quickJumpTitle = isRuntimeView() ? "Live runtime jump" : "Quick jump";
+  const quickJumpDescription = isRuntimeView()
+    ? "Use the short row for the current workspace path, handoff proof, and technical runtime checks."
+    : "Use the short row for the main story. Open the full list only for deeper drill-down.";
 
   tabStrip.innerHTML = `
     <section class="tab-strip-shell">
       <div class="tab-strip-head">
         <div>
-          <p class="eyebrow">Quick jump</p>
-          <p class="section-description">Use the short row for the main story. Open the full list only for deeper drill-down.</p>
+          <p class="eyebrow">${escapeHtml(quickJumpTitle)}</p>
+          <p class="section-description">${escapeHtml(quickJumpDescription)}</p>
         </div>
       </div>
       ${renderFreshnessStrip(freshnessBar)}
@@ -1721,6 +1992,28 @@ async function loadLiveSession() {
   }
 }
 
+function renderDashboardPayload(payload) {
+  renderDashboardViewModes();
+  renderHero(payload);
+  renderSummarySheet(payload.command_center?.presentation_summary || {});
+  renderRuntimeSummary(payload.command_center?.runtime_summary || {});
+  renderStackHealth(payload.stack_health || {});
+  renderModeBanner(payload.mode_banner || {});
+  renderIncidentBanner(payload.command_center?.incident_banner || {});
+  renderRiskStrip(payload.command_center?.risk_strip || {});
+  renderNextAction(payload.command_center?.next_action || {});
+  renderWalkthrough(payload.command_center?.walkthrough || []);
+  renderCompareView(payload.command_center?.example_compare || {});
+  renderBriefing(payload.command_center || {});
+  renderProofPipeline(payload.command_center?.proof_pipeline || {});
+  renderReadingGuide(payload.reading_guide || {});
+  renderKpis(payload.audience_paths || []);
+  renderSections(payload.sections);
+  renderTabs(payload.tabs, payload.command_center?.freshness_bar || {});
+  renderSources(payload.sources);
+  applyChangeHighlights();
+}
+
 async function boot() {
   try {
     const response = await fetch("/api/control-plane/overview", { cache: "no-store" });
@@ -1731,22 +2024,7 @@ async function boot() {
     const payload = await response.json();
     updateDashboardChangeTracking(payload);
     lastOverviewPayload = payload;
-    renderHero(payload);
-    renderSummarySheet(payload.command_center?.presentation_summary || {});
-    renderModeBanner(payload.mode_banner || {});
-    renderIncidentBanner(payload.command_center?.incident_banner || {});
-    renderRiskStrip(payload.command_center?.risk_strip || {});
-    renderNextAction(payload.command_center?.next_action || {});
-    renderWalkthrough(payload.command_center?.walkthrough || []);
-    renderCompareView(payload.command_center?.example_compare || {});
-    renderBriefing(payload.command_center || {});
-    renderProofPipeline(payload.command_center?.proof_pipeline || {});
-    renderReadingGuide(payload.reading_guide || {});
-    renderKpis(payload.audience_paths || []);
-    renderSections(payload.sections);
-    renderTabs(payload.tabs, payload.command_center?.freshness_bar || {});
-    renderSources(payload.sources);
-    applyChangeHighlights();
+    renderDashboardPayload(payload);
   } catch (error) {
     const message = escapeHtml(error.message || "Unknown error");
     root.innerHTML = `
@@ -1789,6 +2067,15 @@ async function boot() {
     if (modeBannerRoot) {
       modeBannerRoot.innerHTML = "";
     }
+    if (dashboardViewRoot) {
+      dashboardViewRoot.innerHTML = "";
+    }
+    if (runtimeSummaryRoot) {
+      runtimeSummaryRoot.innerHTML = "";
+    }
+    if (stackHealthRoot) {
+      stackHealthRoot.innerHTML = "";
+    }
     if (tabStrip) {
       tabStrip.innerHTML = "";
     }
@@ -1810,15 +2097,11 @@ async function refreshDashboard() {
   }
 }
 
-presentationModeEnabled = resolveInitialPresentationMode();
-updatePresentationModeButton();
+dashboardViewMode = resolveInitialDashboardViewMode();
+presentationModeEnabled = dashboardViewMode === "executive";
 document.body.classList.toggle("presentation-mode", presentationModeEnabled);
-
-if (presentationModeButton) {
-  presentationModeButton.addEventListener("click", () => {
-    setPresentationMode(!presentationModeEnabled);
-  });
-}
+document.body.dataset.dashboardView = dashboardViewMode;
+renderDashboardViewModes();
 
 if (refreshDashboardButton) {
   refreshDashboardButton.addEventListener("click", () => {

@@ -181,6 +181,83 @@ h3 {
   gap: 10px;
 }
 
+.dashboard-view-root {
+  margin-top: 18px;
+}
+
+.dashboard-view-card {
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.dashboard-view-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.dashboard-view-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.dashboard-view-button {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  border-radius: 18px;
+  border: 1px solid rgba(16, 33, 45, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+  padding: 14px 16px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.dashboard-view-button strong {
+  font-size: 0.96rem;
+}
+
+.dashboard-view-button span {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.dashboard-view-button:hover,
+.dashboard-view-button:focus-visible,
+.dashboard-view-button.is-active {
+  transform: translateY(-1px);
+  border-color: rgba(15, 108, 94, 0.26);
+  box-shadow: 0 14px 30px rgba(15, 108, 94, 0.1);
+}
+
+.dashboard-view-button.is-active {
+  background: linear-gradient(135deg, rgba(15, 108, 94, 0.14), rgba(255, 255, 255, 0.96));
+}
+
+.hero-support-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.85fr);
+  gap: 16px;
+  margin-top: 18px;
+  align-items: start;
+}
+
+.hero-support-column {
+  display: grid;
+  gap: 16px;
+}
+
+.hero-support-column-compact {
+  align-content: start;
+}
+
 .chip,
 .hero-action-button,
 .tab-button,
@@ -318,6 +395,115 @@ h3 {
 .live-session-actions {
   margin-top: 16px;
   justify-content: flex-start;
+}
+
+.hero-runtime-card,
+.stack-health-card {
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 241, 231, 0.88));
+}
+
+.hero-runtime-head,
+.stack-health-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.hero-runtime-title {
+  font-size: clamp(1.28rem, 2.4vw, 1.7rem);
+}
+
+.hero-runtime-summary,
+.hero-runtime-detail,
+.stack-health-summary,
+.stack-health-detail {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.hero-runtime-meta,
+.stack-health-meta {
+  margin-top: 14px;
+}
+
+.hero-runtime-grid,
+.stack-health-service-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.hero-runtime-stat,
+.stack-health-service {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.hero-runtime-stat-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-runtime-stat strong,
+.stack-health-service strong {
+  display: block;
+  margin-top: 8px;
+  line-height: 1.45;
+}
+
+.hero-runtime-stat p,
+.stack-health-service p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.hero-runtime-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.stack-health-disclosure {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.stack-health-disclosure summary,
+.walkthrough-disclosure summary {
+  cursor: pointer;
+  list-style: none;
+  width: 100%;
+}
+
+.stack-health-disclosure summary::-webkit-details-marker,
+.walkthrough-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.stack-health-groups {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.stack-health-link {
+  margin-top: 16px;
 }
 
 .summary-sheet-card,
@@ -837,10 +1023,35 @@ h3 {
 
 .walkthrough-card {
   margin-top: 16px;
-  padding: 18px;
   border-radius: 22px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(245, 239, 229, 0.86));
+}
+
+.walkthrough-disclosure summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+}
+
+.walkthrough-disclosure summary strong {
+  display: block;
+  font-family: "Fraunces", "Iowan Old Style", "Palatino Linotype", serif;
+  font-size: 1.08rem;
+  line-height: 1.2;
+}
+
+.walkthrough-summary-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.walkthrough-disclosure-body {
+  padding: 0 18px 18px;
 }
 
 .walkthrough-grid {
@@ -2034,6 +2245,22 @@ tbody tr:last-child td {
   margin-top: 18px;
 }
 
+body[data-dashboard-view="runtime"] .briefing-root,
+body[data-dashboard-view="runtime"] .command-support-column,
+body[data-dashboard-view="runtime"] #compare-root,
+body[data-dashboard-view="runtime"] #reading-guide-root,
+body[data-dashboard-view="runtime"] #kpi-root {
+  display: none;
+}
+
+body[data-dashboard-view="runtime"] .briefing-panel {
+  padding-top: 20px;
+}
+
+body[data-dashboard-view="runtime"] .hero-copy {
+  max-width: 60ch;
+}
+
 .loading-panel {
   padding: 22px;
   border: 1px dashed var(--line-strong);
@@ -2066,6 +2293,11 @@ tbody tr:last-child td {
     justify-content: flex-start;
   }
 
+  .dashboard-view-switch,
+  .hero-support-grid {
+    grid-template-columns: 1fr;
+  }
+
   .tab-strip {
     margin: 16px 0;
     top: 10px;
@@ -2086,7 +2318,8 @@ tbody tr:last-child td {
   }
 
   .summary-sheet-grid,
-  .compare-grid {
+  .compare-grid,
+  .hero-support-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2120,6 +2353,10 @@ tbody tr:last-child td {
 
   .walkthrough-grid {
     grid-template-columns: 1fr;
+  }
+
+  .walkthrough-disclosure summary {
+    display: grid;
   }
 
   .compare-field-grid {
@@ -2219,7 +2456,10 @@ tbody tr:last-child td {
   .readiness-spotlight-grid,
   .pipeline-step-grid,
   .audience-path-grid,
-  .incident-banner-facts {
+  .incident-banner-facts,
+  .dashboard-view-switch,
+  .hero-runtime-grid,
+  .stack-health-service-grid {
     grid-template-columns: 1fr;
   }
 }
