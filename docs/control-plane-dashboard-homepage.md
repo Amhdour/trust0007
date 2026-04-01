@@ -25,8 +25,9 @@ The page now leads with:
 
 ## Homepage structure
 
-1. Hero: repository positioning, data mode, runtime role, and high-level workflow.
+1. Hero: repository positioning, data mode, runtime role, high-level workflow, and current dev live-session state.
    - explicit wording that Onyx is the governed runtime plane and the dashboard is the trust/security control plane
+   - explicit wording that the embedded live workspace helper is dev-only and intended for local `dev` / `prod-sim`
 2. Mode banner: explicit `LIVE GOVERNED MODE` or `DEMO / FALLBACK MODE` framing with consequence text.
 3. How to read this dashboard:
    - compact color/status meaning at first glance
@@ -108,8 +109,12 @@ The page now leads with:
   - `/api/control-plane/live-log`
   - Onyx container logs and Langfuse activity when available
 - live runtime workspace
+  - `/api/control-plane/live-session`
+  - `/auth/live-session/end?next=/`
   - `/auth/live-session/start?next=/launch/onyx?path=/app&mode=live&view=embedded`
   - same governance evaluation as the standard handoff route
+  - validates the current cookie and shows its user, tenant, session id, and expiry in the hero
+  - supports clearing the dev-only cookie without leaving the dashboard
   - mints a local dev-only `kc_access_token` cookie inside the control plane before redirecting to the governed live workspace
   - embeds the reachable Onyx surface inside a dashboard-owned page while preserving trace and evidence context
 
@@ -125,11 +130,14 @@ The page now leads with:
   - runtime-generated audit records when a governed flow has run
   - live identity, policy, retrieval, secret, and trace evidence panels when those artifacts exist
 - live-log polling from Onyx and Langfuse when reachable
+- current live-session status derived from the request cookie plus Keycloak validation when the helper is enabled
 - Demo-derived fallback:
   - `telemetry/exports/sample_events.jsonl`
   - any KPI or blocked-action summary built from that sample file when live governed-flow artifacts are absent
 
 The dashboard should always make this visible through the data-mode badge in the hero area.
+
+The live-session helper should also stay obviously scoped: it exists to make local and prod-sim live handoffs testable from the browser, not to stand in for production authentication.
 
 ## Governed request visibility
 

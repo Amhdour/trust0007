@@ -170,6 +170,10 @@ h3 {
   margin-top: 18px;
 }
 
+.live-session-root {
+  margin-top: 18px;
+}
+
 .hero-actions {
   display: flex;
   justify-content: flex-end;
@@ -204,6 +208,16 @@ h3 {
   background: linear-gradient(135deg, rgba(15, 108, 94, 0.15), rgba(255, 255, 255, 0.94));
   color: var(--ink);
   cursor: pointer;
+}
+
+.hero-action-button-secondary {
+  border-color: rgba(16, 33, 45, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.hero-action-button.is-disabled {
+  pointer-events: none;
+  opacity: 0.62;
 }
 
 .hero-action-button:hover,
@@ -256,6 +270,54 @@ h3 {
   margin-top: 26px;
   overflow-x: auto;
   padding-bottom: 4px;
+}
+
+.live-session-banner {
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 241, 231, 0.86));
+}
+
+.live-session-banner-healthy {
+  box-shadow: inset 0 0 0 1px rgba(15, 108, 94, 0.1);
+}
+
+.live-session-banner-warning {
+  box-shadow: inset 0 0 0 1px rgba(173, 93, 22, 0.1);
+}
+
+.live-session-banner-critical {
+  box-shadow: inset 0 0 0 1px rgba(157, 45, 45, 0.1);
+}
+
+.live-session-head,
+.live-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.live-session-title {
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem);
+}
+
+.live-session-copy,
+.live-session-detail {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.live-session-meta {
+  margin-top: 14px;
+}
+
+.live-session-actions {
+  margin-top: 16px;
+  justify-content: flex-start;
 }
 
 .summary-sheet-card,
@@ -1937,6 +1999,7 @@ tbody tr:last-child td {
 .presentation-mode .dashboard-section[data-group="operator"],
 .presentation-mode .tab-group[data-tab-group="operator"],
 .presentation-mode .audience-path-card[data-audience="technical"],
+.presentation-mode .live-session-root,
 .presentation-mode .live-log-panel,
 .presentation-mode .footer {
   display: none;

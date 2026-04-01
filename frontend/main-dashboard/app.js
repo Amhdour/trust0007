@@ -4,6 +4,7 @@ const heroEyebrow = document.getElementById("hero-eyebrow");
 const heroTitle = document.getElementById("hero-title");
 const heroCopy = document.getElementById("hero-copy");
 const heroMeta = document.getElementById("hero-meta");
+const liveSessionRoot = document.getElementById("live-session-root");
 const heroSteps = document.getElementById("hero-steps");
 const summarySheetRoot = document.getElementById("summary-sheet-root");
 const modeBannerRoot = document.getElementById("mode-banner-root");
@@ -18,6 +19,7 @@ const readingGuideRoot = document.getElementById("reading-guide-root");
 const kpiRoot = document.getElementById("kpi-root");
 const sourcesRoot = document.getElementById("sources");
 const liveLogRoot = document.getElementById("live-log-root");
+const liveRuntimeLink = document.getElementById("live-runtime-link");
 const clientOverviewLink = document.getElementById("client-overview-link");
 const presentationModeButton = document.getElementById("presentation-mode-button");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
@@ -33,6 +35,7 @@ let tabStripScrollBound = false;
 let presentationModeEnabled = false;
 let lastOverviewPayload = null;
 let lastLiveLogPayload = null;
+let lastLiveSessionPayload = null;
 let liveLogStatusFilter = "all";
 let liveLogSourceFilter = "all";
 let dashboardFingerprints = new Map();
@@ -95,6 +98,29 @@ function formatTimestamp(value) {
   }
 
   return parsed.toLocaleString();
+}
+
+function formatRemainingDuration(totalSeconds) {
+  if (!Number.isFinite(totalSeconds)) {
+    return "";
+  }
+
+  if (totalSeconds <= 0) {
+    return "Expired";
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours > 0 && minutes > 0) {
+    return `${hours}h ${minutes}m left`;
+  }
+  if (hours > 0) {
+    return `${hours}h left`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m left`;
+  }
+  return `${Math.max(1, Math.floor(totalSeconds))}s left`;
 }
 
 function formatBadgeValue(badge) {
@@ -374,6 +400,121 @@ function compactSectionDescription(section) {
   }
 
   return `${description.slice(0, 117).trimEnd()}...`;
+}
+
+function updateLiveRuntimeLink(payload) {
+  if (!liveRuntimeLink) {
+    return;
+  }
+
+  const sessionReady = Boolean(payload?.authenticated);
+  const helperEnabled = payload?.enabled !== false;
+  const needsRestart = Boolean(payload?.cookie_present) && !sessionReady && helperEnabled;
+
+  liveRuntimeLink.classList.remove("is-disabled");
+  liveRuntimeLink.removeAttribute("aria-disabled");
+
+  if (sessionReady) {
+    liveRuntimeLink.textContent = "Open live workspace";
+    liveRuntimeLink.href = payload.workspace_href || "/launch/onyx?path=/app&mode=live&view=embedded";
+    liveRuntimeLink.title = "Open the governed live workspace using the active dev session";
+    return;
+  }
+
+  if (helperEnabled) {
+    liveRuntimeLink.textContent = needsRestart ? "Restart dev live workspace" : "Start dev live workspace";
+    liveRuntimeLink.href = payload?.start_href || "/auth/live-session/start?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded";
+    liveRuntimeLink.title = "Mint a dev-only live session cookie and open the governed live workspace";
+    return;
+  }
+
+  liveRuntimeLink.textContent = "Live workspace helper unavailable";
+  liveRuntimeLink.href = payload?.start_href || "/auth/live-session/start?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded";
+  liveRuntimeLink.title = "This dev-only helper is unavailable in the current environment";
+  liveRuntimeLink.classList.add("is-disabled");
+  liveRuntimeLink.setAttribute("aria-disabled", "true");
+}
+
+function buildLiveSessionMeta(payload) {
+  if (!payload) {
+    return [];
+  }
+
+  const items = [
+    payload.dev_only ? { label: "Scope", value: "dev-only", status: "warning" } : null,
+    payload.environment_mode
+      ? { label: "Mode", value: String(payload.environment_mode).toUpperCase(), status: "neutral" }
+      : null,
+    payload.username ? { label: "User", value: payload.username, status: payload.authenticated ? "healthy" : "neutral" } : null,
+    payload.tenant_id ? { label: "Tenant", value: payload.tenant_id, status: payload.authenticated ? "healthy" : "neutral" } : null,
+    payload.session_id ? { label: "Session", value: payload.session_id, status: "neutral" } : null,
+    payload.expires_at ? { label: "Expires", value: payload.expires_at, kind: "timestamp", status: "neutral" } : null,
+    Number.isFinite(payload.expires_in_seconds)
+      ? { label: "TTL", value: formatRemainingDuration(payload.expires_in_seconds), status: payload.expires_in_seconds > 0 ? "neutral" : "critical" }
+      : null,
+  ];
+
+  return items.filter(Boolean);
+}
+
+function renderLiveSession(payload) {
+  if (!liveSessionRoot) {
+    return;
+  }
+
+  lastLiveSessionPayload = payload;
+  updateLiveRuntimeLink(payload);
+
+  const status = payload?.status || "neutral";
+  const actions = [];
+  if (payload?.cookie_present) {
+    actions.push(`<a class="hero-action-button hero-action-button-secondary" href="${escapeHtml(payload.end_href || "/auth/live-session/end?next=%2F")}">${escapeHtml(payload.authenticated ? "End dev session" : "Clear live-session cookie")}</a>`);
+  }
+  if (payload?.authenticated && payload?.workspace_href) {
+    actions.push(`<a class="hero-action-button hero-action-button-secondary" href="${escapeHtml(payload.workspace_href)}">Re-open workspace</a>`);
+  }
+
+  liveSessionRoot.innerHTML = `
+    <section class="live-session-banner live-session-banner-${escapeHtml(status)}">
+      <div class="live-session-head">
+        <div>
+          <p class="eyebrow">Dev live session</p>
+          <h2 class="live-session-title">${escapeHtml(payload?.status_label || "Live session")}</h2>
+          <p class="live-session-copy">${escapeHtml(payload?.summary || "Session state unavailable.")}</p>
+        </div>
+        ${renderStatusPill(status, { label: payload?.status_label || statusLabel(status) })}
+      </div>
+      ${renderMetaBadges(buildLiveSessionMeta(payload), "live-session-meta")}
+      ${payload?.detail ? `<p class="live-session-detail">${escapeHtml(payload.detail)}</p>` : ""}
+      ${actions.length ? `<div class="live-session-actions">${actions.join("")}</div>` : ""}
+    </section>
+  `;
+}
+
+function renderLiveSessionError(error) {
+  if (!liveSessionRoot) {
+    return;
+  }
+
+  updateLiveRuntimeLink({
+    enabled: true,
+    authenticated: false,
+    cookie_present: false,
+    start_href: "/auth/live-session/start?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded",
+  });
+  liveSessionRoot.innerHTML = `
+    <section class="live-session-banner live-session-banner-warning">
+      <div class="live-session-head">
+        <div>
+          <p class="eyebrow">Dev live session</p>
+          <h2 class="live-session-title">Session state unavailable</h2>
+          <p class="live-session-copy">The dashboard could not check the current dev live-session cookie right now.</p>
+        </div>
+        ${renderStatusPill("warning", { label: "Needs attention" })}
+      </div>
+      <p class="live-session-detail">${escapeHtml(error.message || "Unknown error")}</p>
+    </section>
+  `;
 }
 
 function renderModeBanner(modeBanner) {
@@ -1567,6 +1708,19 @@ async function loadLiveLog() {
   }
 }
 
+async function loadLiveSession() {
+  try {
+    const response = await fetch("/api/control-plane/live-session", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Live session API returned ${response.status}`);
+    }
+
+    renderLiveSession(await response.json());
+  } catch (error) {
+    renderLiveSessionError(error);
+  }
+}
+
 async function boot() {
   try {
     const response = await fetch("/api/control-plane/overview", { cache: "no-store" });
@@ -1648,6 +1802,7 @@ async function refreshDashboard() {
   }
 
   await Promise.all([boot(), loadLiveLog()]);
+  await loadLiveSession();
 
   if (refreshDashboardButton) {
     refreshDashboardButton.disabled = false;
@@ -1673,3 +1828,4 @@ if (refreshDashboardButton) {
 
 boot();
 loadLiveLog();
+loadLiveSession();

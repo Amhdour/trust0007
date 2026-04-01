@@ -40,6 +40,8 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="briefing-root"' in html
     assert 'id="mode-banner-root"' in html
     assert 'id="live-runtime-link"' in html
+    assert 'id="live-session-root"' in html
+    assert "Start dev live workspace" in html
     assert "/auth/live-session/start?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded" in html
     assert 'id="incident-banner-root"' in html
     assert 'id="risk-strip-root"' in html
@@ -69,6 +71,7 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "payload.audience_paths" in js
     assert "block.collapsed" in js
     assert "/api/control-plane/overview" in js
+    assert "/api/control-plane/live-session" in js
 
 
 def test_client_overview_assets_exist_and_reuse_real_dashboard_signals() -> None:
