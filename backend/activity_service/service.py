@@ -442,6 +442,204 @@ def _matches_requested_path(entry: dict[str, str], requested_path: str) -> bool:
     return bool(path_only and path_only != "/" and path_only in summary)
 
 
+def _workspace_activity_row(
+    entry: dict[str, str],
+    *,
+    scope: str,
+    scope_label: str,
+    correlation_detail: str,
+    path_match: bool,
+    trace_match: bool,
+    session_match: bool,
+) -> dict[str, str | bool]:
+    request_id = str(entry.get("request_id", ""))
+    return {
+        "timestamp": str(entry.get("timestamp", "")),
+        "source": str(entry.get("source", "")),
+        "source_label": str(entry.get("source_label", "")),
+        "event_type": str(entry.get("event_type", "")),
+        "summary": str(entry.get("summary", "")),
+        "severity": str(entry.get("severity", "")),
+        "status": str(entry.get("status", "")),
+        "trace_id": str(entry.get("trace_id", "")),
+        "request_id": request_id,
+        "session_id": request_id,
+        "tenant_id": str(entry.get("tenant_id", "")),
+        "scope": scope,
+        "scope_label": scope_label,
+        "correlation_detail": correlation_detail,
+        "path_match": path_match,
+        "trace_match": trace_match,
+        "session_match": session_match,
+    }
+
+
+def build_onyx_workspace_activity(
+    root: Path,
+    *,
+    requested_path: str = "",
+    trace_id: str = "",
+    session_id: str = "",
+    limit: int = 6,
+    activity_snapshot: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    normalized_path = _normalize_requested_path(requested_path)
+    snapshot_limit = max(limit * 4, 24)
+    snapshot = activity_snapshot or build_activity_snapshot(root, limit=snapshot_limit)
+    entries = list(snapshot.get("entries", []))
+
+    current_surface: list[dict[str, str | bool]] = []
+    correlated: list[dict[str, str | bool]] = []
+    other_runtime: list[dict[str, str | bool]] = []
+
+    for entry in entries:
+        source = str(entry.get("source", ""))
+        event_type = str(entry.get("event_type", ""))
+        if source == "onyx" and event_type == "Onyx status":
+            continue
+
+        path_match = source == "onyx" and _matches_requested_path(entry, normalized_path)
+        trace_match = bool(trace_id and str(entry.get("trace_id", "")) == trace_id)
+        session_match = bool(session_id and str(entry.get("request_id", "")) == session_id)
+
+        if path_match:
+            current_surface.append(
+                _workspace_activity_row(
+                    entry,
+                    scope="current_surface",
+                    scope_label="This workspace path",
+                    correlation_detail="Matched the governed Onyx path directly from runtime activity.",
+                    path_match=path_match,
+                    trace_match=trace_match,
+                    session_match=session_match,
+                )
+            )
+            continue
+
+        if trace_match or session_match:
+            matched_bits = []
+            if trace_match:
+                matched_bits.append("trace")
+            if session_match:
+                matched_bits.append("session")
+            correlated.append(
+                _workspace_activity_row(
+                    entry,
+                    scope="correlated",
+                    scope_label="Correlated trace/session",
+                    correlation_detail=(
+                        f"Matched the governed {' and '.join(matched_bits)} in observability. "
+                        "This correlation comes from trace/session evidence rather than raw Onyx container logs."
+                    ),
+                    path_match=path_match,
+                    trace_match=trace_match,
+                    session_match=session_match,
+                )
+            )
+            continue
+
+        if source == "onyx":
+            other_runtime.append(
+                _workspace_activity_row(
+                    entry,
+                    scope="other_runtime",
+                    scope_label="Other Onyx runtime",
+                    correlation_detail="Recent Onyx runtime activity is visible, but it does not match the current governed path.",
+                    path_match=path_match,
+                    trace_match=trace_match,
+                    session_match=session_match,
+                )
+            )
+
+    current_surface = current_surface[:limit]
+    correlated = correlated[:limit]
+    other_runtime = other_runtime[:limit]
+
+    if current_surface:
+        summary_status = "healthy"
+        summary_label = "Direct runtime activity visible"
+        summary_detail = (
+            f"Showing {len(current_surface)} recent Onyx runtime event(s) that matched "
+            f"{normalized_path} inside the dashboard-owned workspace."
+        )
+    elif correlated:
+        summary_status = "warning"
+        summary_label = "Correlated activity only"
+        summary_detail = (
+            "No direct Onyx path match is visible yet, but observability data is already tied to the same "
+            "governed trace or session."
+        )
+    elif other_runtime:
+        summary_status = "warning"
+        summary_label = "Nearby runtime activity only"
+        summary_detail = (
+            "Onyx is active, but none of the recent runtime events matched the current governed path or correlated identifiers."
+        )
+    else:
+        summary_status = "critical"
+        summary_label = "No recent Onyx activity visible"
+        summary_detail = (
+            "No recent Onyx runtime activity or correlated observability events were found for this workspace yet."
+        )
+
+    return {
+        "generated_at": _now_iso(),
+        "poll_interval_ms": int(snapshot.get("poll_interval_ms", 5000) or 5000),
+        "requested_path": normalized_path,
+        "trace_id": trace_id,
+        "session_id": session_id,
+        "source_href": "/api/control-plane/onyx-activity?" + urllib.parse.urlencode(
+            {
+                "path": normalized_path,
+                "trace_id": trace_id,
+                "session_id": session_id,
+                "limit": limit,
+            }
+        ),
+        "sources": {
+            "onyx": str(snapshot.get("sources", {}).get("onyx", "")),
+            "langfuse": str(snapshot.get("sources", {}).get("langfuse", "")),
+        },
+        "summary": {
+            "status": summary_status,
+            "label": summary_label,
+            "detail": summary_detail,
+        },
+        "counts": {
+            "current_surface": len(current_surface),
+            "correlated": len(correlated),
+            "other_runtime": len(other_runtime),
+        },
+        "groups": [
+            {
+                "id": "current-surface",
+                "title": "This workspace path",
+                "description": "Direct runtime events that matched the current Onyx path in the embedded workspace.",
+                "entries": current_surface,
+                "empty_state": "No direct runtime hits for this path yet.",
+            },
+            {
+                "id": "correlated",
+                "title": "Correlated trace or session",
+                "description": "Observability events linked to the same governed trace or session when the runtime logs themselves do not expose those identifiers.",
+                "entries": correlated,
+                "empty_state": "No correlated trace/session activity was found yet.",
+            },
+            {
+                "id": "other-runtime",
+                "title": "Other recent Onyx runtime",
+                "description": "Nearby Onyx activity seen in the same runtime, kept visible so you can tell whether the stack is active even when this workspace has not produced a direct match yet.",
+                "entries": other_runtime,
+                "empty_state": "No unrelated recent Onyx runtime activity was captured.",
+            },
+        ],
+        "limitations": [
+            "Direct Onyx runtime rows are matched by path because current container logs do not expose governed trace or session identifiers.",
+            "Trace and session correlation comes from observability signals such as Langfuse when those identifiers are available.",
+        ],
+    }
+
+
 def build_onyx_runtime_proof(
     root: Path,
     *,

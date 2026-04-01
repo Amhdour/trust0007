@@ -110,6 +110,7 @@ The page now leads with:
   - Onyx container logs and Langfuse activity when available
 - live runtime workspace
   - `/api/control-plane/live-session`
+  - `/api/control-plane/onyx-activity`
   - `/auth/live-session/end?next=/`
   - `/auth/live-session/start?next=/launch/onyx?path=/app&mode=live&view=embedded`
   - same governance evaluation as the standard handoff route
@@ -117,6 +118,7 @@ The page now leads with:
   - supports clearing the dev-only cookie without leaving the dashboard
   - mints a local dev-only `kc_access_token` cookie inside the control plane before redirecting to the governed live workspace
   - embeds the reachable Onyx surface inside a dashboard-owned page while preserving trace and evidence context
+  - surfaces a live “Current Onyx activity” panel that separates direct path matches, correlated trace/session observability, and other nearby runtime activity
 
 ## Real vs demo-derived
 

@@ -12,7 +12,10 @@ from backend.api_gateway.server import _live_session_status_payload
 
 
 class _FakeHandler:
+    do_GET = ControlPlaneRequestHandler.do_GET
+    _parse_int_query = ControlPlaneRequestHandler._parse_int_query
     _query_value = ControlPlaneRequestHandler._query_value
+    _send_json = ControlPlaneRequestHandler._send_json
     _send_html = ControlPlaneRequestHandler._send_html
     _redirect = ControlPlaneRequestHandler._redirect
     _handle_dev_live_session_start = ControlPlaneRequestHandler._handle_dev_live_session_start
@@ -139,3 +142,51 @@ def test_live_session_status_payload_reports_inactive_without_cookie() -> None:
     assert payload["authenticated"] is False
     assert payload["cookie_present"] is False
     assert payload["status_label"] == "No dev live session"
+
+
+def test_onyx_activity_api_supports_json_and_html_payloads() -> None:
+    json_handler = _FakeHandler("/api/control-plane/onyx-activity?path=%2Fapp&trace_id=trace-123&session_id=session-123")
+    html_handler = _FakeHandler("/api/control-plane/onyx-activity?path=%2Fapp&format=html")
+    activity_payload = {
+        "summary": {"status": "healthy", "label": "Direct runtime activity visible", "detail": "Matched /app."},
+        "counts": {"current_surface": 1, "correlated": 0, "other_runtime": 0},
+        "groups": [
+            {
+                "title": "This workspace path",
+                "description": "Direct runtime events.",
+                "entries": [
+                    {
+                        "summary": "GET /app -> 200",
+                        "timestamp": "2026-04-01T12:00:00+00:00",
+                        "scope": "current_surface",
+                        "correlation_detail": "Matched the governed Onyx path directly from runtime activity.",
+                        "path_match": True,
+                        "trace_match": False,
+                        "session_match": False,
+                        "source_label": "Onyx Web",
+                        "trace_id": "",
+                        "session_id": "",
+                    }
+                ],
+                "empty_state": "No direct runtime hits.",
+            }
+        ],
+        "limitations": ["Runtime rows are matched by path."],
+        "sources": {"onyx": "connected", "langfuse": "connected"},
+        "source_href": "/api/control-plane/onyx-activity?path=%2Fapp",
+    }
+
+    with patch("backend.api_gateway.server.build_onyx_workspace_activity", return_value=activity_payload):
+        json_handler.do_GET()
+
+    assert json_handler.status_code == 200
+    json_payload = json.loads(json_handler.wfile.getvalue().decode("utf-8"))
+    assert json_payload["summary"]["label"] == "Direct runtime activity visible"
+
+    with patch("backend.api_gateway.server.build_onyx_workspace_activity", return_value=activity_payload):
+        html_handler.do_GET()
+
+    assert html_handler.status_code == 200
+    html_body = html_handler.wfile.getvalue().decode("utf-8")
+    assert "Current Onyx Activity" in html_body
+    assert "GET /app -&gt; 200" in html_body

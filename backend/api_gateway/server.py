@@ -17,7 +17,7 @@ from urllib.request import Request, urlopen
 
 from adapters.identity.keycloak import KeycloakIdentityProvider
 from adapters.identity.schemas import IdentityResolutionRequest
-from backend.activity_service.service import build_onyx_runtime_proof
+from backend.activity_service.service import build_onyx_runtime_proof, build_onyx_workspace_activity
 from backend.integration_adapter import load_runtime_policy_bundle
 from backend.integration_adapter.repository import load_upstream_usage_inventory
 from backend.posture_service.service import build_control_plane_dashboard, build_control_plane_live_log
@@ -783,6 +783,107 @@ def _runtime_proof_markup(runtime_proof: dict) -> str:
 """
 
 
+def _workspace_activity_entry_markup(entry: dict) -> str:
+    meta_bits: list[str] = []
+    if entry.get("path_match"):
+        meta_bits.append('<span class="activity-entry-chip activity-entry-chip-match">path match</span>')
+    if entry.get("trace_match"):
+        meta_bits.append('<span class="activity-entry-chip activity-entry-chip-match">trace match</span>')
+    if entry.get("session_match"):
+        meta_bits.append('<span class="activity-entry-chip activity-entry-chip-match">session match</span>')
+    if entry.get("source_label"):
+        meta_bits.append(f'<span class="activity-entry-chip">{escape(str(entry.get("source_label", "")))}</span>')
+    if entry.get("trace_id"):
+        meta_bits.append(
+            f'<span class="activity-entry-chip">trace <code>{escape(str(entry.get("trace_id", "")))}</code></span>'
+        )
+    if entry.get("session_id"):
+        meta_bits.append(
+            f'<span class="activity-entry-chip">session <code>{escape(str(entry.get("session_id", "")))}</code></span>'
+        )
+
+    return f"""
+      <article class="activity-entry activity-entry-{escape(str(entry.get("scope", "other")), quote=True)}">
+        <div class="activity-entry-head">
+          <strong>{escape(str(entry.get("summary", "")) or "Activity captured")}</strong>
+          <span class="activity-entry-time">{escape(str(entry.get("timestamp", "")) or "Timestamp unavailable")}</span>
+        </div>
+        <p class="activity-entry-detail">{escape(str(entry.get("correlation_detail", "")))}</p>
+        <div class="activity-entry-meta">
+          {''.join(meta_bits)}
+        </div>
+      </article>
+"""
+
+
+def _workspace_activity_panel_markup(activity_payload: dict) -> str:
+    counts = dict(activity_payload.get("counts", {}))
+    groups = list(activity_payload.get("groups", []))
+    limitations = list(activity_payload.get("limitations", []))
+    summary = dict(activity_payload.get("summary", {}))
+    source_href = str(activity_payload.get("source_href", ""))
+    source_link = (
+        f'<a class="activity-panel-link" href="{escape(source_href, quote=True)}">Open activity API</a>'
+        if source_href
+        else ""
+    )
+
+    groups_markup = "".join(
+        f"""
+      <section class="activity-group">
+        <div class="activity-group-head">
+          <div>
+            <h3>{escape(str(group.get("title", "Activity")))}</h3>
+            <p>{escape(str(group.get("description", "")))}</p>
+          </div>
+          <span class="activity-group-count">{len(group.get("entries", []))}</span>
+        </div>
+        {
+            ''.join(_workspace_activity_entry_markup(entry) for entry in group.get('entries', []))
+            if group.get('entries')
+            else f'<div class="activity-group-empty">{escape(str(group.get("empty_state", "No activity captured.")))}</div>'
+        }
+      </section>
+"""
+        for group in groups
+    )
+
+    limitations_markup = "".join(f"<li>{escape(str(item))}</li>" for item in limitations)
+    return f"""
+      <section class="activity-panel-shell">
+        <div class="activity-panel-head">
+          <div>
+            <p class="eyebrow">Current Onyx activity</p>
+            <h2>Current Onyx Activity</h2>
+            <p class="activity-panel-summary">{escape(str(summary.get("detail", "")))}</p>
+          </div>
+          <div class="activity-panel-summary-badge activity-panel-summary-{escape(str(summary.get("status", "neutral")), quote=True)}">
+            {escape(str(summary.get("label", "Activity")))}
+          </div>
+        </div>
+        <div class="activity-panel-chips">
+          <span class="activity-panel-chip">direct path matches <strong>{escape(str(counts.get("current_surface", 0)))}</strong></span>
+          <span class="activity-panel-chip">correlated trace/session <strong>{escape(str(counts.get("correlated", 0)))}</strong></span>
+          <span class="activity-panel-chip">other runtime <strong>{escape(str(counts.get("other_runtime", 0)))}</strong></span>
+          <span class="activity-panel-chip">Onyx source <strong>{escape(str(activity_payload.get("sources", {}).get("onyx", "unknown")))}</strong></span>
+          <span class="activity-panel-chip">Langfuse source <strong>{escape(str(activity_payload.get("sources", {}).get("langfuse", "unknown")))}</strong></span>
+        </div>
+        <div class="activity-panel-groups">
+          {groups_markup}
+        </div>
+        <div class="activity-panel-footer">
+          <div>
+            <strong>Limits of correlation</strong>
+            <ul class="activity-panel-limitations">
+              {limitations_markup}
+            </ul>
+          </div>
+          {source_link}
+        </div>
+      </section>
+"""
+
+
 def _build_secret_provider() -> VaultSecretsProvider | None:
     vault_addr = os.environ.get("CONTROL_PLANE_VAULT_ADDR", "http://vault:8200").strip()
     vault_token = os.environ.get("CONTROL_PLANE_VAULT_TOKEN", "").strip()
@@ -867,6 +968,22 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/control-plane/live-log":
             limit = self._parse_int_query(parse_qs(parsed.query).get("limit", ["12"])[0], default=12, minimum=1, maximum=50)
             self._send_json(build_control_plane_live_log(REPO_ROOT, limit=limit))
+            return
+
+        if path == "/api/control-plane/onyx-activity":
+            query = parse_qs(parsed.query)
+            limit = self._parse_int_query(self._query_value(query, "limit", "6"), default=6, minimum=1, maximum=12)
+            activity_payload = build_onyx_workspace_activity(
+                REPO_ROOT,
+                requested_path=self._query_value(query, "path", "/app"),
+                trace_id=self._query_value(query, "trace_id", ""),
+                session_id=self._query_value(query, "session_id", ""),
+                limit=limit,
+            )
+            if self._query_value(query, "format", "").lower() == "html":
+                self._send_html(_workspace_activity_panel_markup(activity_payload))
+            else:
+                self._send_json(activity_payload)
             return
 
         if path == "/api/control-plane/live-session":
@@ -1342,6 +1459,15 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 """
 
         if dashboard_workspace_view:
+            workspace_activity = build_onyx_workspace_activity(
+                REPO_ROOT,
+                requested_path=safe_path,
+                trace_id=str(flow_result.trace_id if flow_result else ""),
+                session_id=str(flow_result.session_id if flow_result and flow_result.session_id else ""),
+                limit=4,
+            )
+            activity_api_href = f"{str(workspace_activity.get('source_href', ''))}&format=html"
+            workspace_activity_markup = _workspace_activity_panel_markup(workspace_activity)
             workspace_nav = [
                 ("Chat", launch_view_href("/app", mode="live", view="embedded")),
                 ("Search", launch_view_href("/app?chatMode=search", mode="live", view="embedded")),
@@ -1520,6 +1646,143 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         display: block;
         margin-top: 6px;
       }}
+      .activity-panel {{
+        margin: 18px 0 0;
+      }}
+      .activity-panel-shell {{
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 242, 232, 0.86));
+      }}
+      .activity-panel-head,
+      .activity-group-head,
+      .activity-panel-footer,
+      .activity-entry-head,
+      .activity-entry-meta {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+        align-items: flex-start;
+      }}
+      .activity-panel-head {{
+        margin-bottom: 14px;
+      }}
+      .activity-panel-head h2,
+      .activity-group-head h3 {{
+        margin: 0;
+      }}
+      .activity-panel-summary,
+      .activity-group-head p,
+      .activity-entry-detail,
+      .activity-group-empty,
+      .activity-panel-error {{
+        margin: 8px 0 0;
+        color: var(--muted);
+      }}
+      .activity-panel-summary-badge,
+      .activity-panel-chip,
+      .activity-entry-chip,
+      .activity-group-count {{
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: #fffaf2;
+        font-size: 0.84rem;
+        font-weight: 600;
+      }}
+      .activity-panel-summary-healthy {{
+        color: var(--healthy);
+        background: #eef6f0;
+        border-color: #b8d0bf;
+      }}
+      .activity-panel-summary-warning {{
+        color: var(--warning);
+        background: #fff4e5;
+        border-color: #e2c48e;
+      }}
+      .activity-panel-summary-critical {{
+        color: #a03d26;
+        background: #fbe8e2;
+        border-color: #e0b4a4;
+      }}
+      .activity-panel-chips,
+      .activity-panel-groups {{
+        display: grid;
+        gap: 12px;
+      }}
+      .activity-panel-chips {{
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        margin-bottom: 14px;
+      }}
+      .activity-group {{
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.74);
+      }}
+      .activity-group-empty {{
+        padding: 8px 0 0;
+      }}
+      .activity-entry {{
+        margin-top: 12px;
+        padding: 14px;
+        border: 1px solid rgba(31, 36, 48, 0.08);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.84);
+      }}
+      .activity-entry-current_surface {{
+        box-shadow: inset 0 0 0 1px rgba(31, 111, 67, 0.08);
+      }}
+      .activity-entry-correlated {{
+        box-shadow: inset 0 0 0 1px rgba(138, 90, 18, 0.08);
+      }}
+      .activity-entry-time {{
+        color: var(--muted);
+        font-size: 0.82rem;
+      }}
+      .activity-entry-detail {{
+        line-height: 1.5;
+      }}
+      .activity-entry-meta {{
+        margin-top: 10px;
+        justify-content: flex-start;
+      }}
+      .activity-entry-chip-match {{
+        color: var(--healthy);
+        background: #eef6f0;
+        border-color: #b8d0bf;
+      }}
+      .activity-panel-footer {{
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+        align-items: end;
+      }}
+      .activity-panel-limitations {{
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }}
+      .activity-panel-limitations li {{
+        margin: 0 0 8px;
+      }}
+      .activity-panel-link {{
+        display: inline-flex;
+        align-items: center;
+        min-height: 42px;
+        padding: 0 16px;
+        border-radius: 999px;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        color: var(--ink);
+        background: #fffaf2;
+        font-weight: 600;
+      }}
       .checklist {{
         margin: 0;
         padding-left: 18px;
@@ -1635,6 +1898,14 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             <code>{flow_result.session_id if flow_result and flow_result.session_id else 'missing'}</code>
           </div>
         </div>
+        <div
+          class="activity-panel"
+          id="workspace-activity-root"
+          data-activity-url="{escape(activity_api_href, quote=True)}"
+          data-poll-ms="{escape(str(workspace_activity.get('poll_interval_ms', 5000)), quote=True)}"
+        >
+          {workspace_activity_markup}
+        </div>
         {frame_callout_markup}
         {runtime_health_note_markup}
         <div class="proof-block">
@@ -1655,6 +1926,53 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
       </section>
       {workspace_main_markup}
     </main>
+    <script>
+      (() => {{
+        const activityRoot = document.getElementById("workspace-activity-root");
+        if (!activityRoot) {{
+          return;
+        }}
+
+        const activityUrl = activityRoot.dataset.activityUrl || "";
+        const pollMs = Number(activityRoot.dataset.pollMs || "5000") || 5000;
+        if (!activityUrl) {{
+          return;
+        }}
+
+        let timer = 0;
+        const schedule = () => {{
+          window.clearTimeout(timer);
+          timer = window.setTimeout(refreshActivity, pollMs);
+        }};
+
+        async function refreshActivity() {{
+          try {{
+            const response = await fetch(activityUrl, {{ cache: "no-store" }});
+            if (!response.ok) {{
+              throw new Error(`Onyx activity API returned ${{response.status}}`);
+            }}
+            activityRoot.innerHTML = await response.text();
+          }} catch (error) {{
+            activityRoot.innerHTML = `
+              <section class="activity-panel-shell">
+                <div class="activity-panel-head">
+                  <div>
+                    <p class="eyebrow">Current Onyx activity</p>
+                    <h2>Current Onyx Activity</h2>
+                    <p class="activity-panel-error">${{String(error.message || "Unknown error")}}</p>
+                  </div>
+                  <div class="activity-panel-summary-badge activity-panel-summary-warning">Refresh issue</div>
+                </div>
+              </section>
+            `;
+          }} finally {{
+            schedule();
+          }}
+        }}
+
+        schedule();
+      }})();
+    </script>
   </body>
 </html>
 """

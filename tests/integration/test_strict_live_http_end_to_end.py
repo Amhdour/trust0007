@@ -103,6 +103,8 @@ def test_strict_live_workspace_shell_embeds_runtime_when_reachable() -> None:
         assert '/app"' in response.text
         assert 'title="Live Onyx runtime for /app"' in response.text
         assert "Trace ID" in response.text
+        assert "Current Onyx Activity" in response.text
+        assert "Open activity API" in response.text
 
 
 @pytest.mark.parametrize(

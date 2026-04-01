@@ -49,6 +49,7 @@ Any failed check results in deny with aggregated reasons.
 ## Runtime proof after handoff
 - `/launch/onyx` is the governed entry point into the runtime plane.
 - `/api/control-plane/live-session` reports whether the local dev-only session cookie is currently valid for the embedded workspace.
+- `/api/control-plane/onyx-activity` classifies recent activity into direct Onyx path matches, correlated trace/session observability, and other nearby runtime activity for the current workspace.
 - `/auth/live-session/start` is a dev-only control-plane helper that mints a local `kc_access_token` cookie and redirects back into a governed live handoff.
 - `/auth/live-session/end` clears that cookie and returns the browser to the dashboard.
 - `/launch/onyx?path=/app&mode=live&view=embedded` is the dashboard-owned live workspace view for that same governed entry point.
