@@ -754,6 +754,8 @@ function renderModeBanner(modeBanner) {
 
   const chips = Array.isArray(modeBanner.chips) ? modeBanner.chips : [];
   const consequences = Array.isArray(modeBanner.consequences) ? modeBanner.consequences : [];
+  const detail = modeBanner.display_detail || modeBanner.detail || "";
+  const disclosureLabel = modeBanner.disclosure_label || "What this mode means";
   modeBannerRoot.innerHTML = `
     <section class="mode-banner mode-${escapeHtml(modeBanner.status || "neutral")}">
       <div class="mode-banner-head">
@@ -762,26 +764,32 @@ function renderModeBanner(modeBanner) {
           <h2>${escapeHtml(modeBanner.display_label || modeBanner.label || "Governance mode unavailable")}</h2>
           <p class="section-description">${escapeHtml(modeBanner.display_summary || modeBanner.summary || "")}</p>
         </div>
-        <div class="${statusClass(modeBanner.status || "neutral")}" title="${escapeHtml(modeBanner.status || "neutral")}">${escapeHtml(statusLabel(modeBanner.status || "neutral"))}</div>
+        ${renderStatusPill(modeBanner.status || "neutral", { label: modeBanner.status_label })}
       </div>
-      <p class="mode-banner-detail">${escapeHtml(modeBanner.display_detail || modeBanner.detail || "")}</p>
-      <div class="mode-banner-chips">
-        ${chips
-          .map(
-            (chip) => `
-              <article class="mode-chip">
-                <span class="mode-chip-label">${escapeHtml(chip.display_label || chip.label || "")}</span>
-                <strong>${escapeHtml(chip.display_value || chip.value || "")}</strong>
-              </article>
-            `,
-              )
-              .join("")}
-      </div>
+      ${detail ? `<p class="mode-banner-detail">${escapeHtml(detail)}</p>` : ""}
+      ${
+        chips.length
+          ? `
+            <div class="mode-banner-chips">
+              ${chips
+                .map(
+                  (chip) => `
+                    <article class="mode-chip">
+                      <span class="mode-chip-label">${escapeHtml(chip.display_label || chip.label || "")}</span>
+                      <strong>${escapeHtml(chip.display_value || chip.value || "")}</strong>
+                    </article>
+                  `,
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
       ${
         consequences.length
           ? `
             <details class="mode-banner-disclosure">
-              <summary>How to interpret this mode</summary>
+              <summary>${escapeHtml(disclosureLabel)}</summary>
               <div class="mode-banner-consequences">
                 ${consequences
                   .map(

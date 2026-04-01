@@ -1455,27 +1455,24 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         if live_evidence_mode
         else ("GOVERNED DEMO MODE" if runtime_generated_demo else "DEMO FALLBACK MODE")
     )
-    mode_banner_status = (
-        "healthy"
-        if live_evidence_mode
-        else ("neutral" if latest_handoff_allowed and latest_governed_verdict == "go" else "warning")
-    )
+    mode_banner_status = "healthy" if live_evidence_mode else "neutral"
+    mode_banner_status_label = "Live proof" if live_evidence_mode else "Review only"
     mode_banner_display_label = (
-        "Live governed mode: real checks and live proof"
+        "Live governed mode"
         if live_evidence_mode
         else (
-            "Governed demo mode: local run, not live dependency proof"
+            "Review mode: generated local proof"
             if runtime_generated_demo
-            else "Demo fallback mode: sample review proof"
+            else "Review mode: sample proof"
         )
     )
     mode_banner_display_summary = (
-        "This page is using real live checks. If key checks or proof are missing, the system should block access instead of guessing."
+        "This page is backed by a live governed run with current identity, policy, retrieval, secret, trace, and launch evidence."
         if live_evidence_mode
         else (
-            "This page is showing a governed local run in demo mode. It is useful for control review and UX validation, but it does not prove the full live dependency chain."
+            "This page is backed by repo-generated demo artifacts. It is useful for review, but it does not prove the full live dependency chain."
             if runtime_generated_demo
-            else "This page is showing sample or fallback proof. It is useful for review, but it is not claiming a fresh governed live run."
+            else "This page is using sample or fallback artifacts for review. It is not claiming a fresh governed live run."
         )
     )
     latest_governed_decision_display = _allow_deny_display(latest_handoff_allowed)
@@ -1492,6 +1489,15 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             demo_gap_details.append("conditional live secret access was not exercised on this trace")
         elif not secret_fetched_step:
             demo_gap_details.append("required secret access did not complete")
+    demo_gap_sentence = (
+        f"Live dependency participation is still missing for {', '.join(demo_gap_details[:-1])}, and {demo_gap_details[-1]}."
+        if len(demo_gap_details) > 1
+        else (
+            f"Live dependency participation is still missing for {demo_gap_details[0]}."
+            if demo_gap_details
+            else "Live dependency participation is not yet proven on this trace."
+        )
+    )
     top_baseline_issue = str(failing_controls[0].get("summary", "")).strip() if failing_controls else ""
 
     readiness_panel = {
@@ -1679,9 +1685,73 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         last_good_run_value = "No recent approved run"
         last_good_run_detail = "The recent request feed does not show an allowed governed handoff yet."
         last_good_run_badges = []
+    mode_banner_detail = (
+        f"Source: live governed artifacts. Latest decision: {latest_governed_decision_display}. "
+        f"Latest run posture: {latest_governed_posture}. Baseline posture: {baseline_posture_display}."
+        if live_evidence_mode
+        else (
+            f"Source: governed local artifacts. Latest decision: {latest_governed_decision_display}. "
+            f"Latest run posture: {latest_governed_posture}. Baseline posture: {baseline_posture_display}."
+            if runtime_generated_demo
+            else (
+                f"Source: sample or fallback artifacts. Latest decision: {latest_governed_decision_display}. "
+                f"Fresh governed run: Not available. Baseline posture: {baseline_posture_display}."
+            )
+        )
+    )
+    mode_banner_chips = [
+        {
+            "label": "Evidence mode",
+            "value": "LIVE" if live_evidence_mode else ("GOVERNED DEMO" if runtime_generated_demo else "DEMO FALLBACK"),
+            "display_label": "Proof source",
+            "display_value": (
+                "Live governed artifacts"
+                if live_evidence_mode
+                else ("Generated local proof" if runtime_generated_demo else "Sample review artifacts")
+            ),
+        },
+        {
+            "label": "Latest governed decision",
+            "value": _allow_deny_label(latest_handoff_allowed),
+            "display_label": "Decision shown",
+            "display_value": latest_governed_decision_display,
+        },
+        {
+            "label": "Latest governed run",
+            "value": latest_governed_posture if runtime_generated_demo or live_evidence_mode else "not_available",
+            "display_label": "Latest run posture" if runtime_generated_demo or live_evidence_mode else "Fresh governed run",
+            "display_value": latest_governed_posture if runtime_generated_demo or live_evidence_mode else "Not available",
+        },
+        {
+            "label": "Baseline posture",
+            "value": baseline_posture_display,
+            "display_label": "Baseline posture",
+            "display_value": baseline_posture_display,
+        },
+    ]
+    if live_evidence_mode or runtime_generated_demo:
+        mode_banner_chips.insert(
+            3,
+            {
+                "label": "Live proof",
+                "value": "proven" if live_evidence_mode else "not_proven",
+                "display_label": "Live proof",
+                "display_value": live_readiness_display,
+            },
+        )
+    if latest_trace_id and (live_evidence_mode or runtime_generated_demo):
+        mode_banner_chips.append(
+            {
+                "label": "Latest trace",
+                "value": latest_trace_id,
+                "display_label": "Technical trace",
+                "display_value": latest_trace_id,
+            }
+        )
     mode_banner = {
         "label": mode_banner_label,
         "status": mode_banner_status,
+        "status_label": mode_banner_status_label,
         "display_label": mode_banner_display_label,
         "summary": (
             "Strict live dependency participation is expected. Missing identity, policy, retrieval, secret, trace, or launch-gate evidence should fail closed."
@@ -1689,80 +1759,34 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             else mode_banner_display_summary
         ),
         "display_summary": mode_banner_display_summary,
-        "detail": (
-            f"Current evidence source: {event_feed_path}. Latest governed decision is {_allow_deny_label(latest_handoff_allowed)}. "
-            f"Latest governed run posture: {latest_governed_posture}. Baseline repo posture: {launch_summary['status'].upper()}."
-        ),
-        "display_detail": (
-            f"Source: {event_feed_path}. Latest governed decision: {latest_governed_decision_display}. "
-            f"Latest governed run: {latest_governed_posture}. Baseline repo posture: {baseline_posture_display}."
-        ),
-        "chips": [
-            {
-                "label": "Evidence mode",
-                "value": "LIVE" if live_evidence_mode else ("GOVERNED DEMO" if runtime_generated_demo else "DEMO FALLBACK"),
-                "display_label": "Proof source",
-                "display_value": "Live evidence" if live_evidence_mode else ("Governed local artifacts" if runtime_generated_demo else "Sample or fallback artifacts"),
-            },
-            {
-                "label": "Latest governed decision",
-                "value": _allow_deny_label(latest_handoff_allowed),
-                "display_label": "Latest governed decision",
-                "display_value": latest_governed_decision_display,
-            },
-            {
-                "label": "Latest governed run",
-                "value": latest_governed_posture,
-                "display_label": "Latest run posture",
-                "display_value": latest_governed_posture,
-            },
-            {
-                "label": "Live proof",
-                "value": "proven" if live_evidence_mode else "not_proven",
-                "display_label": "Live readiness",
-                "display_value": live_readiness_display,
-            },
-            {
-                "label": "Baseline posture",
-                "value": baseline_posture_display,
-                "display_label": "Baseline posture",
-                "display_value": baseline_posture_display,
-            },
-            {
-                "label": "Latest trace",
-                "value": latest_trace_id or "missing",
-                "display_label": "Latest technical trace",
-                "display_value": latest_trace_id or "missing",
-            },
-        ],
+        "detail": mode_banner_detail,
+        "display_detail": mode_banner_detail,
+        "disclosure_label": "How to interpret live mode" if live_evidence_mode else "What this mode means",
+        "chips": mode_banner_chips,
         "consequences": [
             (
                 "Live mode means Keycloak-compatible identity, OPA, retrieval, conditional secrets, trace continuity, and launch-gate evidence should participate under one trace or the handoff fails closed."
                 if live_evidence_mode
                 else (
-                    "This page is showing a governed local run with fresh repo artifacts, not a strict live dependency chain."
+                    "This mode is useful for reviewing the control-plane experience with repo-generated artifacts."
                     if runtime_generated_demo
-                    else "This page is showing sample or fallback governed evidence rather than a fresh live run."
+                    else "This mode is useful for walkthroughs and review, not as proof that the current environment just passed a governed handoff."
                 )
             ),
             (
                 "Treat live launch claims as credible only when the same trace shows complete evidence and a governed Onyx handoff outcome."
                 if live_evidence_mode
                 else (
-                    f"For this trace, {', '.join(demo_gap_details[:-1])}, and {demo_gap_details[-1]}."
-                    if len(demo_gap_details) > 1
-                    else (
-                        f"For this trace, {demo_gap_details[0]}."
-                        if demo_gap_details
-                        else "For this trace, live dependency participation is not yet proven."
-                    )
+                    demo_gap_sentence
+                    if runtime_generated_demo
+                    else "The loaded sample does not prove live participation from identity, policy, retrieval, secret access, and trace continuity on one current trace."
                 )
             ),
             (
                 f"The latest governed run passed, but the broader repo baseline is still {baseline_posture_display.lower()} because {top_baseline_issue}"
                 if (not live_evidence_mode and latest_governed_verdict == "go" and launch_summary["status"] != "go" and top_baseline_issue)
                 else (
-                    "Use this mode to inspect UX and proof shape, but not to claim the full fail-closed live path was exercised."
+                    "Use Start dev live workspace or Create fresh technical proof when you need current governed evidence."
                     if not live_evidence_mode
                     else ""
                 )

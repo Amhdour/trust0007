@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import tempfile
 
+import backend.posture_service.service as posture_service_module
 from backend.integration_adapter.repository import (
     list_upstream_component_paths,
     load_dashboard_contract,
@@ -70,6 +71,8 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "proof_pipeline" in js
     assert "dashboardViewMode" in js
     assert "dashboard-view" in js
+    assert "modeBanner.disclosure_label" in js
+    assert "modeBanner.status_label" in js
     assert "live-log-source-filter" in js
     assert "data-live-log-status" in js
     assert "payload.reading_guide" in js
@@ -115,17 +118,20 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     payload = build_control_plane_dashboard()
 
     assert payload["mode_banner"]["label"] in {"LIVE GOVERNED MODE", "GOVERNED DEMO MODE", "DEMO FALLBACK MODE"}
+    assert payload["mode_banner"]["status_label"] in {"Live proof", "Review only"}
+    assert payload["mode_banner"]["disclosure_label"]
+    if payload["mode_banner"]["label"] != "LIVE GOVERNED MODE":
+        assert payload["mode_banner"]["status"] == "neutral"
     chip_labels = {chip["display_label"] for chip in payload["mode_banner"]["chips"]}
     assert {
         "Proof source",
-        "Latest governed decision",
-        "Latest run posture",
-        "Live readiness",
+        "Decision shown",
         "Baseline posture",
-        "Latest technical trace",
     } <= chip_labels
-    assert "Latest governed run:" in payload["mode_banner"]["display_detail"]
-    assert "Baseline repo posture:" in payload["mode_banner"]["display_detail"]
+    assert ("Latest run posture" in chip_labels) or ("Fresh governed run" in chip_labels)
+    assert payload["mode_banner"]["display_detail"].startswith("Source:")
+    assert "Latest decision:" in payload["mode_banner"]["display_detail"]
+    assert "Baseline posture:" in payload["mode_banner"]["display_detail"]
     assert len(payload["command_center"]["cards"]) >= 4
     assert {card["id"] for card in payload["command_center"]["cards"]} >= {
         "readiness",
@@ -179,6 +185,39 @@ def test_dashboard_payload_includes_runtime_summary_and_stack_health() -> None:
     assert stack_health["groups"]
     assert any(group["title"] == "Core governed path" for group in stack_health["groups"])
     assert stack_health["action"]["href"] == "/raw/scripts/check-project-health.sh"
+
+
+def test_fallback_mode_banner_uses_review_only_copy(monkeypatch) -> None:
+    monkeypatch.setattr(
+        posture_service_module,
+        "_event_feed",
+        lambda resolved_root: ([], "Sample or fallback events", "telemetry/exports/sample_events.jsonl"),
+    )
+    monkeypatch.setattr(posture_service_module, "load_latest_governed_flow_summary", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_identity_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_policy_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_retrieval_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_secret_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_trace_correlation", lambda resolved_root: {})
+
+    payload = build_control_plane_dashboard()
+    mode_banner = payload["mode_banner"]
+    chip_lookup = {chip["display_label"]: chip["display_value"] for chip in mode_banner["chips"]}
+
+    assert mode_banner["label"] == "DEMO FALLBACK MODE"
+    assert mode_banner["status"] == "neutral"
+    assert mode_banner["status_label"] == "Review only"
+    assert mode_banner["display_label"] == "Review mode: sample proof"
+    assert mode_banner["display_summary"] == (
+        "This page is using sample or fallback artifacts for review. It is not claiming a fresh governed live run."
+    )
+    assert mode_banner["display_detail"].startswith("Source: sample or fallback artifacts.")
+    assert chip_lookup["Proof source"] == "Sample review artifacts"
+    assert chip_lookup["Decision shown"] in {"Allowed", "Blocked"}
+    assert chip_lookup["Fresh governed run"] == "Not available"
+    assert chip_lookup["Baseline posture"]
+    assert "Technical trace" not in chip_lookup
+    assert mode_banner["disclosure_label"] == "What this mode means"
 
 
 def test_dashboard_tabs_and_sections_have_reviewer_operator_grouping() -> None:
