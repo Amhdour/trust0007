@@ -77,7 +77,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.2
-    command: ["start", "--optimized", "--http-enabled=true", "--hostname-strict=false"]
+    command: ["start", "--http-enabled=true", "--hostname-strict=false"]
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak

@@ -82,6 +82,11 @@ wait_for_json_http() {
   exit 1
 }
 
+KEYCLOAK_BOOTSTRAP_DIR="/opt/keycloak/data/bootstrap"
+KEYCLOAK_REALM_REMOTE_FILE="${KEYCLOAK_BOOTSTRAP_DIR}/realm-governed-template.json"
+KEYCLOAK_MAPPER_REMOTE_FILE="${KEYCLOAK_BOOTSTRAP_DIR}/keycloak-tenant-id-mapper.json"
+KEYCLOAK_USER_REMOTE_FILE="${KEYCLOAK_BOOTSTRAP_DIR}/keycloak-live-user.json"
+
 kcadm() {
   compose exec -T keycloak /opt/keycloak/bin/kcadm.sh "$@" \
     --no-config \
@@ -220,7 +225,7 @@ apply_tenant_mapper() {
     [[ -n "$mapper_id" ]] || continue
     kcadm delete "clients/${client_uuid}/protocol-mappers/models/${mapper_id}" -r "$KEYCLOAK_REALM" >/dev/null
   done < <(printf '%s' "$mappers_json" | json_mapper_ids_by_name "tenant_id")
-  kcadm create "clients/${client_uuid}/protocol-mappers/models" -r "$KEYCLOAK_REALM" -f /tmp/keycloak-tenant-id-mapper.json >/dev/null
+  kcadm create "clients/${client_uuid}/protocol-mappers/models" -r "$KEYCLOAK_REALM" -f "$KEYCLOAK_MAPPER_REMOTE_FILE" >/dev/null
 }
 
 KEYCLOAK_ADMIN="${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME:-${KEYCLOAK_ADMIN:-$(read_env_value KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME)}}"
@@ -265,7 +270,11 @@ wait_for_json_http "Qdrant" "http://127.0.0.1:6333/collections"
 wait_for_json_http "OPA" "http://127.0.0.1:8181/v1/data"
 
 echo "Initializing or unsealing Vault..."
-vault_status_json="$(vault_exec 'vault status -format=json')"
+vault_status_json="$(vault_exec 'vault status -format=json || true')"
+if [[ -z "$vault_status_json" ]]; then
+  echo "error: vault status did not return JSON output" >&2
+  exit 1
+fi
 vault_initialized="$(printf '%s' "$vault_status_json" | json_bool_field initialized)"
 vault_sealed="$(printf '%s' "$vault_status_json" | json_bool_field sealed)"
 
@@ -286,19 +295,20 @@ if [[ "$vault_sealed" == "yes" ]]; then
   vault_exec "vault operator unseal ${VAULT_UNSEAL_KEY}" >/dev/null
 fi
 
-vault_exec "vault secrets enable -path=secret kv-v2 >/dev/null 2>&1 || true"
-vault_exec "vault kv put secret/runtime/${TENANT_ID}/onyx api_token=runtime-secret >/dev/null"
-vault_exec "vault kv put secret/runtime/${TENANT_ID}/governed-flow api_token=runtime-secret >/dev/null"
+vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault secrets enable -path=secret kv-v2 >/dev/null 2>&1 || true"
+vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault kv put secret/runtime/${TENANT_ID}/onyx api_token=runtime-secret >/dev/null"
+vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault kv put secret/runtime/${TENANT_ID}/governed-flow api_token=runtime-secret >/dev/null"
 
 echo "Copying Keycloak bootstrap assets into the container..."
-compose cp "$RENDERED_REALM_FILE" keycloak:/tmp/realm-governed-template.json >/dev/null
-compose cp "$MAPPER_FILE" keycloak:/tmp/keycloak-tenant-id-mapper.json >/dev/null
-compose cp "$RENDERED_USER_FILE" keycloak:/tmp/keycloak-live-user.json >/dev/null
+compose exec -T keycloak sh -lc "mkdir -p ${KEYCLOAK_BOOTSTRAP_DIR}"
+compose cp "$RENDERED_REALM_FILE" "keycloak:${KEYCLOAK_REALM_REMOTE_FILE}" >/dev/null
+compose cp "$MAPPER_FILE" "keycloak:${KEYCLOAK_MAPPER_REMOTE_FILE}" >/dev/null
+compose cp "$RENDERED_USER_FILE" "keycloak:${KEYCLOAK_USER_REMOTE_FILE}" >/dev/null
 
 echo "Ensuring realm ${KEYCLOAK_REALM} exists..."
 realms_json="$(kcadm get realms)"
 if [[ "$(printf '%s' "$realms_json" | json_has_realm "$KEYCLOAK_REALM")" != "yes" ]]; then
-  kcadm create realms -f /tmp/realm-governed-template.json >/dev/null
+  kcadm create realms -f "$KEYCLOAK_REALM_REMOTE_FILE" >/dev/null
 fi
 
 ensure_role tenant_user
@@ -312,7 +322,7 @@ echo "Ensuring governed live user ${LIVE_USERNAME} exists..."
 users_json="$(kcadm get users -r "$KEYCLOAK_REALM" -q username="$LIVE_USERNAME")"
 user_uuid="$(printf '%s' "$users_json" | json_first_id)"
 if [[ -z "$user_uuid" ]]; then
-  kcadm create users -r "$KEYCLOAK_REALM" -f /tmp/keycloak-live-user.json >/dev/null
+  kcadm create users -r "$KEYCLOAK_REALM" -f "$KEYCLOAK_USER_REMOTE_FILE" >/dev/null
   users_json="$(kcadm get users -r "$KEYCLOAK_REALM" -q username="$LIVE_USERNAME")"
   user_uuid="$(printf '%s' "$users_json" | json_first_id)"
 fi
@@ -321,7 +331,7 @@ if [[ -z "$user_uuid" ]]; then
   exit 1
 fi
 
-kcadm update "users/${user_uuid}" -r "$KEYCLOAK_REALM" -f /tmp/keycloak-live-user.json >/dev/null
+kcadm update "users/${user_uuid}" -r "$KEYCLOAK_REALM" -f "$KEYCLOAK_USER_REMOTE_FILE" >/dev/null
 kcadm set-password -r "$KEYCLOAK_REALM" --username "$LIVE_USERNAME" --new-password "$LIVE_PASSWORD" >/dev/null
 kcadm add-roles -r "$KEYCLOAK_REALM" --uid "$user_uuid" --rolename tenant_user >/dev/null 2>&1 || true
 kcadm add-roles -r "$KEYCLOAK_REALM" --uid "$user_uuid" --rolename tenant_admin >/dev/null 2>&1 || true
