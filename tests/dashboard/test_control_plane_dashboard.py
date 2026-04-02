@@ -45,8 +45,8 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="live-session-root"' in html
     assert 'id="runtime-summary-root"' in html
     assert 'id="stack-health-root"' in html
-    assert "Start dev live workspace" in html
-    assert "/auth/live-session/start?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded" in html
+    assert "Open live workspace" in html
+    assert "/launch/onyx?path=/app&mode=live&view=embedded" in html
     assert 'id="incident-banner-root"' in html
     assert 'id="risk-strip-root"' in html
     assert 'id="next-action-root"' in html
@@ -79,7 +79,7 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "payload.audience_paths" in js
     assert "block.collapsed" in js
     assert "/api/control-plane/overview" in js
-    assert "/api/control-plane/live-session" in js
+    assert "External identity required" in js
 
 
 def test_client_overview_assets_exist_and_reuse_real_dashboard_signals() -> None:
@@ -320,8 +320,7 @@ def test_dashboard_prefers_overlay_policy_bundle_when_present() -> None:
             link_items.extend(block["items"])
 
     links = {item["label"]: item for item in link_items}
-    assert "/auth/live-session/start?next=" in links["Live Workspace"]["href"]
-    assert "%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded" in links["Live Workspace"]["href"]
+    assert links["Live Workspace"]["href"].endswith("/launch/onyx?path=/app&mode=live&view=embedded")
     assert links["Open Chat"]["href"].endswith("/launch/onyx?path=/app")
     assert links["Open Agents"]["href"].endswith("/launch/onyx?path=/app/agents")
     assert links["Search Knowledge"]["href"].endswith("/launch/onyx?path=/app?chatMode=search")

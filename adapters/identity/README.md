@@ -4,6 +4,8 @@ This directory holds identity integration artifacts for Keycloak and downstream 
 
 Contents:
 - `claims-mapping.example.yaml`: example token claim to internal-context mapping.
+- `realm-governed-template.json`: production-like realm import template for the governed live stack.
+- `keycloak-tenant-id-mapper.json`: user-attribute mapper used by the governed live clients.
 - `realm-dev-template.json`: local-development realm import template.
 - `keycloak-dev-tenant-id-mapper.json`: dev-only hardcoded tenant mapper for local strict-live bootstrap.
 - `keycloak-dev-live-user.json`: local bootstrap user profile for repeatable live smoke tests.
@@ -16,5 +18,5 @@ The repo still supports demo fallback mode, but live governed flows should resol
 
 Local development note:
 
-- `keycloak-dev-tenant-id-mapper.json` is intentionally a dev-only shortcut. It hardcodes `tenant_id=tenant-dashboard` for the local strict-live bootstrap and should not be treated as a production claim-mapping pattern.
-- The repeatable local smoke flow is meant to run from the control-plane network context. That keeps token minting and the live `userinfo` validation path aligned during local strict-live verification.
+- `keycloak-tenant-id-mapper.json` is the live-path mapping pattern. It reads `tenant_id` from the user record instead of hardcoding a tenant value into the mapper.
+- `keycloak-dev-tenant-id-mapper.json` is now legacy local scaffolding only and should not be used for the staging or production-like governed path.

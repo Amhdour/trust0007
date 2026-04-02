@@ -122,4 +122,4 @@ Do not describe live identity, live OPA, live retrieval, live secret access, or 
 
 Local development note:
 
-- The repeatable local bootstrap uses a dev-only Keycloak mapper that hardcodes `tenant_id=tenant-dashboard` so a single local tenant can exercise the strict live path. Treat that as local bootstrap scaffolding, not as a production tenant-claim pattern.
+- The staging bootstrap maps `tenant_id` from a real Keycloak user attribute into token and userinfo claims. The control-plane default tenant env var is only a fallback for non-live demo flows.

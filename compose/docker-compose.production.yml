@@ -35,9 +35,6 @@ services:
       - qdrant
       - vault
       - opa
-      - langfuse
-      - grafana
-      - superset
     networks:
       - trust_stack
     read_only: true

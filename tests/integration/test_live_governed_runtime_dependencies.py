@@ -60,7 +60,7 @@ def _mock_urlopen_factory(
                 raise _http_error(url, 401)
             payload = {
                 "sub": "tenant-admin-1",
-                "tenant_id": "tenant-dashboard",
+                "tenant_id": "tenant-stage",
                 "realm_access": {"roles": ["tenant_admin"]},
             }
             if include_session:
@@ -87,12 +87,12 @@ def _mock_urlopen_factory(
                 {
                     "result": {
                         "points": [
-                            {
-                                "id": "launch-doc-1",
-                                "payload": {
-                                    "tenant_id": "tenant-dashboard",
-                                    "source": "qdrant",
-                                    "content": "Navigate to Onyx path: /app launch context",
+                                {
+                                    "id": "launch-doc-1",
+                                    "payload": {
+                                        "tenant_id": "tenant-stage",
+                                        "source": "qdrant",
+                                        "content": "Navigate to Onyx path: /app launch context",
                                     "trust_label": "trusted",
                                     "quarantined": False,
                                     "provenance": {"uri": "kb://launch-doc-1"},
@@ -103,7 +103,7 @@ def _mock_urlopen_factory(
                 }
             )
 
-        if "/v1/secret/data/dev/tenant-dashboard/runtime" in url:
+        if "/v1/secret/data/runtime/tenant-stage/onyx" in url:
             if not vault_enabled:
                 raise _http_error(url, 503)
             if headers.get("x-vault-token", "") != "root-token":
@@ -131,7 +131,7 @@ def _build_live_evaluator(
             client=OPAClient("http://opa.test"),
             package_path="umbrella/policy/decision",
             runtime_policy=policy_context.document,
-            environment_mode="prod-sim",
+            environment_mode="staging",
         ),
         retrieval_checker=RuntimeRetrievalChecker(policy_context),
         tool_checker=RuntimeToolChecker(policy_context),
@@ -143,7 +143,7 @@ def _build_live_evaluator(
         identity_provider=KeycloakIdentityProvider("http://keycloak.test/realms/umbrella-dev/protocol/openid-connect/userinfo"),
         secret_provider=secret_provider,
         flow_mode="live",
-        environment_mode="prod-sim",
+        environment_mode="staging",
     )
 
 
@@ -177,7 +177,7 @@ def _run_live_flow(
         ):
             result = evaluator.run(
                 user_id="dashboard-user",
-                tenant_id="tenant-dashboard",
+                tenant_id="tenant-stage",
                 prompt="Navigate to Onyx path: /app",
                 requested_tools=["onyx"],
                 retrieval_source="qdrant",
@@ -192,7 +192,7 @@ def _run_live_flow(
                 evidence_mode="live",
                 secret_request={
                     "needed": True,
-                    "secret_path": "secret/data/dev/tenant-dashboard/runtime",
+                    "secret_path": "secret/data/runtime/tenant-stage/onyx",
                     "secret_key": "api_token",
                     "purpose": "onyx_runtime_handoff",
                 },

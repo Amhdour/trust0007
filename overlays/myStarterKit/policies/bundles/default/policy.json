@@ -30,6 +30,10 @@
         "tenant_user",
         "tenant_admin"
       ],
+      "tenant-stage": [
+        "tenant_user",
+        "tenant_admin"
+      ],
       "tenant-api": [
         "service_runtime"
       ]
@@ -73,6 +77,10 @@
         "incident-runbooks"
       ],
       "tenant-dashboard": [
+        "qdrant",
+        "knowledge-base"
+      ],
+      "tenant-stage": [
         "qdrant",
         "knowledge-base"
       ],

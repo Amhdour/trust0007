@@ -1,4 +1,4 @@
-.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live smoke-live-host health-check
+.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check
 
 CLIENT_NAME ?= Example Client
 CLIENT_SLUG ?= example-client
@@ -55,10 +55,10 @@ bootstrap-live:
 	bash scripts/bootstrap-live-governed-path.sh
 
 smoke-live:
-	docker compose --env-file compose/.env -f compose/docker-compose.yml exec -T control_plane python scripts/smoke-live-onyx-handoff.py --keycloak-base-url http://keycloak:8080
+	python scripts/smoke-live-onyx-handoff.py
 
-smoke-live-host:
-	python scripts/smoke-live-onyx-handoff.py --control-plane-base-url http://127.0.0.1:3000 --auth-mode bootstrap
+test-live-stack:
+	pytest -q tests/integration/test_strict_live_http_end_to_end.py
 
 health-check:
 	bash scripts/check-project-health.sh

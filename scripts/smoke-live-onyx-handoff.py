@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import argparse
 import base64
-from http.cookiejar import CookieJar
 import json
+import os
 import sys
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
-from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
+from urllib.parse import quote, urlencode
+from urllib.request import Request, urlopen
 
 
 def _request_json(
@@ -19,11 +19,9 @@ def _request_json(
     headers: dict[str, str] | None = None,
     method: str = "GET",
     timeout: float = 10.0,
-    opener=None,
 ) -> dict[str, Any]:
     request = Request(url, data=data, headers=headers or {}, method=method)
-    open_request = opener.open if opener is not None else urlopen
-    with open_request(request, timeout=timeout) as response:
+    with urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -32,12 +30,10 @@ def _request_text(
     *,
     headers: dict[str, str] | None = None,
     timeout: float = 30.0,
-    opener=None,
 ) -> tuple[int, str, str]:
     request = Request(url, headers=headers or {}, method="GET")
-    open_request = opener.open if opener is not None else urlopen
     try:
-        with open_request(request, timeout=timeout) as response:
+        with urlopen(request, timeout=timeout) as response:
             return (
                 int(getattr(response, "status", 200)),
                 response.read().decode("utf-8"),
@@ -77,7 +73,25 @@ def _dashboard_mode_payload(control_plane_base_url: str) -> dict[str, Any]:
     }
 
 
-def _direct_result(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
+def _artifact(control_plane_base_url: str, filename: str) -> dict[str, Any]:
+    return _request_json(f"{control_plane_base_url.rstrip('/')}/raw/overlays/myStarterKit/artifacts/{quote(filename)}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Mint a real Keycloak token and verify the governed /launch/onyx live path against the running stack."
+    )
+    parser.add_argument("--control-plane-base-url", default=os.environ.get("CONTROL_PLANE_BASE_URL", "http://127.0.0.1:3000"))
+    parser.add_argument("--keycloak-base-url", default=os.environ.get("KEYCLOAK_BASE_URL", "http://127.0.0.1:18080"))
+    parser.add_argument("--realm", default=os.environ.get("KEYCLOAK_REALM", "umbrella"))
+    parser.add_argument("--client-id", default=os.environ.get("SMOKE_CLIENT_ID", "governed-smoke-client"))
+    parser.add_argument("--username", default=os.environ.get("LIVE_USERNAME", "governed-live-admin"))
+    parser.add_argument("--password", default=os.environ.get("LIVE_PASSWORD", "change-me"))
+    parser.add_argument("--scope", default=os.environ.get("KEYCLOAK_SCOPE", "openid email profile"))
+    parser.add_argument("--path", default="/app")
+    parser.add_argument("--expected-tenant-id", default=os.environ.get("TENANT_ID", "tenant-stage"))
+    args = parser.parse_args()
+
     token_payload = _request_json(
         f"{args.keycloak_base_url.rstrip('/')}/realms/{args.realm}/protocol/openid-connect/token",
         data=urlencode(
@@ -107,15 +121,18 @@ def _direct_result(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
     )
 
     launch_status, launch_html, final_url = _request_text(
-        f"{args.control_plane_base_url.rstrip('/')}/launch/onyx?path={args.path}&mode=live",
+        f"{args.control_plane_base_url.rstrip('/')}/launch/onyx?path={quote(args.path, safe='/?=&')}&mode=live",
         headers={
             "Authorization": f"Bearer {access_token}",
             "Accept": "text/html",
         },
     )
 
+    summary = _artifact(args.control_plane_base_url, "governed-flow-summary.json")
+    identity = _artifact(args.control_plane_base_url, "identity-evidence.json")
+    dashboard = _dashboard_mode_payload(args.control_plane_base_url)
+
     result = {
-        "auth_mode": "direct",
         "token_claims": {
             "preferred_username": claims.get("preferred_username"),
             "tenant_id": claims.get("tenant_id"),
@@ -136,7 +153,17 @@ def _direct_result(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
             "runtime_proof_present": "Runtime proof after handoff" in launch_html,
             "final_url": final_url,
         },
-        "dashboard": _dashboard_mode_payload(args.control_plane_base_url),
+        "summary": {
+            "trace_id": summary.get("trace_id"),
+            "handoff_allowed": summary.get("handoff_allowed"),
+            "launch_gate_decision": summary.get("launch_gate", {}).get("decision"),
+        },
+        "identity": {
+            "tenant_id": identity.get("tenant_id"),
+            "source": identity.get("source"),
+            "reason": identity.get("reason"),
+        },
+        "dashboard": dashboard,
     }
 
     success = (
@@ -145,77 +172,13 @@ def _direct_result(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
         and result["launch"]["evidence_mode_live"]
         and result["launch"]["identity_live"]
         and result["launch"]["runtime_proof_present"]
-        and result["dashboard"]["data_mode"] == "Live current evidence"
-        and result["dashboard"]["mode_banner"] == "LIVE GOVERNED MODE"
+        and summary.get("handoff_allowed") is True
+        and summary.get("launch_gate", {}).get("decision") == "pass"
+        and identity.get("tenant_id") == args.expected_tenant_id
+        and userinfo.get("tenant_id") == args.expected_tenant_id
+        and dashboard["data_mode"] == "Live current evidence"
+        and dashboard["mode_banner"] == "LIVE GOVERNED MODE"
     )
-    return result, success
-
-
-def _bootstrap_result(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
-    cookies = CookieJar()
-    opener = build_opener(HTTPCookieProcessor(cookies))
-    next_path = f"/launch/onyx?path={args.path}&mode=live&view=embedded"
-    launch_status, launch_html, final_url = _request_text(
-        f"{args.control_plane_base_url.rstrip('/')}/auth/live-session/start?{urlencode({'next': next_path})}",
-        headers={"Accept": "text/html"},
-        opener=opener,
-    )
-    session = _request_json(
-        f"{args.control_plane_base_url.rstrip('/')}/api/control-plane/live-session",
-        headers={"Accept": "application/json"},
-        opener=opener,
-    )
-    cookie_present = any(cookie.name == "kc_access_token" and bool(cookie.value) for cookie in cookies)
-
-    result = {
-        "auth_mode": "bootstrap",
-        "session": {
-            "status": session.get("status"),
-            "status_label": session.get("status_label"),
-            "authenticated": session.get("authenticated"),
-            "username": session.get("username"),
-            "tenant_id": session.get("tenant_id"),
-            "session_id": session.get("session_id"),
-            "cookie_present": cookie_present,
-        },
-        "launch": {
-            "status": launch_status,
-            "workspace_loaded": "Live Runtime Workspace" in launch_html,
-            "activity_panel_present": "Current Onyx Activity" in launch_html,
-            "final_url": final_url,
-        },
-        "dashboard": _dashboard_mode_payload(args.control_plane_base_url),
-    }
-
-    success = (
-        launch_status == 200
-        and bool(result["session"]["authenticated"])
-        and bool(result["session"]["cookie_present"])
-        and result["launch"]["workspace_loaded"]
-        and result["launch"]["activity_panel_present"]
-        and result["dashboard"]["data_mode"] == "Live current evidence"
-        and result["dashboard"]["mode_banner"] == "LIVE GOVERNED MODE"
-    )
-    return result, success
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Mint a live Keycloak token and verify the governed /launch/onyx live path.")
-    parser.add_argument("--control-plane-base-url", default="http://127.0.0.1:3000")
-    parser.add_argument("--keycloak-base-url", default="http://127.0.0.1:18080")
-    parser.add_argument("--auth-mode", choices=("direct", "bootstrap"), default="direct")
-    parser.add_argument("--realm", default="umbrella-dev")
-    parser.add_argument("--client-id", default="dev-web-app")
-    parser.add_argument("--username", default="live-tenant-admin")
-    parser.add_argument("--password", default="change-me")
-    parser.add_argument("--scope", default="openid email profile")
-    parser.add_argument("--path", default="/app")
-    args = parser.parse_args()
-
-    if args.auth_mode == "bootstrap":
-        result, success = _bootstrap_result(args)
-    else:
-        result, success = _direct_result(args)
 
     print(json.dumps(result, indent=2))
     return 0 if success else 1

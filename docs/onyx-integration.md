@@ -48,11 +48,9 @@ Any failed check results in deny with aggregated reasons.
 
 ## Runtime proof after handoff
 - `/launch/onyx` is the governed entry point into the runtime plane.
-- `/api/control-plane/live-session` reports whether the local dev-only session cookie is currently valid for the embedded workspace.
 - `/api/control-plane/onyx-activity` classifies recent activity into direct Onyx path matches, correlated trace/session observability, and other nearby runtime activity for the current workspace.
-- `/auth/live-session/start` is a dev-only control-plane helper that mints a local `kc_access_token` cookie and redirects back into a governed live handoff.
-- `/auth/live-session/end` clears that cookie and returns the browser to the dashboard.
 - `/launch/onyx?path=/app&mode=live&view=embedded` is the dashboard-owned live workspace view for that same governed entry point.
+- The live workspace path now requires a deployment-provided OIDC browser session or an explicit Keycloak-backed bearer token. The dashboard does not mint dev cookies anymore.
 - A successful or denied handoff now writes `overlays/myStarterKit/artifacts/onyx-runtime-proof.json`.
 - That artifact summarizes:
   - the requested Onyx path,
@@ -68,7 +66,6 @@ This keeps the proof model honest: the control plane proves the launch decision 
 - Runtime readiness is treated separately from governance approval.
 - A handoff can be approved while readiness is still degraded, and the runtime proof artifact should show that difference clearly.
 - The embedded live workspace only frames Onyx when the public runtime target is reachable; otherwise it stays in the control-plane shell and explains what still needs to be started, exposed, or retried.
-- The live-session helper is intentionally labeled as dev-only so the local browser path does not get mistaken for a production auth flow.
 
 ## Guardrails for future changes
 - Keep governance logic in repo-owned adapters and evaluators, not inside upstream Onyx modules.

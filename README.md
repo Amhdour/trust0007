@@ -89,26 +89,31 @@ That path proves:
 - launch-gate pass from live evidence
 - governed Onyx handoff approval
 
-## Repeatable Local Live Bootstrap
+## Repeatable Live Staging Bootstrap
 
-If you want to stand the strict local live path up from scratch, use the repeatable bootstrap instead of re-seeding Keycloak, Qdrant, and Vault by hand:
+If you want to stand the governed live path up from scratch against real running dependencies, first create the staging-style env file and then use the repeatable bootstrap:
 
 ```bash
+cp compose/.env.production.example compose/.env.production
 make bootstrap-live
 make smoke-live
 ```
 
 That workflow:
 
-- imports or reuses the local Keycloak realm
-- applies the dev-only local `tenant_id` mapper used by the single-tenant bootstrap
-- creates or refreshes the repeatable live bootstrap user
+- starts `compose/docker-compose.production.yml`
+- initializes and unseals non-dev Vault storage under `.runtime/live-governed/`
+- imports or reuses the governed Keycloak realm
+- applies a user-attribute-backed `tenant_id` mapper to the live web and smoke clients
+- creates or refreshes the governed live bootstrap user
 - seeds tenant-scoped Qdrant content and the required Vault runtime secret
-- starts the control plane in `live` mode
-- mints a real Keycloak token with `openid email profile` from the control-plane network context
+- starts the control plane in `live` / `staging` mode
+- mints a real Keycloak token with `openid email profile`
 - verifies `/launch/onyx?path=/app&mode=live` and the live dashboard evidence
 
-The precise claim after `make smoke-live` passes is: the governed live path is proven. That is intentionally narrower and more accurate than claiming every supporting service or every runtime-health surface is fully production-ready.
+The precise claim after `make smoke-live` passes is: a staging-style governed live path is proven against a running Keycloak, OPA, Qdrant, and Vault stack. That is intentionally narrower and more accurate than claiming every supporting service or every runtime-health surface is fully production-ready.
+
+For the full runbook, see [docs/staging-governed-stack.md](/workspaces/beta011/docs/staging-governed-stack.md).
 
 ## Failing Strict Live Flow Examples
 
@@ -200,7 +205,7 @@ When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a gover
 
 - The repo should not claim that every supporting service or every runtime-health surface is fully live-ready just because the governed live handoff is passing.
 - In containerized local setups where Onyx runs outside the compose network, runtime-local health proof can remain partial even when the governed live chain is passing. That is why `overlays/myStarterKit/artifacts/onyx-runtime-proof.json` can still show visibility caveats while the live launch gate is passing.
-- The local strict-live bootstrap uses a dev-only Keycloak mapper that hardcodes `tenant_id=tenant-dashboard` for the single-tenant local stack. It is a local proof aid, not a production tenant-claim design.
+- The repo still needs one externally reachable staging or production deployment outside localhost before it should be described as a true live product workflow.
 
 ## Design intent
 
@@ -278,7 +283,7 @@ Serve the local control-plane dashboard API/UI shell:
 make serve-dashboard
 ```
 
-## Development vs Production Simulation
+## Development vs Live Staging
 
 **Development stack** (current default):
 ```bash
@@ -288,14 +293,14 @@ docker-compose -f compose/docker-compose.yml up
 - Localhost-only service exposure
 - Development defaults for rapid iteration
 
-**Production simulation** (hardened stack):
+**Live staging stack** (real dependency path):
 ```bash
-docker-compose -f compose/docker-compose.prod-sim.yml up
+bash scripts/bootstrap-live-governed-path.sh
 ```
-- Keycloak/Vault in production mode
-- Security hardening (read-only filesystems, no-new-privileges)
-- Proper initialization requirements
-- External certificate/trust store support
+- `compose/docker-compose.production.yml`
+- non-dev Keycloak and Vault initialization
+- user-attribute tenant claims instead of a hardcoded tenant mapper
+- real-stack smoke test and `live_stack` pytest coverage
 
 ## Upstream integration model
 

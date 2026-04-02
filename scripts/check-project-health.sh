@@ -2,8 +2,13 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILE="$ROOT_DIR/compose/docker-compose.yml"
-ENV_FILE="$ROOT_DIR/compose/.env"
+COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/compose/docker-compose.production.yml}"
+ENV_FILE="${ENV_FILE:-$ROOT_DIR/compose/.env.production}"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "error: $ENV_FILE is missing. Copy compose/.env.production.example to compose/.env.production first." >&2
+  exit 1
+fi
 
 compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
@@ -12,6 +17,7 @@ compose() {
 required_services=(
   control_plane
   db
+  keycloak_db
   keycloak
   opa
   qdrant
@@ -34,19 +40,12 @@ printf '\n==> Dashboard health\n'
 curl -sSf http://127.0.0.1:3000/api/health
 printf '\n'
 
-printf '\n==> Host bootstrap smoke\n'
-python "$ROOT_DIR/scripts/smoke-live-onyx-handoff.py" \
-  --control-plane-base-url http://127.0.0.1:3000 \
-  --auth-mode bootstrap
-
-printf '\n==> In-network strict live smoke\n'
-compose exec -T control_plane \
-  python scripts/smoke-live-onyx-handoff.py --keycloak-base-url http://keycloak:8080
+printf '\n==> Live smoke\n'
+python "$ROOT_DIR/scripts/smoke-live-onyx-handoff.py" --control-plane-base-url http://127.0.0.1:3000
 
 printf '\n==> Focused pytest bundle\n'
 pytest -q \
   "$ROOT_DIR/tests/dashboard/test_control_plane_dashboard.py" \
-  "$ROOT_DIR/tests/integration/test_live_session_bootstrap.py" \
   "$ROOT_DIR/tests/integration/test_strict_live_http_end_to_end.py" \
   "$ROOT_DIR/tests/observability/test_onyx_workspace_activity.py" \
   "$ROOT_DIR/tests/integration/test_live_end_to_end.py"

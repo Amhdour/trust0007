@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urlencode
+from urllib.parse import quote
 
 from backend.activity_service.service import build_activity_snapshot, build_onyx_runtime_proof, build_stack_health_snapshot
 from backend.evidence_service.service import build_evidence_pack_summary
