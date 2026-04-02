@@ -1,0 +1,26 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY adapters /app/adapters
+COPY apps /app/apps
+COPY backend /app/backend
+COPY contracts /app/contracts
+COPY docs /app/docs
+COPY evidence /app/evidence
+COPY frontend /app/frontend
+COPY infra /app/infra
+COPY launch-gate /app/launch-gate
+COPY overlays /app/overlays
+COPY policies /app/policies
+COPY scripts /app/scripts
+COPY telemetry /app/telemetry
+COPY README.md /app/README.md
+COPY README.template.md /app/README.template.md
+
+EXPOSE 3000
+
+CMD ["python", "-m", "backend.api_gateway.server"]

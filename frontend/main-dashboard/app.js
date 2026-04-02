@@ -61,7 +61,6 @@ let dashboardViewMode = "operator";
 let dashboardSectionQuery = "";
 let lastOverviewPayload = null;
 let lastLiveLogPayload = null;
-let lastLiveSessionPayload = null;
 let liveLogStatusFilter = "all";
 let liveLogSourceFilter = "all";
 let dashboardFingerprints = new Map();
@@ -125,29 +124,6 @@ function formatTimestamp(value) {
   }
 
   return parsed.toLocaleString();
-}
-
-function formatRemainingDuration(totalSeconds) {
-  if (!Number.isFinite(totalSeconds)) {
-    return "";
-  }
-
-  if (totalSeconds <= 0) {
-    return "Expired";
-  }
-
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  if (hours > 0 && minutes > 0) {
-    return `${hours}h ${minutes}m left`;
-  }
-  if (hours > 0) {
-    return `${hours}h left`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m left`;
-  }
-  return `${Math.max(1, Math.floor(totalSeconds))}s left`;
 }
 
 function formatBadgeValue(badge) {
@@ -690,7 +666,7 @@ function renderHero(payload) {
     "Use this audience-facing view to explain the current posture, main blocker, and strongest governed proof without the operator-only drill-down.";
   const runtimeTitle = "Governed Live Runtime Workspace";
   const runtimeCopy =
-    "Focus on the current Onyx path, runtime proof, live session state, and the activity that confirms the governed handoff is doing real work.";
+    "Focus on the current Onyx path, runtime proof, authentication requirements, and the activity that confirms the governed handoff is doing real work.";
 
   if (heroEyebrow) {
     heroEyebrow.textContent = isExecutiveView()
@@ -760,117 +736,55 @@ function compactSectionDescription(section) {
   return `${description.slice(0, 117).trimEnd()}...`;
 }
 
-function updateLiveRuntimeLink(payload) {
+function updateLiveRuntimeLink() {
   if (!liveRuntimeLink) {
     return;
   }
 
-  const sessionReady = Boolean(payload?.authenticated);
-  const helperEnabled = payload?.enabled !== false;
-  const needsRestart = Boolean(payload?.cookie_present) && !sessionReady && helperEnabled;
-
   liveRuntimeLink.classList.remove("is-disabled");
   liveRuntimeLink.removeAttribute("aria-disabled");
-
-  if (sessionReady) {
-    liveRuntimeLink.textContent = "Open live workspace";
-    liveRuntimeLink.href = payload.workspace_href || "/launch/onyx?path=/app&mode=live&view=embedded";
-    liveRuntimeLink.title = "Open the governed live workspace using the active dev session";
-    return;
-  }
-
-  if (helperEnabled) {
-    liveRuntimeLink.textContent = needsRestart ? "Restart dev live workspace" : "Start dev live workspace";
-    liveRuntimeLink.href = payload?.start_href || "/auth/live-session/start?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded";
-    liveRuntimeLink.title = "Mint a dev-only live session cookie and open the governed live workspace";
-    return;
-  }
-
-  liveRuntimeLink.textContent = "Live workspace helper unavailable";
-  liveRuntimeLink.href = payload?.start_href || "/auth/live-session/start?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded";
-  liveRuntimeLink.title = "This dev-only helper is unavailable in the current environment";
-  liveRuntimeLink.classList.add("is-disabled");
-  liveRuntimeLink.setAttribute("aria-disabled", "true");
+  liveRuntimeLink.textContent = "Open live workspace";
+  liveRuntimeLink.href = "/launch/onyx?path=/app&mode=live&view=embedded";
+  liveRuntimeLink.title = "Open the governed live workspace; authentication must already be in place";
 }
 
-function buildLiveSessionMeta(payload) {
+function buildAccessRequirementsMeta(payload) {
   if (!payload) {
     return [];
   }
 
   const items = [
-    payload.dev_only ? { label: "Scope", value: "dev-only", status: "warning" } : null,
-    payload.environment_mode
-      ? { label: "Mode", value: String(payload.environment_mode).toUpperCase(), status: "neutral" }
-      : null,
-    payload.username ? { label: "User", value: payload.username, status: payload.authenticated ? "healthy" : "neutral" } : null,
-    payload.tenant_id ? { label: "Tenant", value: payload.tenant_id, status: payload.authenticated ? "healthy" : "neutral" } : null,
-    payload.session_id ? { label: "Session", value: payload.session_id, status: "neutral" } : null,
-    payload.expires_at ? { label: "Expires", value: payload.expires_at, kind: "timestamp", status: "neutral" } : null,
-    Number.isFinite(payload.expires_in_seconds)
-      ? { label: "TTL", value: formatRemainingDuration(payload.expires_in_seconds), status: payload.expires_in_seconds > 0 ? "neutral" : "critical" }
-      : null,
+    { label: "Auth", value: "External OIDC", status: "neutral" },
+    payload.data_mode?.label ? { label: "Evidence", value: payload.data_mode.label, status: "neutral" } : null,
+    payload.mode_banner?.label ? { label: "Mode", value: payload.mode_banner.label, status: "neutral" } : null,
+    { label: "Workspace", value: "/launch/onyx?path=/app&mode=live", status: "neutral" },
   ];
 
   return items.filter(Boolean);
 }
 
-function renderLiveSession(payload) {
+function renderAccessRequirements(payload) {
   if (!liveSessionRoot) {
     return;
   }
 
-  lastLiveSessionPayload = payload;
-  updateLiveRuntimeLink(payload);
-
-  const status = payload?.status || "neutral";
-  const actions = [];
-  if (payload?.cookie_present) {
-    actions.push(`<a class="hero-action-button hero-action-button-secondary" href="${escapeHtml(payload.end_href || "/auth/live-session/end?next=%2F")}">${escapeHtml(payload.authenticated ? "End dev session" : "Clear live-session cookie")}</a>`);
-  }
-  if (payload?.authenticated && payload?.workspace_href) {
-    actions.push(`<a class="hero-action-button hero-action-button-secondary" href="${escapeHtml(payload.workspace_href)}">Re-open workspace</a>`);
-  }
+  updateLiveRuntimeLink();
 
   liveSessionRoot.innerHTML = `
-    <section class="live-session-banner live-session-banner-${escapeHtml(status)}">
+    <section class="live-session-banner live-session-banner-neutral">
       <div class="live-session-head">
         <div>
-          <p class="eyebrow">Dev live session</p>
-          <h2 class="live-session-title">${escapeHtml(payload?.status_label || "Live session")}</h2>
-          <p class="live-session-copy">${escapeHtml(payload?.summary || "Session state unavailable.")}</p>
+          <p class="eyebrow">Live access</p>
+          <h2 class="live-session-title">External identity required</h2>
+          <p class="live-session-copy">The dashboard no longer mints dev cookies or browser bootstrap tokens. Use the deployment's OIDC sign-in flow or present a valid Keycloak-backed bearer token before opening the live workspace.</p>
         </div>
-        ${renderStatusPill(status, { label: payload?.status_label || statusLabel(status) })}
+        ${renderStatusPill("neutral", { label: "Bring your own auth" })}
       </div>
-      ${renderMetaBadges(buildLiveSessionMeta(payload), "live-session-meta")}
-      ${payload?.detail ? `<p class="live-session-detail">${escapeHtml(payload.detail)}</p>` : ""}
-      ${actions.length ? `<div class="live-session-actions">${actions.join("")}</div>` : ""}
-    </section>
-  `;
-}
-
-function renderLiveSessionError(error) {
-  if (!liveSessionRoot) {
-    return;
-  }
-
-  updateLiveRuntimeLink({
-    enabled: true,
-    authenticated: false,
-    cookie_present: false,
-    start_href: "/auth/live-session/start?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive%26view%3Dembedded",
-  });
-  liveSessionRoot.innerHTML = `
-    <section class="live-session-banner live-session-banner-warning">
-      <div class="live-session-head">
-        <div>
-          <p class="eyebrow">Dev live session</p>
-          <h2 class="live-session-title">Session state unavailable</h2>
-          <p class="live-session-copy">The dashboard could not check the current dev live-session cookie right now.</p>
-        </div>
-        ${renderStatusPill("warning", { label: "Needs attention" })}
+      ${renderMetaBadges(buildAccessRequirementsMeta(payload), "live-session-meta")}
+      <p class="live-session-detail">Live handoffs still fail closed when identity, policy, retrieval, secret, trace, or launch-gate evidence is missing on the same request trace.</p>
+      <div class="live-session-actions">
+        <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/onyx-integration.md">Auth and runtime note</a>
       </div>
-      <p class="live-session-detail">${escapeHtml(error.message || "Unknown error")}</p>
     </section>
   `;
 }
@@ -2306,22 +2220,10 @@ async function loadLiveLog() {
   }
 }
 
-async function loadLiveSession() {
-  try {
-    const response = await fetch("/api/control-plane/live-session", { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(`Live session API returned ${response.status}`);
-    }
-
-    renderLiveSession(await response.json());
-  } catch (error) {
-    renderLiveSessionError(error);
-  }
-}
-
 function renderDashboardPayload(payload) {
   renderDashboardViewModes();
   renderHero(payload);
+  renderAccessRequirements(payload);
   renderSummarySheet(payload.command_center?.presentation_summary || {});
   renderRuntimeSummary(payload.command_center?.runtime_summary || {});
   renderStackHealth(payload.stack_health || {});
@@ -2416,7 +2318,6 @@ async function refreshDashboard() {
   }
 
   await Promise.all([boot(), loadLiveLog()]);
-  await loadLiveSession();
 
   if (refreshDashboardButton) {
     refreshDashboardButton.disabled = false;
@@ -2438,4 +2339,3 @@ if (refreshDashboardButton) {
 
 boot();
 loadLiveLog();
-loadLiveSession();

@@ -1,0 +1,49 @@
+{
+  "realm": "umbrella",
+  "enabled": true,
+  "displayName": "Umbrella Governed Realm",
+  "roles": {
+    "realm": [
+      { "name": "platform_admin" },
+      { "name": "security_operator" },
+      { "name": "tenant_admin" },
+      { "name": "tenant_user" },
+      { "name": "service_runtime" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "onyx-runtime",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false
+    },
+    {
+      "clientId": "control-plane-web",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*"
+      ],
+      "webOrigins": ["*"]
+    },
+    {
+      "clientId": "governed-smoke-client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true
+    }
+  ],
+  "attributes": {
+    "note": "Governed stack template. Review realm name, hostnames, and redirect URIs before non-local usage."
+  }
+}

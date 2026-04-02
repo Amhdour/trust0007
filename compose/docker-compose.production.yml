@@ -1,0 +1,238 @@
+services:
+  control_plane:
+    build:
+      context: ..
+      dockerfile: Dockerfile.control-plane
+    image: beta011-control-plane:local
+    environment:
+      CONTROL_PLANE_REPO_ROOT: /app
+      CONTROL_PLANE_ARTIFACT_DIR: /app/overlays/myStarterKit/artifacts
+      CONTROL_PLANE_HOST: 0.0.0.0
+      CONTROL_PLANE_PORT: 3000
+      CONTROL_PLANE_GOVERNANCE_MODE: ${CONTROL_PLANE_GOVERNANCE_MODE:-live}
+      CONTROL_PLANE_ENVIRONMENT_MODE: ${CONTROL_PLANE_ENVIRONMENT_MODE:-staging}
+      CONTROL_PLANE_DEFAULT_TENANT_ID: ${CONTROL_PLANE_DEFAULT_TENANT_ID:-tenant-stage}
+      CONTROL_PLANE_KEYCLOAK_BASE_URL: ${CONTROL_PLANE_KEYCLOAK_BASE_URL:-http://keycloak:8080}
+      CONTROL_PLANE_KEYCLOAK_REALM: ${CONTROL_PLANE_KEYCLOAK_REALM:-umbrella}
+      CONTROL_PLANE_OPA_URL: ${CONTROL_PLANE_OPA_URL:-http://opa:8181}
+      CONTROL_PLANE_OPA_PACKAGE: ${CONTROL_PLANE_OPA_PACKAGE:-umbrella/policy/decision}
+      CONTROL_PLANE_QDRANT_URL: ${CONTROL_PLANE_QDRANT_URL:-http://qdrant:6333}
+      CONTROL_PLANE_QDRANT_COLLECTION: ${CONTROL_PLANE_QDRANT_COLLECTION:-governed_docs}
+      CONTROL_PLANE_VAULT_ADDR: ${CONTROL_PLANE_VAULT_ADDR:-http://vault:8200}
+      CONTROL_PLANE_VAULT_TOKEN: ${CONTROL_PLANE_VAULT_TOKEN:-}
+      CONTROL_PLANE_ONYX_SECRET_PATH: ${CONTROL_PLANE_ONYX_SECRET_PATH:-secret/data/runtime/tenant-stage/onyx}
+      CONTROL_PLANE_ONYX_SECRET_KEY: ${CONTROL_PLANE_ONYX_SECRET_KEY:-api_token}
+      CONTROL_PLANE_REQUIRED_SECRET_PATH: ${CONTROL_PLANE_REQUIRED_SECRET_PATH:-secret/data/runtime/tenant-stage/governed-flow}
+      CONTROL_PLANE_REQUIRED_SECRET_KEY: ${CONTROL_PLANE_REQUIRED_SECRET_KEY:-api_token}
+      CODESPACE_NAME: ${CODESPACE_NAME:-}
+      GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: ${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - control_plane_artifacts:/app/overlays/myStarterKit/artifacts
+    depends_on:
+      - keycloak
+      - qdrant
+      - vault
+      - opa
+      - langfuse
+      - grafana
+      - superset
+    networks:
+      - trust_stack
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  keycloak_db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: ${KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER:-keycloak} -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+    networks:
+      - trust_stack
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${LANGFUSE_POSTGRES_DB:-langfuse}
+      POSTGRES_USER: ${LANGFUSE_POSTGRES_USER:-langfuse}
+      POSTGRES_PASSWORD: ${LANGFUSE_POSTGRES_PASSWORD:-langfuse}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LANGFUSE_POSTGRES_USER:-langfuse} -d ${LANGFUSE_POSTGRES_DB:-langfuse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    networks:
+      - trust_stack
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    command: ["start", "--optimized", "--http-enabled=true", "--hostname-strict=false"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD}
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-localhost}
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    depends_on:
+      keycloak_db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${KEYCLOAK_HOST_PORT:-18080}:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    networks:
+      - trust_stack
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  vault:
+    image: hashicorp/vault:1.16
+    cap_add:
+      - IPC_LOCK
+    command: ["vault", "server", "-config=/vault/config/config.hcl"]
+    ports:
+      - "127.0.0.1:8200:8200"
+    volumes:
+      - vault_data:/vault/file
+      - ./vault/config.hcl:/vault/config/config.hcl:ro
+    networks:
+      - trust_stack
+    security_opt:
+      - no-new-privileges:true
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.4
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - trust_stack
+    security_opt:
+      - no-new-privileges:true
+
+  langfuse:
+    image: langfuse/langfuse:2
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${LANGFUSE_DATABASE_URL}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
+      SALT: ${LANGFUSE_SALT}
+      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL}
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:-}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:-}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
+      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+    ports:
+      - "3002:3000"
+    networks:
+      - trust_stack
+    security_opt:
+      - no-new-privileges:true
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - trust_stack
+    security_opt:
+      - no-new-privileges:true
+
+  superset:
+    image: apache/superset:4.1.1
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+    ports:
+      - "127.0.0.1:8088:8088"
+    volumes:
+      - superset_home:/app/superset_home
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+    command: ["/bin/sh", "-c", "superset db upgrade && (superset fab create-admin --username ${SUPERSET_ADMIN_USER:-admin} --firstname Stage --lastname Admin --email stage-admin@example.com --password ${SUPERSET_ADMIN_PASSWORD} || true) && superset init && superset run -h 0.0.0.0 -p 8088"]
+    networks:
+      - trust_stack
+    security_opt:
+      - no-new-privileges:true
+
+  opa:
+    image: openpolicyagent/opa:1.0.0
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies/runtime.rego", "/policies/retrieval.rego"]
+    volumes:
+      - ../policies/rego/policy.rego:/policies/runtime.rego:ro
+      - ../policies/retrieval/policy.rego:/policies/retrieval.rego:ro
+    ports:
+      - "127.0.0.1:8181:8181"
+    networks:
+      - trust_stack
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    command: ["envoy", "-c", "/etc/envoy/envoy.local.yaml", "-l", "info"]
+    volumes:
+      - ./envoy/envoy.local.yaml:/etc/envoy/envoy.local.yaml:ro
+    ports:
+      - "10000:10000"
+      - "9901:9901"
+    depends_on:
+      - opa
+    networks:
+      - trust_stack
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  trust_stack:
+    name: trust_stack_production
+
+volumes:
+  control_plane_artifacts:
+  keycloak_postgres_data:
+  langfuse_postgres_data:
+  keycloak_data:
+  vault_data:
+  qdrant_data:
+  grafana_data:
+  superset_home:

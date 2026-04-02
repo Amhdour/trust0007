@@ -144,11 +144,6 @@ def _launch_handoff_path(path: str, *, mode: str = "", view: str = "") -> str:
 def _launch_handoff_url(path: str, *, mode: str = "", view: str = "") -> str:
     return _dashboard_url(_launch_handoff_path(path, mode=mode, view=view))
 
-
-def _live_session_start_url(next_path: str) -> str:
-    return _dashboard_url(f"/auth/live-session/start?{urlencode({'next': next_path})}")
-
-
 def _status_from_launch(verdict: str) -> str:
     return {
         "go": "healthy",
@@ -1786,7 +1781,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 f"The latest governed run passed, but the broader repo baseline is still {baseline_posture_display.lower()} because {top_baseline_issue}"
                 if (not live_evidence_mode and latest_governed_verdict == "go" and launch_summary["status"] != "go" and top_baseline_issue)
                 else (
-                    "Use Start dev live workspace or Create fresh technical proof when you need current governed evidence."
+                    "Use Open live workspace with a valid bearer token or Create fresh technical proof when you need current governed evidence."
                     if not live_evidence_mode
                     else ""
                 )
@@ -3535,7 +3530,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "type": "links",
                     "title": "AI-access links",
                     "items": [
-                        _link("Live Workspace", _live_session_start_url(_launch_handoff_path("/app", mode="live", view="embedded")), "Mint a local dev-only live session in the control plane and open the dashboard-owned runtime workspace with governance context and embedded Onyx access when reachable. Intended for local dev and prod-sim runs.", "healthy", display_label="Start dev live workspace", display_description="Mint the local dev-only session and open the live chat surface inside the dashboard-owned runtime workspace."),
+                        _link("Live Workspace", _launch_handoff_url("/app", mode="live", view="embedded"), "Open the dashboard-owned runtime workspace. The deployment must already provide a valid Keycloak-backed browser session or bearer token for the live handoff to succeed.", "healthy", display_label="Open live workspace", display_description="Open the checked live chat surface. Authentication must already be in place."),
                         _link("Open Chat", _launch_handoff_url("/app"), "Launch the governed Onyx chat surface through the dashboard handoff.", "healthy", display_label="Open chat", display_description="Open the checked chat entry point for the AI system."),
                         _link("Search Knowledge", _launch_handoff_url("/app?chatMode=search"), "Launch the governed search-oriented Onyx surface.", "healthy", display_label="Open search", display_description="Open the checked search entry point for the AI system."),
                         _link("Open Agents", _launch_handoff_url("/app/agents"), "Governed agents surface; non-admin roles should be denied.", "warning", display_label="Open agents", display_description="Open the agents entry point. Non-admin roles should still be blocked here."),

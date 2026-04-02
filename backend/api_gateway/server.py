@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from base64 import urlsafe_b64decode
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from html import escape
 import json
 import mimetypes
@@ -12,11 +10,10 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
-from urllib.request import Request, urlopen
+from urllib.parse import parse_qs, quote, unquote, urlparse
+from urllib.request import urlopen
 
 from adapters.identity.keycloak import KeycloakIdentityProvider
-from adapters.identity.schemas import IdentityResolutionRequest
 from backend.activity_service.service import build_onyx_runtime_proof, build_onyx_workspace_activity
 from backend.integration_adapter import load_runtime_policy_bundle
 from backend.integration_adapter.repository import load_upstream_usage_inventory
@@ -118,234 +115,32 @@ def _keycloak_userinfo_url() -> str:
     return f"{base_url}/realms/{realm}/protocol/openid-connect/userinfo"
 
 
-def _keycloak_token_url() -> str:
-    explicit = os.environ.get("CONTROL_PLANE_KEYCLOAK_TOKEN_URL", "").strip()
+def _default_tenant_id() -> str:
+    return os.environ.get("CONTROL_PLANE_DEFAULT_TENANT_ID", "tenant-a").strip() or "tenant-a"
+
+
+def _dashboard_user_id() -> str:
+    return os.environ.get("CONTROL_PLANE_DASHBOARD_USER_ID", "dashboard-user").strip() or "dashboard-user"
+
+
+def _governed_flow_user_id() -> str:
+    return os.environ.get("CONTROL_PLANE_API_USER_ID", "api-user").strip() or "api-user"
+
+
+def _onyx_secret_path(tenant_id: str = "") -> str:
+    explicit = os.environ.get("CONTROL_PLANE_ONYX_SECRET_PATH", "").strip()
     if explicit:
         return explicit
-    base_url = os.environ.get("CONTROL_PLANE_KEYCLOAK_BASE_URL", "http://keycloak:8080").strip().rstrip("/")
-    realm = os.environ.get("CONTROL_PLANE_KEYCLOAK_REALM", "umbrella-dev").strip()
-    return f"{base_url}/realms/{realm}/protocol/openid-connect/token"
+    resolved_tenant = tenant_id or _default_tenant_id()
+    return f"secret/data/runtime/{resolved_tenant}/onyx"
 
 
-def _dev_live_session_allowed() -> bool:
-    if os.environ.get("CONTROL_PLANE_DISABLE_DEV_LIVE_SESSION", "").strip().lower() in {"1", "true", "yes"}:
-        return False
-    return _control_plane_environment_mode() in {"dev", "prod-sim"}
-
-
-def _dev_live_session_default_next_path() -> str:
-    return "/launch/onyx?path=/app&mode=live&view=embedded"
-
-
-def _dev_live_session_start_path(next_path: str = "") -> str:
-    target = next_path or _dev_live_session_default_next_path()
-    return f"/auth/live-session/start?{urlencode({'next': target})}"
-
-
-def _safe_internal_redirect_target(raw_target: str, *, default_target: str = "") -> str:
-    fallback = default_target or _dev_live_session_default_next_path()
-    candidate = unquote(raw_target or "").strip()
-    if not candidate:
-        return fallback
-    parsed = urlparse(candidate)
-    if parsed.scheme or parsed.netloc:
-        return fallback
-    if not candidate.startswith("/") or candidate.startswith("//"):
-        return fallback
-    if candidate.startswith("/auth/live-session/start"):
-        return fallback
-    return candidate
-
-
-def _dev_live_session_end_path(next_path: str = "/") -> str:
-    target = _safe_internal_redirect_target(next_path, default_target="/")
-    return f"/auth/live-session/end?{urlencode({'next': target})}"
-
-
-def _decode_jwt_claims(token: str) -> dict[str, object]:
-    parts = token.split(".")
-    if len(parts) != 3:
-        return {}
-    payload = parts[1].strip()
-    if not payload:
-        return {}
-    padding = "=" * ((4 - len(payload) % 4) % 4)
-    try:
-        decoded = json.loads(urlsafe_b64decode(f"{payload}{padding}".encode("ascii")).decode("utf-8"))
-    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
-        return {}
-    return decoded if isinstance(decoded, dict) else {}
-
-
-def _unix_timestamp_to_iso(value: object) -> str:
-    try:
-        return datetime.fromtimestamp(float(value), tz=timezone.utc).isoformat()
-    except (TypeError, ValueError, OSError):
-        return ""
-
-
-def _seconds_until_timestamp(value: object) -> int | None:
-    try:
-        delta = datetime.fromtimestamp(float(value), tz=timezone.utc) - datetime.now(timezone.utc)
-    except (TypeError, ValueError, OSError):
-        return None
-    return int(delta.total_seconds())
-
-
-def _live_session_cookie_headers(token: str) -> list[str]:
-    cookie = SimpleCookie()
-    cookie["kc_access_token"] = token
-    cookie["kc_access_token"]["path"] = "/"
-    cookie["kc_access_token"]["httponly"] = True
-    cookie["kc_access_token"]["samesite"] = "Lax"
-    cookie["kc_access_token"]["max-age"] = str(
-        int(os.environ.get("CONTROL_PLANE_DEV_LIVE_SESSION_MAX_AGE", "3600") or "3600")
-    )
-    return [morsel.OutputString() for morsel in cookie.values()]
-
-
-def _expired_live_session_cookie_headers() -> list[str]:
-    cookie = SimpleCookie()
-    cookie["kc_access_token"] = ""
-    cookie["kc_access_token"]["path"] = "/"
-    cookie["kc_access_token"]["httponly"] = True
-    cookie["kc_access_token"]["samesite"] = "Lax"
-    cookie["kc_access_token"]["max-age"] = "0"
-    cookie["kc_access_token"]["expires"] = "Thu, 01 Jan 1970 00:00:00 GMT"
-    return [morsel.OutputString() for morsel in cookie.values()]
-
-
-def _live_session_status_payload(cookies: dict[str, str]) -> dict[str, object]:
-    workspace_href = _dev_live_session_default_next_path()
-    start_href = _dev_live_session_start_path(workspace_href)
-    end_href = _dev_live_session_end_path("/")
-    token = str(cookies.get("kc_access_token", "")).strip()
-    token_claims = _decode_jwt_claims(token)
-    expires_at = _unix_timestamp_to_iso(token_claims.get("exp"))
-    expires_in_seconds = _seconds_until_timestamp(token_claims.get("exp"))
-    issuer = str(token_claims.get("iss", "")).strip()
-    preferred_username = str(
-        token_claims.get("preferred_username") or token_claims.get("email") or token_claims.get("sub") or ""
-    ).strip()
-    status_payload: dict[str, object] = {
-        "enabled": _dev_live_session_allowed(),
-        "dev_only": True,
-        "environment_mode": _control_plane_environment_mode(),
-        "status": "neutral",
-        "status_label": "No dev live session",
-        "summary": "Start the dev-only live session to open the dashboard-owned Onyx workspace in this local environment.",
-        "detail": "The dashboard will mint a local Keycloak-backed cookie inside the control plane before it hands you into the governed live workspace.",
-        "authenticated": False,
-        "cookie_present": bool(token),
-        "user_id": "",
-        "username": preferred_username,
-        "tenant_id": "",
-        "session_id": str(token_claims.get("sid") or token_claims.get("session_state") or "").strip(),
-        "issuer": issuer,
-        "source": "missing_token" if not token else "cookie_only",
-        "reason": "identity.missing_bearer_token" if not token else "identity.cookie_present",
-        "expires_at": expires_at,
-        "expires_in_seconds": expires_in_seconds,
-        "workspace_href": workspace_href,
-        "start_href": start_href,
-        "end_href": end_href,
-    }
-
-    if not status_payload["enabled"]:
-        status_payload.update(
-            {
-                "status": "warning",
-                "status_label": "Dev live session disabled",
-                "summary": "This helper is only meant for local dev and prod-sim environments, and it is currently turned off.",
-                "detail": "Use a separately issued live token if you need to validate production-like identity outside the local bootstrap path.",
-                "reason": "live_session.disabled",
-            }
-        )
-        return status_payload
-
-    if not token:
-        return status_payload
-
-    identity = KeycloakIdentityProvider(_keycloak_userinfo_url()).resolve(
-        IdentityResolutionRequest(
-            cookies=cookies,
-            requested_path=workspace_href,
-            required_live_identity=True,
-        )
-    )
-    username = str(identity.metadata.get("preferred_username", "") or preferred_username or identity.user_id).strip()
-    status_payload.update(
-        {
-            "authenticated": identity.authenticated and identity.live,
-            "user_id": identity.user_id,
-            "username": username,
-            "tenant_id": identity.tenant_id,
-            "session_id": identity.session_id or str(status_payload.get("session_id", "")),
-            "issuer": str(identity.metadata.get("issuer", "") or issuer).strip(),
-            "source": identity.source,
-            "reason": identity.reason,
-        }
-    )
-
-    if identity.authenticated and identity.live:
-        status_payload.update(
-            {
-                "status": "healthy",
-                "status_label": "Live session active",
-                "summary": f"Validated via Keycloak for {username or identity.user_id} in tenant {identity.tenant_id or 'unknown'}.",
-                "detail": "This remains a dev-only convenience path: governance still runs on every live handoff before the embedded runtime appears.",
-            }
-        )
-        return status_payload
-
-    reason = identity.reason or "identity.validation_failed"
-    degraded = reason == "identity.keycloak_unreachable"
-    status_payload.update(
-        {
-            "status": "warning" if degraded else "critical",
-            "status_label": "Dev live session needs attention",
-            "summary": "A live-session cookie is present, but the control plane could not validate it for the governed workspace.",
-            "detail": f"Current validation result: {reason}. Restart the dev live session to replace the cookie before you retry the embedded workspace.",
-        }
-    )
-    return status_payload
-
-
-def _mint_dev_live_session_token() -> str:
-    username = os.environ.get("CONTROL_PLANE_DEV_LIVE_USERNAME", "live-tenant-admin").strip() or "live-tenant-admin"
-    password = os.environ.get("CONTROL_PLANE_DEV_LIVE_PASSWORD", "change-me").strip() or "change-me"
-    client_id = os.environ.get("CONTROL_PLANE_DEV_LIVE_CLIENT_ID", "dev-web-app").strip() or "dev-web-app"
-    scope = os.environ.get("CONTROL_PLANE_DEV_LIVE_SCOPE", "openid email profile").strip() or "openid email profile"
-
-    request = Request(
-        _keycloak_token_url(),
-        data=urlencode(
-            {
-                "client_id": client_id,
-                "grant_type": "password",
-                "username": username,
-                "password": password,
-                "scope": scope,
-            }
-        ).encode("utf-8"),
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json",
-        },
-        method="POST",
-    )
-    try:
-        with urlopen(request, timeout=10) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
-        raise RuntimeError(f"keycloak_token_http_error:{exc.code}") from exc
-    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise RuntimeError("keycloak_token_unreachable") from exc
-
-    access_token = str(payload.get("access_token", "")).strip()
-    if not access_token:
-        raise RuntimeError("keycloak_token_missing")
-    return access_token
+def _required_secret_path(tenant_id: str = "") -> str:
+    explicit = os.environ.get("CONTROL_PLANE_REQUIRED_SECRET_PATH", "").strip()
+    if explicit:
+        return explicit
+    resolved_tenant = tenant_id or _default_tenant_id()
+    return f"secret/data/runtime/{resolved_tenant}/governed-flow"
 
 
 def _cookie_map(raw_cookie: str) -> dict[str, str]:
@@ -986,20 +781,8 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(activity_payload)
             return
 
-        if path == "/api/control-plane/live-session":
-            self._send_json(_live_session_status_payload(self._request_cookies()))
-            return
-
         if path == "/api/control-plane/governed-flow":
             self._handle_governed_flow()
-            return
-
-        if path == "/auth/live-session/start":
-            self._handle_dev_live_session_start(parsed)
-            return
-
-        if path == "/auth/live-session/end":
-            self._handle_dev_live_session_end(parsed)
             return
 
         if path.startswith("/raw/"):
@@ -1058,71 +841,6 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     def _request_cookies(self) -> dict[str, str]:
         return _cookie_map(self.headers.get("Cookie", ""))
 
-    def _handle_dev_live_session_start(self, parsed) -> None:
-        next_path = _safe_internal_redirect_target(
-            self._query_value(parse_qs(parsed.query), "next", ""),
-            default_target=_dev_live_session_default_next_path(),
-        )
-        if not _dev_live_session_allowed():
-            self._send_html(
-                """<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Live Session Unavailable</title>
-  </head>
-  <body>
-    <main>
-      <h1>Live session bootstrap is disabled</h1>
-      <p>This dev-only helper is not available in the current environment.</p>
-      <p>It is intended only for local <code>dev</code> or <code>prod-sim</code> flows.</p>
-      <p><a href="/">Return to dashboard</a></p>
-    </main>
-  </body>
-</html>
-""",
-                status=HTTPStatus.FORBIDDEN,
-            )
-            return
-
-        try:
-            access_token = _mint_dev_live_session_token()
-        except RuntimeError as exc:
-            reason = escape(str(exc))
-            self._send_html(
-                f"""<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Live Session Start Failed</title>
-  </head>
-  <body>
-    <main>
-      <h1>Live session start failed</h1>
-      <p>The control plane could not mint a dev live session token from Keycloak.</p>
-      <p>This helper only exists to smooth local and prod-sim testing. Governance still runs on the redirected live handoff after the cookie is minted.</p>
-      <p>Reason: <code>{reason}</code></p>
-      <p><a href="/">Return to dashboard</a></p>
-      <p><a href="{escape(next_path)}">Retry the governed route</a></p>
-    </main>
-  </body>
-</html>
-""",
-                status=HTTPStatus.BAD_GATEWAY,
-            )
-            return
-
-        self._redirect(next_path, cookies=_live_session_cookie_headers(access_token))
-
-    def _handle_dev_live_session_end(self, parsed) -> None:
-        next_path = _safe_internal_redirect_target(
-            self._query_value(parse_qs(parsed.query), "next", ""),
-            default_target="/",
-        )
-        self._redirect(next_path, cookies=_expired_live_session_cookie_headers())
-
     def _handle_governed_flow(self) -> None:
         """Execute a governed flow with runtime policy enforcement and emit artifacts."""
         try:
@@ -1133,10 +851,11 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             question = self._query_value(query, "question", "Demonstrate governed flow through control plane API")
             policy_context = _runtime_policy_context()
             evaluator = _build_governed_flow_evaluator(policy_context, flow_mode=flow_mode)
+            tenant_id = _default_tenant_id()
 
             result = evaluator.run(
-                user_id="api-user",
-                tenant_id="tenant-a",
+                user_id=_governed_flow_user_id(),
+                tenant_id=tenant_id,
                 prompt=question,
                 requested_tools=["search", "summarize"],
                 retrieval_source="qdrant",
@@ -1157,7 +876,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 evidence_mode=flow_mode,
                 secret_request={
                     "needed": secret_required,
-                    "secret_path": os.environ.get("CONTROL_PLANE_REQUIRED_SECRET_PATH", "secret/data/dev/tenant-a/runtime"),
+                    "secret_path": _required_secret_path(tenant_id),
                     "secret_key": os.environ.get("CONTROL_PLANE_REQUIRED_SECRET_KEY", "api_token"),
                     "purpose": "governed_flow_runtime_secret",
                 }
@@ -1209,13 +928,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 href = f"{href}&view={quote(view, safe='')}"
             return href
 
-        current_handoff_href = launch_view_href(
-            safe_path,
-            mode=flow_mode,
-            view=view_mode if dashboard_workspace_view else "",
-        )
-        live_session_start_href = _dev_live_session_start_path(current_handoff_href)
-        live_session_end_href = _dev_live_session_end_path("/")
+        default_tenant_id = _default_tenant_id()
 
         # Run governance check for Onyx handoff
         try:
@@ -1224,8 +937,8 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             evaluator = _build_governed_flow_evaluator(policy_context, flow_mode=flow_mode)
 
             flow_result = evaluator.run(
-                user_id="dashboard-user",
-                tenant_id="tenant-dashboard",
+                user_id=_dashboard_user_id(),
+                tenant_id=default_tenant_id,
                 prompt=question,
                 requested_tools=["onyx"],
                 retrieval_source="qdrant",
@@ -1250,7 +963,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 evidence_mode=flow_mode,
                 secret_request={
                     "needed": live_mode,
-                    "secret_path": os.environ.get("CONTROL_PLANE_ONYX_SECRET_PATH", "secret/data/dev/tenant-dashboard/runtime"),
+                    "secret_path": _onyx_secret_path(default_tenant_id),
                     "secret_key": os.environ.get("CONTROL_PLANE_ONYX_SECRET_KEY", "api_token"),
                     "purpose": "onyx_runtime_handoff",
                 }
@@ -1283,13 +996,6 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             artifact_markup = _artifact_list_markup(flow_result.artifacts if flow_result else {})
             dependency_markup = _dependency_summary_markup(flow_result)
             runtime_proof_section = _runtime_proof_markup(runtime_proof)
-            live_session_help_markup = ""
-            if live_mode and _dev_live_session_allowed() and any(
-                reason.startswith("identity.") for reason in (flow_result.reasons if flow_result else [])
-            ):
-                live_session_help_markup = f"""
-      <p><a href="{live_session_start_href}">Start dev live session and retry</a></p>
-"""
             # Governance denied the handoff
             body = f"""<!doctype html>
 <html lang="en">
@@ -1352,7 +1058,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     <main>
       <h1>⛔ Access Denied</h1>
       <p>The governance layer has blocked your access to <code>{safe_path_html}</code>.</p>
-      {live_session_help_markup}
+      <p>Present a valid Keycloak-backed bearer token or enter through the deployment's OIDC front door before retrying the live workspace.</p>
       <p><a href="/">Return to dashboard</a></p>
       <div class="status">
         <strong>Handoff to Onyx was denied by control-plane policy.</strong>
@@ -1875,7 +1581,6 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
           <a class="primary" href="{public_url}" target="_blank" rel="noreferrer">Open in new tab</a>
           <a href="/">Return to dashboard</a>
           <a href="{launch_view_href(safe_path, mode='live', view='embedded')}">Re-check governance</a>
-          <a href="{live_session_end_href}">End dev session</a>
         </div>
         <div class="surface-links" aria-label="Switch live Onyx surface">
           {workspace_nav_markup}
