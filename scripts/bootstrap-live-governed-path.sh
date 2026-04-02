@@ -332,6 +332,7 @@ if [[ -z "$user_uuid" ]]; then
 fi
 
 kcadm update "users/${user_uuid}" -r "$KEYCLOAK_REALM" -f "$KEYCLOAK_USER_REMOTE_FILE" >/dev/null
+kcadm update "users/${user_uuid}" -r "$KEYCLOAK_REALM" -s "attributes.tenant_id=[\"${TENANT_ID}\"]" >/dev/null
 kcadm set-password -r "$KEYCLOAK_REALM" --username "$LIVE_USERNAME" --new-password "$LIVE_PASSWORD" >/dev/null
 kcadm add-roles -r "$KEYCLOAK_REALM" --uid "$user_uuid" --rolename tenant_user >/dev/null 2>&1 || true
 kcadm add-roles -r "$KEYCLOAK_REALM" --uid "$user_uuid" --rolename tenant_admin >/dev/null 2>&1 || true
