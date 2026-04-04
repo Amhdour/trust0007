@@ -1,0 +1,205 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1600" role="img" aria-labelledby="title desc">
+  <title id="title">GITEX Africa 2026 shortlist recognition proof</title>
+  <desc id="desc">Certificate-style recognition poster for Ahmed Amhdour, shortlisted for the GITEX Africa 2026 Cyber and AI Achiever Awards Rising Star category.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#160405"/>
+      <stop offset="45%" stop-color="#4b0909"/>
+      <stop offset="100%" stop-color="#140202"/>
+    </linearGradient>
+    <radialGradient id="burst" cx="50%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#ffcf7a" stop-opacity="0.40"/>
+      <stop offset="45%" stop-color="#ad2e0d" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="paper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f9eedf"/>
+      <stop offset="100%" stop-color="#dfc4a4"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff0bf"/>
+      <stop offset="20%" stop-color="#f4c86d"/>
+      <stop offset="55%" stop-color="#c98b2f"/>
+      <stop offset="100%" stop-color="#8a5115"/>
+    </linearGradient>
+    <linearGradient id="goldSoft" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff3d0"/>
+      <stop offset="100%" stop-color="#c4882e"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#25080c"/>
+      <stop offset="50%" stop-color="#4c1217"/>
+      <stop offset="100%" stop-color="#21070a"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <rect width="1080" height="1600" fill="url(#bg)"/>
+  <rect width="1080" height="1600" fill="url(#burst)"/>
+
+  <g opacity="0.55" fill="#f5a53a">
+    <circle cx="72" cy="92" r="5"/>
+    <circle cx="130" cy="128" r="3"/>
+    <circle cx="181" cy="64" r="4"/>
+    <circle cx="264" cy="90" r="6"/>
+    <circle cx="1012" cy="116" r="5"/>
+    <circle cx="944" cy="164" r="3"/>
+    <circle cx="882" cy="76" r="4"/>
+    <circle cx="828" cy="126" r="6"/>
+    <circle cx="180" cy="1406" r="4"/>
+    <circle cx="266" cy="1472" r="5"/>
+    <circle cx="910" cy="1422" r="4"/>
+    <circle cx="1004" cy="1494" r="6"/>
+    <circle cx="70" cy="1212" r="3"/>
+    <circle cx="142" cy="1246" r="5"/>
+    <circle cx="970" cy="1244" r="4"/>
+    <circle cx="1008" cy="1182" r="3"/>
+  </g>
+
+  <g opacity="0.22" stroke="#a12f1d">
+    <path d="M40 220 H1040"/>
+    <path d="M40 514 H1040"/>
+    <path d="M40 968 H1040"/>
+    <path d="M40 1290 H1040"/>
+    <path d="M220 40 V1560"/>
+    <path d="M844 40 V1560"/>
+  </g>
+
+  <text x="540" y="86" fill="#f6dfc2" font-size="32" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">
+    Under the High Patronage of His Majesty King Mohammed VI
+  </text>
+
+  <g filter="url(#shadow)">
+    <rect x="92" y="172" width="896" height="968" rx="24" fill="url(#paper)" stroke="url(#gold)" stroke-width="6"/>
+    <rect x="114" y="194" width="852" height="924" rx="18" fill="none" stroke="#b28555" stroke-width="2"/>
+  </g>
+
+  <text x="540" y="270" fill="#5d3116" font-size="36" font-family="Georgia, Times New Roman, serif" text-anchor="middle" font-weight="700" letter-spacing="2">
+    SHORTLIST RECOGNITION PROOF
+  </text>
+  <line x1="160" y1="304" x2="920" y2="304" stroke="#b49a7b" stroke-width="2"/>
+
+  <text x="540" y="410" fill="#26120f" font-size="84" font-family="Georgia, Times New Roman, serif" text-anchor="middle" font-weight="700">
+    Ahmed Amhdour
+  </text>
+  <text x="540" y="470" fill="#6a3d20" font-size="28" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">
+    Proud to be shortlisted for
+  </text>
+
+  <g filter="url(#shadow)">
+    <rect x="150" y="520" width="780" height="148" rx="16" fill="url(#ribbon)" stroke="url(#gold)" stroke-width="3"/>
+    <line x1="150" y1="592" x2="930" y2="592" stroke="#f3d39a" stroke-opacity="0.26" stroke-width="2"/>
+  </g>
+
+  <text x="540" y="595" fill="#fff6eb" font-size="56" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700" letter-spacing="1">
+    GITEX AFRICA 2026
+  </text>
+  <text x="540" y="645" fill="#f5cb73" font-size="28" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">
+    Cyber &amp; AI Achiever Awards
+  </text>
+
+  <g transform="translate(110 690)" filter="url(#shadow)">
+    <rect x="18" y="174" width="120" height="24" rx="6" fill="#2a1612"/>
+    <rect x="38" y="152" width="80" height="26" rx="6" fill="url(#gold)"/>
+    <path d="M68 0 L90 0 L106 96 L84 226 L74 226 L52 96 Z" fill="url(#gold)"/>
+    <rect x="56" y="226" width="44" height="84" rx="10" fill="#2b1713"/>
+    <rect x="0" y="310" width="156" height="36" rx="8" fill="url(#gold)"/>
+    <rect x="12" y="346" width="132" height="32" rx="8" fill="#2b1713"/>
+    <path d="M68 18 C38 32 18 70 24 118 C32 178 56 208 78 208 C100 208 124 178 132 118 C138 70 118 32 88 18" fill="none" stroke="#fff2c7" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(360 720)" filter="url(#shadow)">
+    <path d="M180 0 L304 42 V190 C304 264 250 322 180 350 C110 322 56 264 56 190 V42 Z" fill="url(#gold)" stroke="#6d3e10" stroke-width="6"/>
+    <path d="M180 28 L276 60 V184 C276 240 236 286 180 312 C124 286 84 240 84 184 V60 Z" fill="url(#ribbon)" stroke="#f3d191" stroke-width="3"/>
+    <rect x="28" y="114" width="304" height="78" rx="18" fill="url(#ribbon)" stroke="url(#gold)" stroke-width="4"/>
+    <text x="180" y="164" fill="#f7cc6d" font-size="34" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700" letter-spacing="2">
+      RISING STAR
+    </text>
+    <text x="180" y="220" fill="#f2d59b" font-size="22" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700" letter-spacing="3">
+      SHORTLISTED
+    </text>
+    <g fill="#ffdfa0">
+      <circle cx="110" cy="82" r="6"/>
+      <circle cx="150" cy="68" r="6"/>
+      <circle cx="180" cy="58" r="7"/>
+      <circle cx="210" cy="68" r="6"/>
+      <circle cx="250" cy="82" r="6"/>
+    </g>
+  </g>
+
+  <g transform="translate(760 772)">
+    <path d="M0 66 H172" stroke="#b59771" stroke-width="2"/>
+    <text x="0" y="44" fill="#452118" font-size="24" font-family="Georgia, Times New Roman, serif" font-style="italic">
+      Souhaila Boudir
+    </text>
+    <text x="0" y="102" fill="#5a382d" font-size="18" font-family="Arial, Helvetica, sans-serif">
+      Senior Marketing Manager
+    </text>
+    <text x="0" y="130" fill="#5a382d" font-size="18" font-family="Arial, Helvetica, sans-serif">
+      Dubai World Trade Centre
+    </text>
+  </g>
+
+  <text x="540" y="980" fill="#fff5dc" font-size="44" font-family="Georgia, Times New Roman, serif" text-anchor="middle" font-weight="700" letter-spacing="1">
+    9 APRIL 2026
+  </text>
+  <text x="540" y="1034" fill="#fff5dc" font-size="32" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700" letter-spacing="2">
+    FRONTIER STAGE - HALL 4
+  </text>
+  <text x="540" y="1080" fill="#fff5dc" font-size="32" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700" letter-spacing="3">
+    MARRAKECH
+  </text>
+
+  <g transform="translate(760 930)" filter="url(#shadow)">
+    <circle cx="126" cy="126" r="118" fill="url(#gold)" stroke="#6d3f14" stroke-width="6"/>
+    <circle cx="126" cy="126" r="94" fill="url(#ribbon)" stroke="#ffde9d" stroke-width="4"/>
+    <circle cx="126" cy="126" r="78" fill="none" stroke="#d9b16a" stroke-width="2" stroke-dasharray="6 8"/>
+    <text x="126" y="96" fill="#f9d585" font-size="18" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">
+      OFFICIAL
+    </text>
+    <text x="126" y="124" fill="#f9d585" font-size="18" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">
+      SHORTLISTED
+    </text>
+    <text x="126" y="176" fill="#fff9f0" font-size="30" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">
+      GITEX
+    </text>
+    <text x="126" y="214" fill="#fff9f0" font-size="18" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700" letter-spacing="5">
+      AFRICA
+    </text>
+    <text x="126" y="252" fill="#f9d585" font-size="18" font-family="Georgia, Times New Roman, serif" text-anchor="middle" font-style="italic">
+      Morocco
+    </text>
+    <path d="M58 226 L12 316 L82 276 Z" fill="#8b2415"/>
+    <path d="M194 226 L240 316 L170 276 Z" fill="#8b2415"/>
+  </g>
+
+  <g transform="translate(250 1166)">
+    <text x="290" y="0" fill="#f1d8b4" font-size="18" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" letter-spacing="2">
+      UNDER THE AUTHORITY OF
+    </text>
+    <g transform="translate(0 26)">
+      <rect x="0" y="0" width="116" height="92" rx="10" fill="#23070a" stroke="#a66f2d" stroke-width="2"/>
+      <rect x="138" y="0" width="116" height="92" rx="10" fill="#23070a" stroke="#a66f2d" stroke-width="2"/>
+      <rect x="276" y="0" width="116" height="92" rx="10" fill="#23070a" stroke="#a66f2d" stroke-width="2"/>
+      <rect x="414" y="0" width="170" height="92" rx="10" fill="#23070a" stroke="#a66f2d" stroke-width="2"/>
+      <text x="58" y="34" fill="#f5d48d" font-size="14" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">KINGDOM OF</text>
+      <text x="58" y="58" fill="#f5d48d" font-size="14" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">MOROCCO</text>
+      <text x="196" y="46" fill="#f5d48d" font-size="14" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">LOCAL PARTNER</text>
+      <text x="334" y="46" fill="#f5d48d" font-size="14" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">DIGITAL AGENCY</text>
+      <text x="499" y="34" fill="#f5d48d" font-size="14" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">ORGANISED BY</text>
+      <text x="499" y="58" fill="#fff2d2" font-size="26" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">KAOUN</text>
+      <text x="499" y="80" fill="#fff2d2" font-size="14" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">INTERNATIONAL</text>
+    </g>
+  </g>
+
+  <g transform="translate(0 1392)">
+    <text x="540" y="0" fill="#f2dcc0" font-size="24" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700" letter-spacing="2">
+      9 APRIL 2026 | FRONTIER STAGE - HALL 4 | MARRAKECH
+    </text>
+    <text x="540" y="56" fill="#f2dcc0" font-size="18" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+      #GITEXAfrica   #CyberAndAI   #GITEXMorocco
+    </text>
+  </g>
+</svg>
