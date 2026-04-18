@@ -194,7 +194,6 @@ h3 {
 .process-grid,
 .comparison-grid,
 .example-grid,
-.recognition-grid,
 .readiness-grid,
 .link-grid {
   display: grid;
@@ -211,7 +210,6 @@ h3 {
 
 .comparison-grid,
 .example-grid,
-.recognition-grid,
 .readiness-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -291,50 +289,6 @@ h3 {
 .deep-link-card {
   display: grid;
   gap: 14px;
-}
-
-.recognition-poster-card,
-.recognition-copy-card {
-  min-height: 100%;
-  border-radius: 24px;
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(246, 240, 230, 0.84));
-}
-
-.recognition-poster-card {
-  display: block;
-  overflow: hidden;
-  box-shadow: 0 18px 44px rgba(78, 18, 12, 0.18);
-}
-
-.recognition-poster {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.recognition-copy-card {
-  display: grid;
-  gap: 14px;
-  padding: 20px;
-}
-
-.recognition-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.recognition-facts article {
-  padding: 14px 16px;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.62);
-}
-
-.recognition-facts strong {
-  display: block;
-  margin-bottom: 6px;
 }
 
 .warning-card {
@@ -439,7 +393,6 @@ h3 {
   .client-hero,
   .comparison-grid,
   .example-grid,
-  .recognition-grid,
   .readiness-grid,
   .gauge-card {
     grid-template-columns: 1fr;
@@ -466,8 +419,7 @@ h3 {
   .traffic-grid,
   .process-grid,
   .link-grid,
-  .readiness-points,
-  .recognition-facts {
+  .readiness-points {
     grid-template-columns: 1fr;
   }
 

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Trust &amp; Security Stack Control Plane</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-head">
+          <div>
+            <p class="eyebrow" id="hero-eyebrow">Trust &amp; Security Operations Dashboard</p>
+            <h1 id="hero-title">AI Trust &amp; Security Stack Control Plane</h1>
+            <p id="hero-copy" class="hero-copy">
+              Loading governed runtime posture, blocked actions, evidence quality, and launch readiness.
+            </p>
+            <div class="hero-meta" id="hero-meta"></div>
+            <div class="mode-banner-root" id="mode-banner-root"></div>
+          </div>
+          <div class="hero-actions">
+            <a
+              class="hero-action-button"
+              id="live-runtime-link"
+              title="Open the governed live workspace; authentication must already be in place"
+              href="/launch/onyx?path=/app&mode=live&view=embedded"
+            >
+              Open live workspace
+            </a>
+            <a class="hero-action-button" id="client-overview-link" href="/client-overview">Open client overview</a>
+            <button class="hero-action-button" id="refresh-dashboard-button" type="button">
+              Refresh evidence
+            </button>
+          </div>
+        </div>
+        <div class="dashboard-view-root" id="dashboard-view-root"></div>
+        <div class="hero-support-grid">
+          <div class="hero-support-column">
+            <div class="live-session-root" id="live-session-root"></div>
+            <div id="runtime-summary-root"></div>
+          </div>
+          <div class="hero-support-column hero-support-column-compact">
+            <div id="stack-health-root"></div>
+          </div>
+        </div>
+        <div class="hero-steps" id="hero-steps"></div>
+      </header>
+
+      <div id="summary-sheet-root"></div>
+
+      <section class="briefing-panel" aria-labelledby="briefing-title">
+        <div class="section-head">
+          <p class="eyebrow">Command summary</p>
+          <h2 id="briefing-title">Platform State In One Scan</h2>
+          <p class="section-description">
+            Start here for the current safety state, latest access decision, newest request, and strongest proof links.
+          </p>
+        </div>
+        <div id="incident-banner-root"></div>
+        <div id="risk-strip-root"></div>
+        <div id="next-action-root"></div>
+        <div id="walkthrough-root"></div>
+        <div id="compare-root"></div>
+        <div id="briefing-root" class="briefing-grid">
+          <section class="loading-panel">
+            <p class="eyebrow">Loading</p>
+            <h3>Preparing command summary</h3>
+            <p>Gathering mode, launch, evidence, and governed request signals.</p>
+          </section>
+        </div>
+        <div class="command-secondary-grid">
+          <div id="proof-pipeline-root">
+            <section class="loading-panel">
+              <p class="eyebrow">Loading</p>
+              <h3>Preparing latest governed path</h3>
+              <p>Gathering the latest identity, policy, retrieval, secret, trace, and handoff checks.</p>
+            </section>
+          </div>
+          <div class="command-support-column">
+            <div id="reading-guide-root">
+              <section class="loading-panel">
+                <p class="eyebrow">Loading</p>
+                <h3 id="guide-title">How To Read This Dashboard</h3>
+                <p>Preparing the plain-language guide, color legend, and main questions this page answers.</p>
+              </section>
+            </div>
+            <div id="kpi-root">
+              <section class="loading-panel">
+                <p class="eyebrow">Loading</p>
+                <h3 id="kpi-title">Reviewer View And Operator Drilldown</h3>
+                <p>Grouping reviewer-facing proof and operator drill-down sections.</p>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <nav class="tab-strip" id="tab-strip" aria-label="Dashboard sections"></nav>
+
+      <main id="dashboard-root" class="dashboard-root" aria-live="polite">
+        <section class="loading-panel">
+          <p class="eyebrow">Loading</p>
+          <h2>Building dashboard sections</h2>
+          <p>Loading protection coverage, blocked actions, auditability, and governed runtime details.</p>
+        </section>
+      </main>
+
+      <section class="live-log-panel" aria-labelledby="live-log-title">
+        <div class="section-head">
+          <p class="eyebrow">Recent activity</p>
+          <h2 id="live-log-title">Recent Activity And Alerts</h2>
+          <p class="section-description">
+            Live request, alert, and runtime telemetry from the governed stack.
+          </p>
+        </div>
+        <div id="live-log-root" class="live-log-root">
+          <section class="loading-panel">
+            <p class="eyebrow">Loading</p>
+            <h3>Loading recent activity</h3>
+            <p>Waiting for the latest runtime and observability events.</p>
+          </section>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <div>
+          <p class="eyebrow">Control-plane sources</p>
+          <div id="sources" class="source-grid"></div>
+        </div>
+      </footer>
+    </div>
+
+    <noscript>This dashboard needs JavaScript enabled to show governance posture, evidence, and launch readiness.</noscript>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

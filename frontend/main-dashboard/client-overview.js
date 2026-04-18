@@ -1,22 +1,12 @@
 const heroTitle = document.getElementById("client-hero-title");
 const heroCopy = document.getElementById("client-hero-copy");
 const heroMeta = document.getElementById("client-hero-meta");
-const recognitionRoot = document.getElementById("recognition-root");
 const trafficSummaryRoot = document.getElementById("traffic-summary-root");
 const processRoot = document.getElementById("process-root");
 const comparisonRoot = document.getElementById("comparison-root");
 const examplesRoot = document.getElementById("examples-root");
 const readinessRoot = document.getElementById("readiness-root");
 const linksRoot = document.getElementById("links-root");
-
-const RECOGNITION_PROFILE = {
-  title: "GITEX Africa 2026 Rising Star shortlist",
-  person: "Ahmed Amhdour",
-  award: "Cyber & AI Achiever Awards",
-  date: "9 April 2026",
-  venue: "Frontier Stage - Hall 4, Marrakech",
-  imageHref: "/gitex-africa-recognition-proof.svg",
-};
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -102,65 +92,6 @@ function renderHero(payload) {
       <span class="meta-chip">Latest checked request: ${escapeHtml(formatTimestamp(latestRequest.display_fields?.find((field) => field.label === "Time")?.value || latestRequest.fields?.find((field) => field.label === "Timestamp")?.value || payload.generated_at))}</span>
     `;
   }
-}
-
-function renderRecognition(payload) {
-  const readiness = payload.readiness_panel || {};
-  const mode = payload.mode_banner || {};
-  const readinessLabel = clientReadinessLabel(readiness.status_label || "");
-
-  recognitionRoot.innerHTML = `
-    <div class="recognition-grid">
-      <a class="recognition-poster-card" href="${escapeHtml(RECOGNITION_PROFILE.imageHref)}" target="_blank" rel="noreferrer">
-        <img
-          class="recognition-poster"
-          src="${escapeHtml(RECOGNITION_PROFILE.imageHref)}"
-          alt="${escapeHtml(RECOGNITION_PROFILE.title)} poster for ${escapeHtml(RECOGNITION_PROFILE.person)}"
-          loading="lazy"
-        />
-      </a>
-      <article class="recognition-copy-card">
-        <div class="card-topline">
-          <p class="eyebrow">External recognition</p>
-          <span class="${statusClass("neutral")}">Context only</span>
-        </div>
-        <h3>${escapeHtml(RECOGNITION_PROFILE.title)}</h3>
-        <p>
-          This panel adds market-facing recognition context to the client overview while keeping the operational proof
-          separate. It does not change the control results, live evidence, or readiness decision.
-        </p>
-        <div class="recognition-facts">
-          <article>
-            <strong>Recognized person</strong>
-            <p>${escapeHtml(RECOGNITION_PROFILE.person)}</p>
-          </article>
-          <article>
-            <strong>Award track</strong>
-            <p>${escapeHtml(RECOGNITION_PROFILE.award)}</p>
-          </article>
-          <article>
-            <strong>Event date</strong>
-            <p>${escapeHtml(RECOGNITION_PROFILE.date)}</p>
-          </article>
-          <article>
-            <strong>Venue</strong>
-            <p>${escapeHtml(RECOGNITION_PROFILE.venue)}</p>
-          </article>
-        </div>
-        <p class="comparison-note">
-          Current dashboard mode: ${escapeHtml(mode.display_label || mode.label || "Unavailable")}. Current readiness:
-          ${escapeHtml(readinessLabel)}. Those results still come from governed checks and saved proof, not from this
-          recognition panel.
-        </p>
-        <div class="hero-actions">
-          <a class="link-button" href="${escapeHtml(RECOGNITION_PROFILE.imageHref)}" target="_blank" rel="noreferrer">
-            Open full poster
-          </a>
-          <a class="link-button" href="/">Open technical dashboard</a>
-        </div>
-      </article>
-    </div>
-  `;
 }
 
 function renderTrafficSummary(payload) {
@@ -476,7 +407,7 @@ function renderLinks(payload) {
 
 function renderError(error) {
   const message = `Unable to load the client overview. ${error.message || error}`;
-  for (const root of [recognitionRoot, trafficSummaryRoot, processRoot, comparisonRoot, examplesRoot, readinessRoot, linksRoot]) {
+  for (const root of [trafficSummaryRoot, processRoot, comparisonRoot, examplesRoot, readinessRoot, linksRoot]) {
     root.innerHTML = `<section class="loading-card error-card">${escapeHtml(message)}</section>`;
   }
 }
@@ -492,7 +423,6 @@ async function boot() {
     const deniedFlow = deniedResult.status === "fulfilled" ? deniedResult.value : null;
 
     renderHero(payload);
-    renderRecognition(payload);
     renderTrafficSummary(payload);
     renderProcess(payload);
     renderComparison(payload);

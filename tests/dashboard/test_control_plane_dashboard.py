@@ -87,20 +87,16 @@ def test_client_overview_assets_exist_and_reuse_real_dashboard_signals() -> None
     js = Path("frontend/main-dashboard/client-overview.js").read_text(encoding="utf-8")
     css = Path("frontend/main-dashboard/client-overview.css").read_text(encoding="utf-8")
 
-    assert 'id="recognition-root"' in html
     assert 'id="traffic-summary-root"' in html
     assert 'id="process-root"' in html
     assert 'id="examples-root"' in html
     assert "/api/control-plane/overview" in js
-    assert "/gitex-africa-recognition-proof.svg" in js
     assert "/raw/evidence/reviewer/inspectable-live-runtime/allowed-flow.json" in js
     assert "/raw/evidence/reviewer/inspectable-live-runtime/denied-flow.json" in js
     assert "evidence_freshness" in js
     assert "reviewer_evidence_bundle" in js
-    assert ".recognition-grid" in css
     assert ".comparison-grid" in css
     assert ".gauge" in css
-    assert Path("frontend/main-dashboard/gitex-africa-recognition-proof.svg").exists()
 
 
 def test_static_router_supports_client_overview_entrypoint() -> None:
