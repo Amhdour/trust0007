@@ -37,49 +37,32 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="hero-title"' in html
     assert 'id="hero-copy"' in html
     assert 'id="hero-eyebrow"' in html
-    assert 'id="dashboard-view-root"' in html
-    assert 'id="summary-sheet-root"' in html
-    assert 'id="briefing-root"' in html
-    assert 'id="mode-banner-root"' in html
+    assert 'id="homepage-panels-root"' in html
+    assert 'id="trust-scorecard-root"' in html
+    assert 'id="secondary-context-root"' in html
     assert 'id="live-runtime-link"' in html
-    assert 'id="live-session-root"' in html
-    assert 'id="runtime-summary-root"' in html
-    assert 'id="stack-health-root"' in html
-    assert "Open live workspace" in html
+    assert 'id="view-evidence-link"' in html
+    assert "Open Onyx" in html
     assert "/launch/onyx?path=/app&mode=live&view=embedded" in html
-    assert 'id="incident-banner-root"' in html
-    assert 'id="risk-strip-root"' in html
-    assert 'id="next-action-root"' in html
-    assert 'id="walkthrough-root"' in html
-    assert 'id="compare-root"' in html
-    assert 'id="proof-pipeline-root"' in html
-    assert 'id="client-overview-link"' in html
-    assert 'id="reading-guide-root"' in html
+    assert 'id="tab-strip"' in html
+    assert 'id="dashboard-root"' in html
     assert "payload.title" in js
-    assert "payload.landing_steps" in js
-    assert "payload.mode_banner" in js
-    assert "payload.command_center" in js
-    assert "payload.stack_health" in js
-    assert "incident_banner" in js
-    assert "risk_strip" in js
-    assert "next_action" in js
-    assert "walkthrough" in js
-    assert "example_compare" in js
-    assert "presentation_summary" in js
-    assert "runtime_summary" in js
-    assert "freshness-strip" in js
-    assert "proof_pipeline" in js
-    assert "dashboardViewMode" in js
-    assert "dashboard-view" in js
-    assert "modeBanner.disclosure_label" in js
-    assert "modeBanner.status_label" in js
-    assert "live-log-source-filter" in js
-    assert "data-live-log-status" in js
-    assert "payload.reading_guide" in js
-    assert "payload.audience_paths" in js
-    assert "block.collapsed" in js
+    assert "payload.readiness" in js
+    assert "payload.trust_proof" in js
+    assert "payload.security_posture" in js
+    assert "renderHomepagePanels" in js
+    assert "renderTrustScorecard" in js
+    assert "renderSecondaryContext" in js
+    assert "renderDecisionHero" in js
+    assert "renderDrilldownTabs" in js
+    assert "ACTIVE_DRILLDOWN_SECTION_IDS" in js
+    assert "Onyx Readiness" in js
+    assert "Trust Proof" in js
+    assert "Security Posture" in js
+    assert "readiness.decision" in js
+    assert "trustProof.identity_proven" in js
+    assert "security.blocked_actions_count" in js
     assert "/api/control-plane/overview" in js
-    assert "External identity required" in js
 
 
 def test_client_overview_assets_exist_and_reuse_real_dashboard_signals() -> None:
@@ -161,14 +144,35 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
     assert payload["command_center"]["freshness_bar"]["items"][0]["label"] == "Updated"
     assert payload["command_center"]["presentation_summary"]["export_text"]
     assert len(payload["command_center"]["proof_pipeline"]["steps"]) == 6
-    assert payload["command_center"]["proof_pipeline"]["meta_badges"]
-    assert payload["command_center"]["proof_pipeline"]["steps"][0]["meta_badges"]
     assert payload["mode_banner"]["consequences"]
     assert len(payload["audience_paths"]) == 2
     assert len(payload["operator_briefing"]) == 5
     assert len(payload["kpis"]) >= 10
     assert payload["readiness_panel"]["status_label"] in {"GO", "CONDITIONAL", "NO-GO"}
     assert payload["data_mode"]["label"]
+    assert payload["readiness"]["decision"] in {"GO", "CONDITIONAL_GO", "NO_GO"}
+    assert isinstance(payload["readiness"]["readiness_score"], int)
+    assert payload["readiness"]["latest_handoff_decision"] in {"ALLOW", "DENY"}
+    assert set(payload["trust_proof"]) >= {
+        "identity_proven",
+        "policy_proven",
+        "retrieval_proven",
+        "tool_governance_proven",
+        "audit_proven",
+        "evidence_freshness",
+        "launch_report_available",
+        "governed_flow_summary_available",
+        "reviewer_bundle_available",
+    }
+    assert set(payload["security_posture"]) >= {
+        "denied_events_count",
+        "blocked_actions_count",
+        "confirmation_required_count",
+        "retrieval_denials_count",
+        "tool_denials_count",
+        "failing_controls",
+        "residual_risk_count",
+    }
 
 
 def test_dashboard_payload_includes_runtime_summary_and_stack_health() -> None:
@@ -226,39 +230,47 @@ def test_dashboard_tabs_and_sections_have_reviewer_operator_grouping() -> None:
     tab_groups = {tab["group_label"] for tab in payload["tabs"]}
     section_groups = {section["group_label"] for section in payload["sections"]}
 
-    assert {"Plain-Language Review", "Technical Details"} <= tab_groups
-    assert {"Plain-Language Review", "Technical Details"} <= section_groups
+    assert {"Homepage Decision", "Evidence Drill-Down"} <= tab_groups
+    assert {"Homepage Decision", "Evidence Drill-Down"} <= section_groups
 
 
-def test_dashboard_includes_upstream_integration_posture_section() -> None:
+def test_dashboard_sections_match_slim_contract_ids() -> None:
     payload = build_control_plane_dashboard()
+    section_ids = {section["id"] for section in payload["sections"]}
+    assert section_ids == {
+        "launch-gate",
+        "entry-points",
+        "policy-enforcement",
+        "retrieval-boundaries",
+        "tool-mcp-governance",
+        "audit-replay",
+    }
 
-    upstream_section = next(section for section in payload["sections"] if section["id"] == "upstream-posture")
-    cards_block = next(block for block in upstream_section["blocks"] if block["type"] == "cards")
-    records_block = next(block for block in upstream_section["blocks"] if block["type"] == "records")
-    table_block = next(block for block in upstream_section["blocks"] if block["type"] == "table")
-    links_block = next(block for block in upstream_section["blocks"] if block["type"] == "links")
 
-    labels = {item["label"] for item in cards_block["items"]}
-    assert {"Used now", "Partially used", "Inventory coverage", "Snapshot provenance", "Mandatory path components"} <= labels
-    assert any(row["component"] == "Onyx" and row["classification"] == "used_now" for row in table_block["rows"])
-    onyx_row = next(row for row in table_block["rows"] if row["component"] == "Onyx")
-    assert onyx_row["live_surface"]
-    assert len(table_block["rows"]) <= 5
-    assert table_block["collapsed"] is True
-    assert any(column["key"] == "path_status" for column in table_block["columns"])
-    assert any(column["key"] == "checkout" for column in table_block["columns"])
-    assert any(column["key"] == "validated" for column in table_block["columns"])
-    assert any(column["key"] == "source_pin" for column in table_block["columns"])
-    assert any(column["key"] == "live_surface" for column in table_block["columns"])
-    onyx_record = next(item for item in records_block["items"] if item["title"] == "Onyx")
-    assert "/launch/onyx?path=" in onyx_record["href"]
-    assert "Live runtime URL:" in onyx_record["detail"]
-    link_labels = {item["label"] for item in links_block["items"]}
-    assert "Onyx governed entry" in link_labels
-    assert "Onyx live runtime" in link_labels
-    assert any(item["label"] == "Upstream usage API" for item in links_block["items"])
-    assert any(item["label"] == "Upstream source lock" for item in links_block["items"])
+def test_dashboard_regression_homepage_does_not_require_legacy_section_ids(monkeypatch) -> None:
+    minimal_contract = {
+        "title": "Onyx Readiness Dashboard",
+        "subtitle": "Decision surface",
+        "hero_copy": "Decision-first",
+        "landing_steps": [],
+        "repo_description_suggestion": "Decision-first",
+        "tabs": [
+            {"id": "launch-gate", "label": "Readiness", "group": "reviewer", "group_label": "Homepage Decision"},
+            {"id": "audit-replay", "label": "Audit Replay", "group": "operator", "group_label": "Evidence Drill-Down"},
+        ],
+        "sections": [
+            {"id": "launch-gate", "title": "Onyx Readiness", "description": "Readiness detail", "group": "reviewer", "group_label": "Homepage Decision"},
+            {"id": "audit-replay", "title": "Audit and Replay", "description": "Audit detail", "group": "operator", "group_label": "Evidence Drill-Down"},
+        ],
+    }
+    monkeypatch.setattr(posture_service_module, "load_dashboard_contract", lambda resolved_root: minimal_contract)
+
+    payload = build_control_plane_dashboard()
+    ids = [section["id"] for section in payload["sections"]]
+    assert ids == ["launch-gate", "audit-replay"]
+    assert "readiness" in payload
+    assert "trust_proof" in payload
+    assert "security_posture" in payload
 
 
 def test_upstream_usage_inventory_is_machine_readable() -> None:
@@ -357,31 +369,23 @@ def test_runtime_policy_bundle_falls_back_when_overlay_is_missing() -> None:
         assert bundle.document["tools"]["allowed_tools"] == ["search"]
 
 
-def test_blocked_actions_section_includes_reason_codes() -> None:
+def test_security_posture_surfaces_denial_and_block_counts() -> None:
     payload = build_control_plane_dashboard()
-    blocked = next(section for section in payload["sections"] if section["id"] == "blocked-actions")
+    posture = payload["security_posture"]
 
-    records_block = next(block for block in blocked["blocks"] if block["type"] == "records")
-    table_block = next(block for block in blocked["blocks"] if block["type"] == "table")
-
-    assert records_block["items"]
-    assert any(column["key"] == "reason" for column in table_block["columns"])
-    assert any(column["key"] == "request" for column in table_block["columns"])
-    assert any(row["reason"] for row in table_block["rows"])
+    assert posture["denied_events_count"] >= 0
+    assert posture["blocked_actions_count"] >= 0
+    assert posture["confirmation_required_count"] >= 0
+    assert posture["retrieval_denials_count"] >= 0
+    assert posture["tool_denials_count"] >= 0
+    assert posture["residual_risk_count"] >= 0
+    assert isinstance(posture["failing_controls"], list)
 
 
 def test_dashboard_surfaces_flagship_denied_onyx_proof_and_audit_source() -> None:
     payload = build_control_plane_dashboard()
 
-    blocked = next(section for section in payload["sections"] if section["id"] == "blocked-actions")
     audit = next(section for section in payload["sections"] if section["id"] == "audit-replay")
-
-    blocked_record_titles = {
-        item["title"]
-        for block in blocked["blocks"]
-        if block["type"] == "records"
-        for item in block["items"]
-    }
     audit_card_labels = {
         item["label"]
         for block in audit["blocks"]
@@ -390,22 +394,24 @@ def test_dashboard_surfaces_flagship_denied_onyx_proof_and_audit_source() -> Non
     }
 
     assert payload["command_center"]["flagship_proof"]["title"] == "Denied /launch/onyx handoff"
-    assert "Flagship denied Onyx handoff proof" in blocked_record_titles
+    assert payload["security_posture"]["blocked_actions_count"] >= 0
     assert "Audit record source" in audit_card_labels
 
 
-def test_heavy_homepage_tables_are_reduced_to_summary_slices() -> None:
+def test_removed_legacy_sections_are_not_emitted_on_homepage() -> None:
     payload = build_control_plane_dashboard()
-
-    capped_sections = {"governed-requests", "blocked-actions", "upstream-posture", "asset-coverage", "evidence-integrity"}
-    for section in payload["sections"]:
-        if section["id"] not in capped_sections:
-            continue
-        for block in section["blocks"]:
-            if block["type"] == "table":
-                assert len(block["rows"]) <= 5
-                assert block["collapsed"] is True
-                assert block["summary"]
+    section_ids = {section["id"] for section in payload["sections"]}
+    assert {
+        "overview",
+        "governed-requests",
+        "blocked-actions",
+        "upstream-posture",
+        "identity-session",
+        "secret-access",
+        "trace-correlation",
+        "asset-coverage",
+        "evidence-integrity",
+    }.isdisjoint(section_ids)
 
 
 def test_contract_files_present() -> None:

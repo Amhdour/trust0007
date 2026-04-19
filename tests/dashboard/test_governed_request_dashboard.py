@@ -135,8 +135,12 @@ def _run_flow(
     )
 
 
-def _governed_request_section(payload: dict[str, object]) -> dict[str, object]:
-    return next(section for section in payload["sections"] if section["id"] == "governed-requests")
+def _latest_governed_request(payload: dict[str, object]) -> dict[str, object]:
+    command_center = payload.get("command_center", {})
+    if not isinstance(command_center, dict):
+        return {}
+    latest_request = command_center.get("latest_request", {})
+    return latest_request if isinstance(latest_request, dict) else {}
 
 
 def test_dashboard_shows_sanitized_governed_request_preview(tmp_path: Path) -> None:
@@ -149,13 +153,12 @@ def test_dashboard_shows_sanitized_governed_request_preview(tmp_path: Path) -> N
     )
 
     payload = build_control_plane_dashboard(root)
-    section = _governed_request_section(payload)
-    table = next(block for block in section["blocks"] if block["type"] == "table")
+    latest_request = _latest_governed_request(payload)
 
-    assert table["rows"]
-    assert table["rows"][0]["question"].startswith("Summarize governed launch readiness blockers")
-    assert table["rows"][0]["mode"] == "demo"
-    assert table["rows"][0]["handoff"] == "ALLOW"
+    assert latest_request["title"].startswith("Summarize governed launch readiness blockers")
+    fields = {field["label"]: field["value"] for field in latest_request.get("display_fields", [])}
+    assert fields["Proof mode"] == "Demo"
+    assert fields["Decision"] == "Allowed"
 
 
 def test_dashboard_redacts_sensitive_request_preview_and_keeps_secret_out_of_payload(tmp_path: Path) -> None:
@@ -169,8 +172,8 @@ def test_dashboard_redacts_sensitive_request_preview_and_keeps_secret_out_of_pay
     )
 
     payload = build_control_plane_dashboard(root)
-    section = _governed_request_section(payload)
-    dashboard_text = json.dumps(section)
+    latest_request = _latest_governed_request(payload)
+    dashboard_text = json.dumps(latest_request)
     feed_text = (artifact_dir / "governed-request-feed.json").read_text(encoding="utf-8")
 
     assert "[REDACTED" in dashboard_text

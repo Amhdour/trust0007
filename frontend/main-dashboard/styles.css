@@ -2690,3 +2690,121 @@ body[data-dashboard-view="runtime"] .hero-copy {
     grid-template-columns: 1fr;
   }
 }
+
+.decision-panels-root {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.decision-panel {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.decision-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.decision-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.decision-list li span {
+  color: var(--muted);
+}
+
+.decision-links {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.decision-failing-controls {
+  margin-top: 12px;
+}
+
+.decision-failing-controls ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.compact-drilldown-nav .tab-strip-head {
+  margin-bottom: 8px;
+}
+
+.live-log-panel-compact {
+  margin-top: 18px;
+  opacity: 0.85;
+}
+
+.trust-scorecard-panel {
+  border: 1px solid rgba(15, 108, 94, 0.2);
+  box-shadow: 0 8px 20px rgba(16, 33, 45, 0.08);
+}
+
+.trust-scorecard-wrap {
+  overflow-x: auto;
+}
+
+.trust-scorecard-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 780px;
+}
+
+.trust-scorecard-table th,
+.trust-scorecard-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.trust-scorecard-table th {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.trust-scorecard-table td:last-child {
+  max-width: 320px;
+  color: var(--muted);
+}
+
+.secondary-context-links {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.secondary-context-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.live-log-disclosure {
+  margin-top: 12px;
+}
+
+.live-log-disclosure > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 1024px) {
+  .decision-panels-root {
+    grid-template-columns: 1fr;
+  }
+}

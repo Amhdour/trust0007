@@ -4,6 +4,7 @@ const heroEyebrow = document.getElementById("hero-eyebrow");
 const heroTitle = document.getElementById("hero-title");
 const heroCopy = document.getElementById("hero-copy");
 const heroMeta = document.getElementById("hero-meta");
+// Legacy roots retained as no-op placeholders while cleanup converges.
 const dashboardViewRoot = document.getElementById("dashboard-view-root");
 const liveSessionRoot = document.getElementById("live-session-root");
 const runtimeSummaryRoot = document.getElementById("runtime-summary-root");
@@ -22,35 +23,26 @@ const readingGuideRoot = document.getElementById("reading-guide-root");
 const kpiRoot = document.getElementById("kpi-root");
 const sourcesRoot = document.getElementById("sources");
 const liveLogRoot = document.getElementById("live-log-root");
+const trustScorecardRoot = document.getElementById("trust-scorecard-root");
+const secondaryContextRoot = document.getElementById("secondary-context-root");
 const liveRuntimeLink = document.getElementById("live-runtime-link");
-const clientOverviewLink = document.getElementById("client-overview-link");
+const viewEvidenceLink = document.getElementById("view-evidence-link");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
 
 const LIVE_LOG_LIMIT = 6;
 const DEFAULT_LIVE_LOG_POLL_MS = 5000;
 const SECTION_SCROLL_OFFSET_PX = 152;
-const DASHBOARD_VIEW_STORAGE_KEY = "controlPlaneDashboardView";
-const DASHBOARD_VIEW_MODES = {
-  executive: {
-    label: "Executive",
-    description: "Posture, blocker, next step, and reviewer-friendly proof only.",
-  },
-  operator: {
-    label: "Operator",
-    description: "Full control-plane briefing with reviewer and technical lanes.",
-  },
-  runtime: {
-    label: "Live Runtime",
-    description: "Focus on the live workspace path, runtime proof, and current activity.",
-  },
-};
-const RUNTIME_SECTION_IDS = new Set([
+const DASHBOARD_VIEW_MODES = { operator: { label: "Operator" } };
+// Keep a single source of truth for visible drill-down sections:
+// the homepage is for readiness/trust/security decisioning, while deeper
+// diagnostics remain secondary.
+const ACTIVE_DRILLDOWN_SECTION_IDS = new Set([
+  "launch-gate",
   "entry-points",
-  "governed-requests",
-  "identity-session",
-  "audit-replay",
-  "trace-correlation",
   "policy-enforcement",
+  "retrieval-boundaries",
+  "tool-mcp-governance",
+  "audit-replay",
 ]);
 let liveLogTimer = 0;
 let activeTabTarget = "";
@@ -363,107 +355,17 @@ function applyChangeHighlights() {
   }, 4200);
 }
 
-function resolveInitialDashboardViewMode() {
-  const params = new URLSearchParams(window.location.search);
-  const view = params.get("view");
-  if (view === "presentation") {
-    return "executive";
-  }
-  if (view === "full") {
-    return "operator";
-  }
-  if (view && DASHBOARD_VIEW_MODES[view]) {
-    return view;
-  }
-
-  try {
-    const stored = window.localStorage.getItem(DASHBOARD_VIEW_STORAGE_KEY);
-    if (stored && DASHBOARD_VIEW_MODES[stored]) {
-      return stored;
-    }
-  } catch {
-    return "operator";
-  }
-  return "operator";
-}
-
-function renderDashboardViewModes() {
-  if (!dashboardViewRoot) {
-    return;
-  }
-
-  dashboardViewRoot.innerHTML = `
-    <section class="dashboard-view-card">
-      <div class="dashboard-view-head">
-        <div>
-          <p class="eyebrow">View mode</p>
-          <h2>Choose the lens</h2>
-        </div>
-      </div>
-      <div class="dashboard-view-switch" role="tablist" aria-label="Dashboard view modes">
-        ${Object.entries(DASHBOARD_VIEW_MODES)
-          .map(
-            ([mode, config]) => `
-              <button
-                class="dashboard-view-button${dashboardViewMode === mode ? " is-active" : ""}"
-                type="button"
-                role="tab"
-                aria-selected="${dashboardViewMode === mode ? "true" : "false"}"
-                data-dashboard-view="${escapeHtml(mode)}"
-              >
-                <strong>${escapeHtml(config.label)}</strong>
-                <span>${escapeHtml(config.description)}</span>
-              </button>
-            `,
-          )
-          .join("")}
-      </div>
-    </section>
-  `;
-
-  for (const button of dashboardViewRoot.querySelectorAll("[data-dashboard-view]")) {
-    button.addEventListener("click", () => {
-      setDashboardViewMode(button.dataset.dashboardView || "operator");
-    });
-  }
-}
-
-function setDashboardViewMode(mode) {
-  dashboardViewMode = DASHBOARD_VIEW_MODES[mode] ? mode : "operator";
-  presentationModeEnabled = dashboardViewMode === "executive";
-  document.body.classList.toggle("presentation-mode", presentationModeEnabled);
-  document.body.dataset.dashboardView = dashboardViewMode;
-  renderDashboardViewModes();
-
-  try {
-    window.localStorage.setItem(DASHBOARD_VIEW_STORAGE_KEY, dashboardViewMode);
-  } catch {
-    // Ignore storage failures and keep the in-memory toggle working.
-  }
-
-  if (lastOverviewPayload) {
-    renderDashboardPayload(lastOverviewPayload);
-  }
-  scheduleActiveTabSync();
-}
-
 function isExecutiveView() {
-  return dashboardViewMode === "executive";
+  return false;
 }
 
 function isRuntimeView() {
-  return dashboardViewMode === "runtime";
+  return false;
 }
 
 function visibleSectionsForView(sections) {
   const items = Array.isArray(sections) ? sections : [];
-  if (isExecutiveView()) {
-    return items.filter((section) => section.group === "reviewer" && section.id !== "upstream-posture");
-  }
-  if (isRuntimeView()) {
-    return items.filter((section) => RUNTIME_SECTION_IDS.has(section.id));
-  }
-  return items;
+  return items.filter((section) => ACTIVE_DRILLDOWN_SECTION_IDS.has(section?.id));
 }
 
 function sectionSearchText(section) {
@@ -485,13 +387,7 @@ function filteredSectionsForView(sections) {
 
 function visibleTabsForView(tabs) {
   const items = Array.isArray(tabs) ? tabs : [];
-  if (isExecutiveView()) {
-    return items.filter((tab) => tab.group === "reviewer" && tab.id !== "upstream-posture");
-  }
-  if (isRuntimeView()) {
-    return items.filter((tab) => RUNTIME_SECTION_IDS.has(tab.id));
-  }
-  return items;
+  return items.filter((tab) => ACTIVE_DRILLDOWN_SECTION_IDS.has(tab?.id));
 }
 
 function filteredTabsForView(tabs, sections = []) {
@@ -659,7 +555,7 @@ function renderSectionsEmptyState() {
 }
 
 function renderHero(payload) {
-  const defaultTitle = payload.title || "AI Trust & Security Stack Control Plane";
+  const defaultTitle = payload.title || "Onyx Readiness Dashboard";
   const defaultCopy = `${payload.subtitle ? `${payload.subtitle} ` : ""}${payload.hero_copy || ""}`.trim();
   const presenterTitle = "AI Trust & Security Review Brief";
   const presenterCopy =
@@ -673,7 +569,7 @@ function renderHero(payload) {
       ? "Executive review mode"
       : isRuntimeView()
         ? "Live runtime focus"
-        : "Trust & Security Operations Dashboard";
+        : "Onyx Readiness Dashboard";
   }
 
   if (heroTitle) {
@@ -2221,26 +2117,302 @@ async function loadLiveLog() {
 }
 
 function renderDashboardPayload(payload) {
-  renderDashboardViewModes();
-  renderHero(payload);
-  renderAccessRequirements(payload);
-  renderSummarySheet(payload.command_center?.presentation_summary || {});
-  renderRuntimeSummary(payload.command_center?.runtime_summary || {});
-  renderStackHealth(payload.stack_health || {});
-  renderModeBanner(payload.mode_banner || {});
-  renderIncidentBanner(payload.command_center?.incident_banner || {});
-  renderRiskStrip(payload.command_center?.risk_strip || {});
-  renderNextAction(payload.command_center?.next_action || {});
-  renderWalkthrough(payload.command_center?.walkthrough || []);
-  renderCompareView(payload.command_center?.example_compare || {});
-  renderBriefing(payload.command_center || {});
-  renderProofPipeline(payload.command_center?.proof_pipeline || {});
-  renderReadingGuide(payload.reading_guide || {});
-  renderKpis(payload.audience_paths || []);
-  renderSections(payload.sections);
-  renderTabs(payload.tabs, payload.command_center?.freshness_bar || {});
+  renderDecisionHero(payload);
+  renderHomepagePanels(payload);
+  renderTrustScorecard(payload);
+  renderSecondaryContext(payload);
+  renderSections((Array.isArray(payload.sections) ? payload.sections : []).filter((section) => ACTIVE_DRILLDOWN_SECTION_IDS.has(section?.id)));
+  renderDrilldownTabs(payload.tabs);
   renderSources(payload.sources);
   applyChangeHighlights();
+}
+
+function renderSecondaryContext(payload) {
+  if (!secondaryContextRoot) {
+    return;
+  }
+
+  const sources = Array.isArray(payload.sources) ? payload.sources : [];
+  const sourceById = (id) => sources.find((item) => item?.id === id);
+
+  const contextLinks = [
+    { label: "Client Overview", href: "/client-overview", detail: "Non-technical explanation layer." },
+    { label: "Connected systems inventory", href: "/api/control-plane/upstream-usage", detail: "Machine-readable upstream posture inventory." },
+    {
+      label: sourceById("dashboard_ingestion_feed")?.label || "Dashboard ingestion feed",
+      href: sourceById("dashboard_ingestion_feed")?.href || "",
+      detail: sourceById("dashboard_ingestion_feed")?.description || "Supporting export feed.",
+    },
+    {
+      label: sourceById("governed_event_feed")?.label || "Governed event feed",
+      href: sourceById("governed_event_feed")?.href || "",
+      detail: sourceById("governed_event_feed")?.description || "Underlying event stream.",
+    },
+  ];
+
+  secondaryContextRoot.innerHTML = `
+    <div class="decision-links secondary-context-links">
+      ${contextLinks
+        .map((item) => {
+          if (!item.href) {
+            return `<span>${escapeHtml(item.label)} — ${escapeHtml(item.detail)}</span>`;
+          }
+          return `<a href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a><span class="secondary-context-note">${escapeHtml(item.detail)}</span>`;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function latestCheckedLabelFromBadges(metaBadges = []) {
+  const checkedBadge = (Array.isArray(metaBadges) ? metaBadges : []).find((badge) => badge?.kind === "timestamp");
+  return checkedBadge?.value ? formatTimestamp(checkedBadge.value) : "Unavailable";
+}
+
+function renderTrustScorecard(payload) {
+  if (!trustScorecardRoot) {
+    return;
+  }
+
+  const trustProof = payload.trust_proof || {};
+  const readiness = payload.readiness || {};
+  const commandCenter = payload.command_center || {};
+  const proofPipeline = commandCenter.proof_pipeline || {};
+  const pipelineSteps = Array.isArray(proofPipeline.steps) ? proofPipeline.steps : [];
+  const evidenceLinks = Array.isArray(payload.sources) ? payload.sources : [];
+
+  const findStep = (label) => pipelineSteps.find((step) => String(step?.label || "").toLowerCase().includes(label));
+  const findSource = (id) => evidenceLinks.find((item) => item?.id === id);
+
+  const statusLabel = (proven) => (proven ? "PASS" : "CHECK");
+  const rowStatusClass = (proven) => (proven ? "healthy" : "warning");
+
+  const launchReport = findSource("launch_report");
+  const governedFlow = findSource("governed_flow_summary");
+  const reviewerBundle = findSource("reviewer_evidence_bundle");
+
+  const rows = [
+    {
+      control: "Identity",
+      proven: Boolean(trustProof.identity_proven),
+      lastChecked: latestCheckedLabelFromBadges(findStep("identity")?.meta_badges || []),
+      proofLabel: findStep("identity")?.label || "Identity step",
+      proofHref: findStep("identity")?.href || "",
+      blocker: trustProof.identity_proven ? "" : "Identity proof is missing or incomplete.",
+    },
+    {
+      control: "Policy",
+      proven: Boolean(trustProof.policy_proven),
+      lastChecked: latestCheckedLabelFromBadges(findStep("policy")?.meta_badges || []),
+      proofLabel: findStep("policy")?.label || "Policy step",
+      proofHref: findStep("policy")?.href || "",
+      blocker: trustProof.policy_proven ? "" : "Policy enforcement proof is missing or incomplete.",
+    },
+    {
+      control: "Retrieval",
+      proven: Boolean(trustProof.retrieval_proven),
+      lastChecked: latestCheckedLabelFromBadges(findStep("retrieval")?.meta_badges || []),
+      proofLabel: findStep("retrieval")?.label || "Retrieval step",
+      proofHref: findStep("retrieval")?.href || "",
+      blocker: trustProof.retrieval_proven ? "" : "Retrieval boundary proof is missing or incomplete.",
+    },
+    {
+      control: "Tool Governance",
+      proven: Boolean(trustProof.tool_governance_proven),
+      lastChecked: latestCheckedLabelFromBadges(findStep("tool")?.meta_badges || []),
+      proofLabel: "Tool / MCP governance",
+      proofHref: "#tool-mcp-governance",
+      blocker: trustProof.tool_governance_proven ? "" : "Tool governance checks need review.",
+    },
+    {
+      control: "Audit",
+      proven: Boolean(trustProof.audit_proven),
+      lastChecked: latestCheckedLabelFromBadges(findStep("audit")?.meta_badges || []),
+      proofLabel: reviewerBundle?.label || "Reviewer bundle",
+      proofHref: reviewerBundle?.href || "#audit-replay",
+      blocker: trustProof.audit_proven ? "" : "Audit linkage or records are incomplete.",
+    },
+    {
+      control: "Launch Gate",
+      proven: String(readiness.decision || "").toUpperCase() === "GO",
+      lastChecked: formatTimestamp(readiness.last_updated),
+      proofLabel: launchReport?.label || governedFlow?.label || "Launch evidence",
+      proofHref: launchReport?.href || governedFlow?.href || "#launch-gate",
+      blocker:
+        String(readiness.decision || "").toUpperCase() === "GO"
+          ? ""
+          : (readiness.top_blocker || "Launch gate has unresolved blockers."),
+    },
+  ];
+
+  trustScorecardRoot.innerHTML = `
+    <div class="trust-scorecard-wrap">
+      <table class="trust-scorecard-table">
+        <thead>
+          <tr>
+            <th>Control</th>
+            <th>Status</th>
+            <th>Last checked</th>
+            <th>Proof</th>
+            <th>Blocker / reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map(
+              (row) => `
+                <tr>
+                  <td>${escapeHtml(row.control)}</td>
+                  <td><span class="${statusClass(rowStatusClass(row.proven))}">${escapeHtml(statusLabel(row.proven))}</span></td>
+                  <td>${escapeHtml(row.lastChecked || "Unavailable")}</td>
+                  <td>${
+                    row.proofHref
+                      ? `<a href="${escapeHtml(row.proofHref)}">${escapeHtml(row.proofLabel || "Evidence")}</a>`
+                      : `<span>${escapeHtml(row.proofLabel || "Unavailable")}</span>`
+                  }</td>
+                  <td>${escapeHtml(row.blocker || "None")}</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderDecisionHero(payload) {
+  if (heroEyebrow) {
+    heroEyebrow.textContent = "Onyx Decision Surface";
+  }
+  if (heroTitle) {
+    heroTitle.textContent = payload.title || "Onyx Readiness Dashboard";
+  }
+  if (heroCopy) {
+    heroCopy.textContent = payload.subtitle || "Trust, Security, and Launch Posture for Governed Onyx Runtime.";
+  }
+
+  const readiness = payload.readiness || {};
+  const topBlocker = readiness.top_blocker || "No blocker listed.";
+  const evidenceMode = readiness.evidence_mode || "unavailable";
+  const score = readiness.readiness_score ?? "n/a";
+  const decision = readiness.decision || "UNKNOWN";
+
+  if (heroMeta) {
+    heroMeta.innerHTML = `
+      <span class="${statusClass(payload.data_mode?.status || "neutral")}">${escapeHtml(decision)}</span>
+      <span class="chip">Score ${escapeHtml(String(score))}</span>
+      <span class="chip">Top blocker: ${escapeHtml(topBlocker)}</span>
+      <span class="chip">Evidence mode: ${escapeHtml(String(evidenceMode).toUpperCase())}</span>
+    `;
+  }
+
+  if (liveRuntimeLink) {
+    liveRuntimeLink.textContent = "Open Onyx";
+  }
+  if (viewEvidenceLink) {
+    viewEvidenceLink.setAttribute("href", "#dashboard-root");
+  }
+}
+
+function renderHomepagePanels(payload) {
+  const panelRoot = document.getElementById("homepage-panels-root");
+  if (!panelRoot) {
+    return;
+  }
+
+  const readiness = payload.readiness || {};
+  const trust = payload.trust_proof || {};
+  const security = payload.security_posture || {};
+  const fallbackFailingControls = Array.isArray(security.failing_controls) && security.failing_controls.length
+    ? security.failing_controls
+    : [{ control: "none", summary: "No failing controls listed." }];
+
+  const trustRow = (label, value) => `
+    <li><span>${escapeHtml(label)}</span><strong>${escapeHtml(String(value))}</strong></li>
+  `;
+
+  panelRoot.innerHTML = `
+    <article class="decision-panel">
+      <p class="eyebrow">Panel A</p>
+      <h3>Onyx Readiness</h3>
+      <ul class="decision-list">
+        <li><span>Decision</span><strong>${escapeHtml(readiness.decision || "UNKNOWN")}</strong></li>
+        <li><span>Readiness score</span><strong>${escapeHtml(String(readiness.readiness_score ?? "n/a"))}</strong></li>
+        <li><span>Latest handoff</span><strong>${escapeHtml(readiness.latest_handoff_decision || "UNKNOWN")}</strong></li>
+        <li><span>Evidence mode</span><strong>${escapeHtml(String(readiness.evidence_mode || "unavailable").toUpperCase())}</strong></li>
+        <li><span>Top blocker</span><strong>${escapeHtml(readiness.top_blocker || "No blocker listed.")}</strong></li>
+        <li><span>Last updated</span><strong>${escapeHtml(formatTimestamp(readiness.last_updated))}</strong></li>
+      </ul>
+    </article>
+    <article class="decision-panel">
+      <p class="eyebrow">Panel B</p>
+      <h3>Trust Proof</h3>
+      <ul class="decision-list">
+        ${trustRow("Identity", trust.identity_proven ? "Proven" : "Missing")}
+        ${trustRow("Policy", trust.policy_proven ? "Proven" : "Missing")}
+        ${trustRow("Retrieval", trust.retrieval_proven ? "Proven" : "Missing")}
+        ${trustRow("Tool governance", trust.tool_governance_proven ? "Proven" : "Missing")}
+        ${trustRow("Audit", trust.audit_proven ? "Proven" : "Missing")}
+        ${trustRow("Evidence freshness", trust.evidence_freshness || "Unavailable")}
+      </ul>
+      <div class="decision-links">
+        ${trust.governed_flow_summary_available ? '<a href="#entry-points">Governed flow summary</a>' : '<span>Governed flow summary unavailable</span>'}
+        ${trust.launch_report_available ? '<a href="#launch-gate">Launch report</a>' : '<span>Launch report unavailable</span>'}
+        ${trust.reviewer_bundle_available ? '<a href="#audit-replay">Reviewer bundle</a>' : '<span>Reviewer bundle unavailable</span>'}
+      </div>
+    </article>
+    <article class="decision-panel">
+      <p class="eyebrow">Panel C</p>
+      <h3>Security Posture</h3>
+      <ul class="decision-list">
+        <li><span>Blocked actions</span><strong>${escapeHtml(String(security.blocked_actions_count ?? 0))}</strong></li>
+        <li><span>Denied events</span><strong>${escapeHtml(String(security.denied_events_count ?? 0))}</strong></li>
+        <li><span>Confirmation required</span><strong>${escapeHtml(String(security.confirmation_required_count ?? 0))}</strong></li>
+        <li><span>Retrieval denials</span><strong>${escapeHtml(String(security.retrieval_denials_count ?? 0))}</strong></li>
+        <li><span>Tool denials</span><strong>${escapeHtml(String(security.tool_denials_count ?? 0))}</strong></li>
+        <li><span>Residual risks</span><strong>${escapeHtml(String(security.residual_risk_count ?? 0))}</strong></li>
+      </ul>
+      <div class="decision-failing-controls">
+        <p class="metric-label">Top failing controls</p>
+        <ul>
+          ${fallbackFailingControls
+            .map((item) => `<li><strong>${escapeHtml(item.control || "control")}</strong>: ${escapeHtml(item.summary || "No summary.")}</li>`)
+            .join("")}
+        </ul>
+      </div>
+    </article>
+  `;
+}
+
+function renderDrilldownTabs(tabs) {
+  if (!tabStrip) {
+    return;
+  }
+  const filteredTabs = (Array.isArray(tabs) ? tabs : []).filter((tab) => ACTIVE_DRILLDOWN_SECTION_IDS.has(tab?.id));
+  tabStrip.innerHTML = `
+    <section class="tab-strip-shell compact-drilldown-nav">
+      <div class="tab-strip-head">
+        <p class="eyebrow">Drill-down evidence</p>
+        <p class="section-description">Technical detail for audit and control verification.</p>
+      </div>
+      <div class="tab-group-row tab-primary-row">
+        ${filteredTabs
+          .map(
+            (tab) => `
+              <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" aria-pressed="false">
+                ${escapeHtml(tab.label || tab.id || "")}
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+
+  for (const button of tabStrip.querySelectorAll("button[data-target]")) {
+    button.addEventListener("click", () => scrollToSection(button.dataset.target));
+  }
 }
 
 async function boot() {
@@ -2263,47 +2435,17 @@ async function boot() {
         <p>${message}</p>
       </section>
     `;
-    if (briefingRoot) {
-      briefingRoot.innerHTML = "";
+    if (heroMeta) {
+      heroMeta.innerHTML = "";
     }
-    if (incidentBannerRoot) {
-      incidentBannerRoot.innerHTML = "";
+    if (trustScorecardRoot) {
+      trustScorecardRoot.innerHTML = "";
     }
-    if (riskStripRoot) {
-      riskStripRoot.innerHTML = "";
+    if (secondaryContextRoot) {
+      secondaryContextRoot.innerHTML = "";
     }
-    if (nextActionRoot) {
-      nextActionRoot.innerHTML = "";
-    }
-    if (summarySheetRoot) {
-      summarySheetRoot.innerHTML = "";
-    }
-    if (walkthroughRoot) {
-      walkthroughRoot.innerHTML = "";
-    }
-    if (compareRoot) {
-      compareRoot.innerHTML = "";
-    }
-    if (proofPipelineRoot) {
-      proofPipelineRoot.innerHTML = "";
-    }
-    if (kpiRoot) {
-      kpiRoot.innerHTML = "";
-    }
-    if (readingGuideRoot) {
-      readingGuideRoot.innerHTML = "";
-    }
-    if (modeBannerRoot) {
-      modeBannerRoot.innerHTML = "";
-    }
-    if (dashboardViewRoot) {
-      dashboardViewRoot.innerHTML = "";
-    }
-    if (runtimeSummaryRoot) {
-      runtimeSummaryRoot.innerHTML = "";
-    }
-    if (stackHealthRoot) {
-      stackHealthRoot.innerHTML = "";
+    if (sourcesRoot) {
+      sourcesRoot.innerHTML = "";
     }
     if (tabStrip) {
       tabStrip.innerHTML = "";
@@ -2324,12 +2466,6 @@ async function refreshDashboard() {
     refreshDashboardButton.textContent = "Refresh evidence";
   }
 }
-
-dashboardViewMode = resolveInitialDashboardViewMode();
-presentationModeEnabled = dashboardViewMode === "executive";
-document.body.classList.toggle("presentation-mode", presentationModeEnabled);
-document.body.dataset.dashboardView = dashboardViewMode;
-renderDashboardViewModes();
 
 if (refreshDashboardButton) {
   refreshDashboardButton.addEventListener("click", () => {
