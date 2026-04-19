@@ -20,6 +20,8 @@ A live-mode governed handoff is considered proven only if:
 6. launch-gate uses live evidence
 7. the final allow or deny is reflected in artifacts and the dashboard
 
+The strict HTTP dependency matrix below uses the Onyx lane as the deepest tested sample path. Dify uses the same launch-gate and fail-closed control-plane model with runtime-specific tool/MCP controls.
+
 ## Proof matrix
 
 | Scenario | Endpoint exercised | Expected result | Primary proof test | Reviewer artifact | Dashboard signal |
@@ -43,7 +45,7 @@ A live-mode governed handoff is considered proven only if:
 
 - The strict live governed path is exercised through the real control-plane HTTP boundary.
 - Keycloak, OPA, Qdrant, and Vault participate as HTTP-level dependencies in the tested live path.
-- Each major dependency can fail closed and block Onyx handoff.
+- Each major dependency can fail closed and block governed runtime handoff.
 - The dashboard exposes live mode, latest dependency posture, launch-gate status, and latest handoff result.
 - Reviewer artifacts include one passing live flow and dependency-specific failure examples.
 - Unauthenticated requests or bearer tokens without the required `openid` scope still fail closed at the identity boundary.

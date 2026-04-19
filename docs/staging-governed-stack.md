@@ -39,7 +39,8 @@ What this does:
 - imports the governed realm template
 - maps `tenant_id` from a real user attribute into token and userinfo claims
 - seeds Qdrant and Vault with tenant-scoped launch data
-- proves `/launch/onyx?path=/app&mode=live` against the running stack
+- proves `/launch/onyx?path=/app&mode=live` against the running stack (deepest default sample lane)
+- keeps `/launch/dify?path=/apps&mode=live` under the same fail-closed governance and launch-gate model
 
 ## External deployment target
 

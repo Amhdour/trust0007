@@ -1,19 +1,21 @@
-# Onyx Readiness Dashboard
+# AI Trust & Security Control Plane
 
-This repository is a **dashboard-first Onyx readiness, trust, and security review surface**. It proves a governed runtime handoff into Onyx, a strict live governed path, dependency-specific fail-closed behavior, and evidence-backed launch readiness without treating every vendored upstream as equally active.
+This repository is a **dashboard-first AI Trust & Security control plane** for dual runtime governance. It proves governed runtime handoffs into **Onyx (RAG)** and **Dify (Autonomous Agents)**, a strict live governed path, dependency-specific fail-closed behavior, and evidence-backed launch readiness without treating every vendored upstream as equally active.
 
-The homepage is a repo-owned **Onyx Readiness Dashboard for trust, security, and launch posture**. Onyx is the governed runtime plane behind that dashboard, not the primary visible product entry. This dashboard is the review/readiness/security surface that decides whether, how, and with what evidence access to Onyx is allowed.
+The homepage is a repo-owned **AI Trust & Security Dashboard for trust, security, and launch posture**. Onyx and Dify are governed runtime lanes behind that dashboard, not the primary visible product entry. This dashboard is the review/readiness/security surface that decides whether, how, and with what evidence runtime access is allowed.
 
 Suggested short repository description:
-`Onyx Readiness Dashboard for trust, security, launch posture, policy enforcement, evidence integrity, and auditable governed handoffs.`
+`AI Trust & Security control plane for governed Onyx (RAG) and Dify (Autonomous Agents) handoffs, policy enforcement, evidence integrity, and launch posture.`
 
 ## What This Repo Proves
 
-- A strict live governed path can allow a runtime handoff only after live identity, live policy, live retrieval, conditional live secret access, trace correlation, and launch-gate evidence all succeed.
-- The same governed path fails closed when Keycloak-compatible identity, OPA, Qdrant, Vault, or trace/evidence requirements fail.
-- The dashboard and artifact set explain why the handoff passed, denied, or downgraded.
-- The dashboard can show recent governed requests as sanitized previews with trace-linked evidence, without exposing raw transcript content in the main reviewer view.
-- The repo distinguishes mandatory path elements from supporting, optional, and reference-only components instead of inflating the architecture.
+- Dashboard-first **Layer Retrofit** and **Secure Starter Kit** patterns for governed AI runtime adoption.
+- A strict **Launch Gate** path: runtime handoff is allowed only after identity, policy, retrieval, conditional secret access, trace correlation, and launch-gate evidence succeed on the same governed flow.
+- Runtime-class governance:
+  - **Onyx (RAG):** retrieval security, tenant/source boundaries, and governed data access.
+  - **Dify (Autonomous Agents):** tool authorization, MCP governance, and agent capability controls.
+- Fail-closed behavior when Keycloak-compatible identity, OPA policy checks, retrieval boundaries, Vault-backed secrets, or required trace/evidence signals fail.
+- Evidence-backed review surfaces for telemetry, auditability, policy reasons, and launch-readiness posture without exposing raw sensitive prompt/transcript content.
 
 ## Reviewer Fast Path
 
@@ -50,7 +52,7 @@ It supports three repeatable engagement tracks:
 - Secure Starter Kit
 - Launch Gate
 
-Onyx remains the default reference runtime used in this repo, but the client-template model is meant to support other governed RAG or agent runtimes as well.
+The client-template model is dual-runtime by default (Onyx for RAG and Dify for Autonomous Agents), while still supporting extensions to other governed runtimes.
 
 - template guide: [docs/client-template-kit.md](/workspaces/beta011/docs/client-template-kit.md)
 - engagement tracks: [docs/client-engagement-tracks.md](/workspaces/beta011/docs/client-engagement-tracks.md)
@@ -87,7 +89,7 @@ That path proves:
 - Vault-backed secret participation when required
 - complete trace correlation
 - launch-gate pass from live evidence
-- governed Onyx handoff approval
+- governed runtime handoff approval (Onyx and Dify routes are enforced through the same control-plane model)
 
 ## Repeatable Live Staging Bootstrap
 
@@ -109,7 +111,7 @@ That workflow:
 - seeds tenant-scoped Qdrant content and the required Vault runtime secret
 - starts the dashboard stack in `live` / `staging` mode
 - mints a real Keycloak token with `openid email profile`
-- verifies `/launch/onyx?path=/app&mode=live` and the live dashboard evidence
+- verifies governed live handoff and dashboard evidence (`/launch/onyx?path=/app&mode=live`, with governed `/launch/dify` surface support)
 
 The precise claim after `make smoke-live` passes is: a staging-style governed live path is proven against a running Keycloak, OPA, Qdrant, and Vault stack. That is intentionally narrower and more accurate than claiming every supporting service or every runtime-health surface is fully production-ready.
 
@@ -119,7 +121,7 @@ For the full runbook, see [docs/staging-governed-stack.md](/workspaces/beta011/d
 
 The strongest “see a deny” and “see a no-go” paths are:
 
-- flagship denied `/launch/onyx` handoff: [denied-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-flow.json)
+- flagship denied governed handoff proof: [denied-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-flow.json)
 - identity denial: [denied-identity-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
 - OPA denial/unavailable: [denied-opa-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
 - retrieval denial: [denied-retrieval-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
@@ -152,16 +154,16 @@ Panel evidence sources:
 - Secret Access: `secret-evidence.json`
 - Audit & Replay: `audit-records.jsonl` when present, otherwise clearly labeled adapter-derived reconstruction from governed events
 - Trace Correlation: `trace-correlation.json`
-- Onyx Runtime: `governed-flow-summary.json`, `audit-records.jsonl`, and inspectable allow/deny bundles
+- Runtime Lanes (Onyx + Dify): `governed-flow-summary.json`, `audit-records.jsonl`, and inspectable allow/deny bundles
 
 Request visibility note:
 
-- The dashboard surfaces sanitized governed request previews and hashes, not raw Onyx chat transcript replay.
+- The dashboard surfaces sanitized governed request previews and hashes, not raw runtime transcript replay.
 - This feature does not persist full raw prompt text into the main dashboard payload or reviewer-safe request feed.
 
 ## What Is Mandatory Now
 
-When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a governed handoff to `/launch/onyx` fails closed unless all of these complete successfully:
+When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a governed handoff to `/launch/onyx` or `/launch/dify` fails closed unless all of these complete successfully:
 
 1. Keycloak-backed identity from bearer token or session cookie
 2. OPA decision for the request
@@ -170,10 +172,16 @@ When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a gover
 5. Complete trace correlation across the governed flow
 6. Launch-gate approval from live evidence
 
+Runtime entrypoint configuration (explicit env vars):
+
+- `CONTROL_PLANE_ONYX_PORT` (default `3010`) controls the governed `Onyx` runtime target for `/launch/onyx`.
+- `CONTROL_PLANE_DIFY_PORT` (default `8088`) controls the governed `Dify` runtime target for `/launch/dify`.
+- `CONTROL_PLANE_ONYX_SECRET_PATH` and `CONTROL_PLANE_DIFY_SECRET_PATH` can override runtime-specific Vault secret paths for live handoff checks.
+
 ## What Is Proven Now
 
 - Proven mandatory path elements in the governed live flow:
-  - Onyx handoff behind the dashboard
+  - Onyx and Dify handoffs behind the dashboard
   - Keycloak-compatible identity
   - OPA policy decision
   - Qdrant retrieval
@@ -309,7 +317,7 @@ Not every vendored upstream under `upstream/` is an equally active part of the c
 Checkout/source-management state is locked in `evidence/upstream.lock.json`. Reviewer-facing classification for the dashboard lives in `evidence/upstream_usage.inventory.json`, `scripts/validate-upstream-state.py` checks that both views stay aligned, `scripts/list-upstream-groups.py` prints the default versus opt-in checkout sets, `scripts/record-upstream-refresh.py` records vendored upstream ref/commit refreshes back into the lock file, `scripts/sync-upstream-pins-from-checkout.py` captures snapshot fingerprints and available git pins, and `scripts/stage-default-upstream-checkout.py` stages a default-only upstream tree when you want opt-in components left out physically.
 
 - Active now:
-  - Onyx is the governed runtime target behind `/launch/onyx`.
+  - Onyx (RAG) and Dify (Autonomous Agents) are governed runtime lanes behind `/launch/onyx` and `/launch/dify`.
   - Langfuse is a supporting evidence-plane activity source the dashboard can consume live.
   - Keycloak, OPA, Qdrant, and Vault are now active in the strict live governed path, where live identity, live policy, live retrieval, and conditional live secret access are mandatory dependencies.
 - Partially used:
@@ -333,10 +341,11 @@ See `docs/strict-live-proof-matrix.md` for the acceptance criteria and pass/fail
 
 ## Runtime Testing Model
 
-- `Onyx` is the primary sample runtime platform for real integration testing in this repo.
-- The in-repo demo is the fast fallback path when the upstream Onyx stack is not running.
-- The dashboard remains the product entrypoint, and Onyx is the governed runtime plane reached behind it through governed handoffs.
-- **Governance enforcement** is now live: `/launch/onyx` blocks denied requests with audit trails.
+- `Onyx` and `Dify` are governed runtime lanes in this control plane (RAG and Autonomous Agents respectively).
+- Onyx remains the deepest sample runtime path in current integration tests, while Dify is a governed first-class launch surface in the control plane.
+- The in-repo demo remains the fast fallback path when full upstream runtime stacks are not running.
+- The dashboard remains the product entrypoint, and both runtimes are reached only through governed handoffs.
+- **Governance enforcement** is now live: `/launch/onyx` and `/launch/dify` block denied requests with audit trails.
 
 ## Proof And Dashboard Docs
 

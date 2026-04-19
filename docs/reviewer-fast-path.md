@@ -52,7 +52,7 @@ What this proves:
 - live Vault participated when required
 - trace correlation completed
 - launch-gate used live evidence and passed
-- governed Onyx handoff was approved
+- governed runtime handoff was approved (Onyx sample lane in this strict-live matrix)
 - the dashboard can show a sanitized governed request preview linked back to the same trace and artifact set
 
 What this does not prove:
@@ -133,7 +133,7 @@ What this does not show:
   - Vault secret access when required
   - trace correlation
   - live-evidence launch gate
-  - governed Onyx handoff
+  - governed runtime handoff (Onyx sample lane)
 - Active supporting elements:
   - Envoy
   - Grafana
@@ -157,7 +157,7 @@ Use this order when you want the fastest high-confidence review:
 3. Newest governed request spotlight:
    - confirm a sanitized preview, result, trace, tenant, evidence mode, and timestamp are visible
 4. Flagship denied handoff spotlight:
-   - confirm denied `/launch/onyx` proof is easy to find without scrolling through inventories
+   - confirm denied governed-runtime proof is easy to find without scrolling through inventories
 5. Plain-language review sections:
    - use `Big Picture`, `What The System Stopped`, `Safety Check Before Use`, `How Reliable The Proof Is`, and `Connected Parts Of The System`
 

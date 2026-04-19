@@ -4,6 +4,7 @@ const heroEyebrow = document.getElementById("hero-eyebrow");
 const heroTitle = document.getElementById("hero-title");
 const heroCopy = document.getElementById("hero-copy");
 const heroMeta = document.getElementById("hero-meta");
+const runtimeLanesMeta = document.getElementById("runtime-lanes-meta");
 // Legacy roots retained as no-op placeholders while cleanup converges.
 const dashboardViewRoot = document.getElementById("dashboard-view-root");
 const liveSessionRoot = document.getElementById("live-session-root");
@@ -25,7 +26,9 @@ const sourcesRoot = document.getElementById("sources");
 const liveLogRoot = document.getElementById("live-log-root");
 const trustScorecardRoot = document.getElementById("trust-scorecard-root");
 const secondaryContextRoot = document.getElementById("secondary-context-root");
+const runtimePortfolioRoot = document.getElementById("runtime-portfolio-root");
 const liveRuntimeLink = document.getElementById("live-runtime-link");
+const liveDifyLink = document.getElementById("live-dify-link");
 const viewEvidenceLink = document.getElementById("view-evidence-link");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
 
@@ -33,12 +36,26 @@ const LIVE_LOG_LIMIT = 6;
 const DEFAULT_LIVE_LOG_POLL_MS = 5000;
 const SECTION_SCROLL_OFFSET_PX = 152;
 const DASHBOARD_VIEW_MODES = { operator: { label: "Operator" } };
-// Keep a single source of truth for visible drill-down sections:
-// the homepage is for readiness/trust/security decisioning, while deeper
-// diagnostics remain secondary.
+// Keep a single source of truth for visible drill-down sections in the
+// shared control plane. New dual-runtime IDs are primary, while legacy IDs
+// remain supported for backwards compatibility with older payloads.
+const SECTION_ID_ALIASES = {
+  "launch-gate": "runtime-portfolio",
+  "entry-points": "rag-runtime-access",
+  "dify-agent-access": "agent-runtime-access",
+};
+const LEGACY_SECTION_ID_BY_CANONICAL = {
+  "runtime-portfolio": "launch-gate",
+  "rag-runtime-access": "entry-points",
+  "agent-runtime-access": "dify-agent-access",
+};
 const ACTIVE_DRILLDOWN_SECTION_IDS = new Set([
+  "runtime-portfolio",
+  "rag-runtime-access",
+  "agent-runtime-access",
   "launch-gate",
   "entry-points",
+  "dify-agent-access",
   "policy-enforcement",
   "retrieval-boundaries",
   "tool-mcp-governance",
@@ -59,6 +76,20 @@ let dashboardFingerprints = new Map();
 let changedDashboardKeys = new Set();
 let changeHighlightTimer = 0;
 let sectionDisclosureState = new Map();
+
+function canonicalSectionId(value) {
+  return SECTION_ID_ALIASES[value] || value;
+}
+
+function resolvedSectionId(value) {
+  if (!value) {
+    return "";
+  }
+  if (document.getElementById(value)) {
+    return value;
+  }
+  return LEGACY_SECTION_ID_BY_CANONICAL[value] || value;
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -365,7 +396,7 @@ function isRuntimeView() {
 
 function visibleSectionsForView(sections) {
   const items = Array.isArray(sections) ? sections : [];
-  return items.filter((section) => ACTIVE_DRILLDOWN_SECTION_IDS.has(section?.id));
+  return items.filter((section) => ACTIVE_DRILLDOWN_SECTION_IDS.has(canonicalSectionId(section?.id)));
 }
 
 function sectionSearchText(section) {
@@ -387,7 +418,7 @@ function filteredSectionsForView(sections) {
 
 function visibleTabsForView(tabs) {
   const items = Array.isArray(tabs) ? tabs : [];
-  return items.filter((tab) => ACTIVE_DRILLDOWN_SECTION_IDS.has(tab?.id));
+  return items.filter((tab) => ACTIVE_DRILLDOWN_SECTION_IDS.has(canonicalSectionId(tab?.id)));
 }
 
 function filteredTabsForView(tabs, sections = []) {
@@ -555,21 +586,21 @@ function renderSectionsEmptyState() {
 }
 
 function renderHero(payload) {
-  const defaultTitle = payload.title || "Onyx Readiness Dashboard";
+  const defaultTitle = payload.title || "AI Trust & Security Control Plane";
   const defaultCopy = `${payload.subtitle ? `${payload.subtitle} ` : ""}${payload.hero_copy || ""}`.trim();
   const presenterTitle = "AI Trust & Security Review Brief";
   const presenterCopy =
     "Use this audience-facing view to explain the current posture, main blocker, and strongest governed proof without the operator-only drill-down.";
   const runtimeTitle = "Governed Live Runtime Workspace";
   const runtimeCopy =
-    "Focus on the current Onyx path, runtime proof, authentication requirements, and the activity that confirms the governed handoff is doing real work.";
+    "Focus on governed runtime paths, runtime proof, authentication requirements, and the activity that confirms governed handoff behavior.";
 
   if (heroEyebrow) {
     heroEyebrow.textContent = isExecutiveView()
       ? "Executive review mode"
       : isRuntimeView()
         ? "Live runtime focus"
-        : "Onyx Readiness Dashboard";
+        : "AI Trust & Security Control Plane";
   }
 
   if (heroTitle) {
@@ -599,8 +630,8 @@ function renderHero(payload) {
     : isRuntimeView()
       ? [
           "Confirm the live session and stack state.",
-          "Open the embedded runtime workspace.",
-          "Watch current Onyx activity and trace continuity.",
+          "Open the governed runtime workspace.",
+          "Watch runtime activity and trace continuity.",
           "Drop into technical sections only when runtime proof looks off.",
         ]
     : Array.isArray(payload.landing_steps)
@@ -639,7 +670,7 @@ function updateLiveRuntimeLink() {
 
   liveRuntimeLink.classList.remove("is-disabled");
   liveRuntimeLink.removeAttribute("aria-disabled");
-  liveRuntimeLink.textContent = "Open live workspace";
+  liveRuntimeLink.textContent = "Open Onyx workspace";
   liveRuntimeLink.href = "/launch/onyx?path=/app&mode=live&view=embedded";
   liveRuntimeLink.title = "Open the governed live workspace; authentication must already be in place";
 }
@@ -653,7 +684,8 @@ function buildAccessRequirementsMeta(payload) {
     { label: "Auth", value: "External OIDC", status: "neutral" },
     payload.data_mode?.label ? { label: "Evidence", value: payload.data_mode.label, status: "neutral" } : null,
     payload.mode_banner?.label ? { label: "Mode", value: payload.mode_banner.label, status: "neutral" } : null,
-    { label: "Workspace", value: "/launch/onyx?path=/app&mode=live", status: "neutral" },
+    { label: "RAG lane", value: "/launch/onyx?path=/app&mode=live", status: "neutral" },
+    { label: "Agent lane", value: "/launch/dify?path=/apps&mode=live", status: "neutral" },
   ];
 
   return items.filter(Boolean);
@@ -679,7 +711,8 @@ function renderAccessRequirements(payload) {
       ${renderMetaBadges(buildAccessRequirementsMeta(payload), "live-session-meta")}
       <p class="live-session-detail">Live handoffs still fail closed when identity, policy, retrieval, secret, trace, or launch-gate evidence is missing on the same request trace.</p>
       <div class="live-session-actions">
-        <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/onyx-integration.md">Auth and runtime note</a>
+        <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/onyx-integration.md">Onyx runtime note</a>
+        <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/dify-integration.md">Dify runtime note</a>
       </div>
     </section>
   `;
@@ -1710,7 +1743,7 @@ function setActiveTab(targetId) {
 
   activeTabTarget = targetId || "";
   for (const button of tabStrip.querySelectorAll("button[data-target]")) {
-    const isActive = button.dataset.target === activeTabTarget;
+    const isActive = canonicalSectionId(button.dataset.target || "") === canonicalSectionId(activeTabTarget);
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", isActive ? "true" : "false");
   }
@@ -1722,11 +1755,11 @@ function syncActiveTabFromScroll() {
     return;
   }
 
-  let nextActive = sections[0].id;
+  let nextActive = canonicalSectionId(sections[0].id);
   for (const section of sections) {
     const top = section.getBoundingClientRect().top;
     if (top - SECTION_SCROLL_OFFSET_PX <= 0) {
-      nextActive = section.id;
+      nextActive = canonicalSectionId(section.id);
       continue;
     }
     break;
@@ -1751,17 +1784,18 @@ function bindTabStripScrollListeners() {
 }
 
 function scrollToSection(targetId) {
-  const target = document.getElementById(targetId);
+  const resolvedTargetId = resolvedSectionId(targetId);
+  const target = document.getElementById(resolvedTargetId);
   if (!target) {
     return;
   }
 
-  ensureSectionOpen(targetId);
+  ensureSectionOpen(resolvedTargetId);
   window.requestAnimationFrame(() => {
     const absoluteTop = window.scrollY + target.getBoundingClientRect().top - SECTION_SCROLL_OFFSET_PX;
     window.scrollTo({ top: Math.max(0, absoluteTop), behavior: "smooth" });
   });
-  setActiveTab(targetId);
+  setActiveTab(canonicalSectionId(targetId));
 }
 
 function renderFreshnessStrip(bar) {
@@ -2118,13 +2152,92 @@ async function loadLiveLog() {
 
 function renderDashboardPayload(payload) {
   renderDecisionHero(payload);
+  renderRuntimePortfolio(payload);
   renderHomepagePanels(payload);
   renderTrustScorecard(payload);
   renderSecondaryContext(payload);
-  renderSections((Array.isArray(payload.sections) ? payload.sections : []).filter((section) => ACTIVE_DRILLDOWN_SECTION_IDS.has(section?.id)));
+  renderSections((Array.isArray(payload.sections) ? payload.sections : []).filter((section) => ACTIVE_DRILLDOWN_SECTION_IDS.has(canonicalSectionId(section?.id))));
   renderDrilldownTabs(payload.tabs);
   renderSources(payload.sources);
   applyChangeHighlights();
+}
+
+function normalizeRuntimeCard(item = {}, fallback = {}) {
+  const launchHref = item.launch_href || item.launch_route || item.workspace_href || fallback.launch_href || "";
+  const evidenceHref = item.evidence_href || fallback.evidence_href || "#audit-replay";
+  const controls = Array.isArray(item.primary_controls) ? item.primary_controls : (fallback.primary_controls || []);
+  return {
+    name: item.name || item.label || fallback.name || "Runtime",
+    runtimeKey: item.runtime_key || item.id || fallback.runtime_key || "runtime",
+    runtimeClass: item.runtime_class || item.type || fallback.runtime_class || "Governed runtime",
+    description: item.description || item.summary || fallback.description || "Governed runtime lane.",
+    status: item.status || fallback.status || "neutral",
+    launchHref,
+    evidenceHref,
+    primaryControls: controls,
+  };
+}
+
+function defaultRuntimePortfolio() {
+  return [
+    {
+      name: "Onyx",
+      runtime_key: "onyx",
+      runtime_class: "RAG",
+      description: "Retrieval-grounded runtime lane with data boundary governance.",
+      status: "neutral",
+      launch_href: "/launch/onyx?path=/app&mode=live&view=embedded",
+      evidence_href: "#retrieval-boundaries",
+      primary_controls: ["Retrieval boundaries", "Tenant/source policy", "Data-path governance"],
+    },
+    {
+      name: "Dify",
+      runtime_key: "dify",
+      runtime_class: "Autonomous Agents",
+      description: "Agent runtime lane with tool, MCP, and authorization governance.",
+      status: "neutral",
+      launch_href: "/launch/dify?path=/apps&mode=live&view=embedded",
+      evidence_href: "#tool-mcp-governance",
+      primary_controls: ["Tool authorization", "MCP allowlists", "Agent capability controls"],
+    },
+  ];
+}
+
+function renderRuntimePortfolio(payload) {
+  if (!runtimePortfolioRoot) {
+    return;
+  }
+
+  const portfolio = payload.runtime_portfolio || {};
+  const runtimeItems = Array.isArray(portfolio.runtimes) && portfolio.runtimes.length
+    ? portfolio.runtimes
+    : defaultRuntimePortfolio();
+
+  const cards = runtimeItems.map((item) => normalizeRuntimeCard(item));
+  runtimePortfolioRoot.innerHTML = `
+    <div class="decision-panels-root">
+      ${cards
+        .map(
+          (card) => `
+            <article class="decision-panel runtime-lane-card">
+              <p class="eyebrow">${escapeHtml(card.runtimeClass)}</p>
+              <h3>${escapeHtml(card.name)}</h3>
+              <p>${escapeHtml(card.description)}</p>
+              ${renderStatusPill(card.status, { label: statusLabel(card.status) })}
+              <ul class="decision-list">
+                <li><span>Runtime key</span><strong>${escapeHtml(card.runtimeKey)}</strong></li>
+                <li><span>Primary controls</span><strong>${escapeHtml(card.primaryControls.join(", ") || "Not listed")}</strong></li>
+              </ul>
+              <div class="decision-links">
+                ${card.launchHref ? `<a href="${escapeHtml(card.launchHref)}">Open ${escapeHtml(card.name)}</a>` : "<span>Launch route unavailable</span>"}
+                ${card.evidenceHref ? `<a href="${escapeHtml(card.evidenceHref)}">View evidence</a>` : "<span>Evidence unavailable</span>"}
+              </div>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function renderSecondaryContext(payload) {
@@ -2283,13 +2396,13 @@ function renderTrustScorecard(payload) {
 
 function renderDecisionHero(payload) {
   if (heroEyebrow) {
-    heroEyebrow.textContent = "Onyx Decision Surface";
+    heroEyebrow.textContent = "Runtime Decision Surface";
   }
   if (heroTitle) {
-    heroTitle.textContent = payload.title || "Onyx Readiness Dashboard";
+    heroTitle.textContent = payload.title || "AI Trust & Security Control Plane";
   }
   if (heroCopy) {
-    heroCopy.textContent = payload.subtitle || "Trust, Security, and Launch Posture for Governed Onyx Runtime.";
+    heroCopy.textContent = payload.subtitle || "Trust, Security, and Launch Posture for Governed Runtime Lanes.";
   }
 
   const readiness = payload.readiness || {};
@@ -2307,11 +2420,35 @@ function renderDecisionHero(payload) {
     `;
   }
 
+  const runtimeItems = Array.isArray(payload.runtime_portfolio?.runtimes) ? payload.runtime_portfolio.runtimes : [];
+  const runtimeByKey = new Map(runtimeItems.map((item) => [String(item?.runtime_key || item?.id || "").toLowerCase(), item]));
+  const onyxLaunchHref = String(
+    runtimeByKey.get("onyx")?.launch_href || runtimeByKey.get("onyx")?.launch_route || "/launch/onyx?path=/app&mode=live&view=embedded",
+  );
+  const difyLaunchHref = String(
+    runtimeByKey.get("dify")?.launch_href || runtimeByKey.get("dify")?.launch_route || "/launch/dify?path=/apps&mode=live&view=embedded",
+  );
+
   if (liveRuntimeLink) {
     liveRuntimeLink.textContent = "Open Onyx";
+    liveRuntimeLink.setAttribute("href", onyxLaunchHref);
+  }
+  if (liveDifyLink) {
+    liveDifyLink.textContent = "Open Dify";
+    liveDifyLink.setAttribute("href", difyLaunchHref);
   }
   if (viewEvidenceLink) {
     viewEvidenceLink.setAttribute("href", "#dashboard-root");
+  }
+  if (runtimeLanesMeta) {
+    runtimeLanesMeta.innerHTML = runtimeItems
+      .map(
+        (item) =>
+          `<span class="chip">${escapeHtml(item.label || "Runtime")} = ${escapeHtml(item.type || "Lane")} · ${escapeHtml(
+            item.governance_focus || "",
+          )}</span>`,
+      )
+      .join("");
   }
 }
 
@@ -2335,7 +2472,7 @@ function renderHomepagePanels(payload) {
   panelRoot.innerHTML = `
     <article class="decision-panel">
       <p class="eyebrow">Panel A</p>
-      <h3>Onyx Readiness</h3>
+      <h3>Runtime Readiness</h3>
       <ul class="decision-list">
         <li><span>Decision</span><strong>${escapeHtml(readiness.decision || "UNKNOWN")}</strong></li>
         <li><span>Readiness score</span><strong>${escapeHtml(String(readiness.readiness_score ?? "n/a"))}</strong></li>
@@ -2357,7 +2494,7 @@ function renderHomepagePanels(payload) {
         ${trustRow("Evidence freshness", trust.evidence_freshness || "Unavailable")}
       </ul>
       <div class="decision-links">
-        ${trust.governed_flow_summary_available ? '<a href="#entry-points">Governed flow summary</a>' : '<span>Governed flow summary unavailable</span>'}
+        ${trust.governed_flow_summary_available ? '<a href="#entry-points">Runtime handoff summary</a>' : '<span>Runtime handoff summary unavailable</span>'}
         ${trust.launch_report_available ? '<a href="#launch-gate">Launch report</a>' : '<span>Launch report unavailable</span>'}
         ${trust.reviewer_bundle_available ? '<a href="#audit-replay">Reviewer bundle</a>' : '<span>Reviewer bundle unavailable</span>'}
       </div>
@@ -2389,7 +2526,7 @@ function renderDrilldownTabs(tabs) {
   if (!tabStrip) {
     return;
   }
-  const filteredTabs = (Array.isArray(tabs) ? tabs : []).filter((tab) => ACTIVE_DRILLDOWN_SECTION_IDS.has(tab?.id));
+  const filteredTabs = (Array.isArray(tabs) ? tabs : []).filter((tab) => ACTIVE_DRILLDOWN_SECTION_IDS.has(SECTION_ID_ALIASES[tab?.id] || tab?.id));
   tabStrip.innerHTML = `
     <section class="tab-strip-shell compact-drilldown-nav">
       <div class="tab-strip-head">

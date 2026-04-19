@@ -12,7 +12,7 @@ This repo keeps both `demo` and `live` governed modes, but they are not equivale
 | Secret access | Optional and usually skipped | Vault-backed access is mandatory when the governed operation requires a secret |
 | Trace correlation | Helpful but not launch-gate blocking | Missing correlation downgrades live readiness and blocks handoff |
 | Launch gate inputs | May summarize demo or sample evidence | Must use live governed-flow artifacts; no silent sample substitution |
-| Onyx handoff | Can succeed with fallback evidence | Fails closed unless live evidence and launch-gate approval exist |
+| Runtime handoff (`/launch/onyx`, `/launch/dify`) | Can succeed with fallback evidence | Fails closed unless live evidence and launch-gate approval exist |
 
 ## How to activate
 
@@ -21,7 +21,7 @@ This repo keeps both `demo` and `live` governed modes, but they are not equivale
   - intended for fast iteration and fallback proof
 - `live` mode
   - `CONTROL_PLANE_GOVERNANCE_MODE=live`
-  - or `mode=live` on `/api/control-plane/governed-flow` and `/launch/onyx`
+  - or `mode=live` on `/api/control-plane/governed-flow`, `/launch/onyx`, and `/launch/dify`
 
 ## Reviewer guidance
 
