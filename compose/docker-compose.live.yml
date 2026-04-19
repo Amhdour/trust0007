@@ -1,0 +1,12 @@
+services:
+  control_plane:
+    environment:
+      CONTROL_PLANE_GOVERNANCE_MODE: ${CONTROL_PLANE_GOVERNANCE_MODE:?set to live}
+      CONTROL_PLANE_ENVIRONMENT_MODE: ${CONTROL_PLANE_ENVIRONMENT_MODE:?set to staging or production}
+      CONTROL_PLANE_VAULT_TOKEN: ${CONTROL_PLANE_VAULT_TOKEN:?required for live governed secret checks}
+      CONTROL_PLANE_ONYX_SECRET_PATH: ${CONTROL_PLANE_ONYX_SECRET_PATH:?required for live governed Onyx runtime}
+      CONTROL_PLANE_DIFY_SECRET_PATH: ${CONTROL_PLANE_DIFY_SECRET_PATH:?required for live governed Dify runtime}
+      CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS: ${CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS:?required true/false}
+      CONTROL_PLANE_EXTERNAL_REACHABLE: ${CONTROL_PLANE_EXTERNAL_REACHABLE:?required true/false}
+      CONTROL_PLANE_KEYCLOAK_DEV_MODE: ${CONTROL_PLANE_KEYCLOAK_DEV_MODE:?must be false outside local dev}
+      CONTROL_PLANE_VAULT_DEV_MODE: ${CONTROL_PLANE_VAULT_DEV_MODE:?must be false outside local dev}

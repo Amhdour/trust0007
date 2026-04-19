@@ -2,7 +2,7 @@
 
 This stack is **development-focused** and intentionally minimal. It is not production hardened.
 
-If you want the production-like governed live path, use [docs/staging-governed-stack.md](/workspaces/beta011/docs/staging-governed-stack.md) instead of this page.
+If you want the production-like governed live path, use [docs/staging-governed-stack.md](docs/staging-governed-stack.md) instead of this page.
 
 ## Services
 - control-plane dashboard homepage
@@ -92,15 +92,15 @@ docker compose --env-file compose/.env -f compose/docker-compose.yml down -v
 ```
 
 ## Service endpoints (Codespaces preview URLs)
-- Control plane dashboard: `https://orange-space-journey-7vrrp4wqq4r6h7p9-3000.app.github.dev`
-- Keycloak: `https://orange-space-journey-7vrrp4wqq4r6h7p9-8080.app.github.dev`
-- Envoy: `https://orange-space-journey-7vrrp4wqq4r6h7p9-10000.app.github.dev`
-- OPA: `https://orange-space-journey-7vrrp4wqq4r6h7p9-8181.app.github.dev`
-- Vault: `https://orange-space-journey-7vrrp4wqq4r6h7p9-8200.app.github.dev`
-- Qdrant: `https://orange-space-journey-7vrrp4wqq4r6h7p9-6333.app.github.dev`
-- Langfuse: `https://orange-space-journey-7vrrp4wqq4r6h7p9-3002.app.github.dev`
-- Grafana: `https://orange-space-journey-7vrrp4wqq4r6h7p9-3001.app.github.dev`
-- Superset: `https://orange-space-journey-7vrrp4wqq4r6h7p9-8088.app.github.dev`
+- Control plane dashboard: `https://<codespace-name>-3000.<forwarding-domain>`
+- Keycloak: `https://<codespace-name>-8080.<forwarding-domain>`
+- Envoy: `https://<codespace-name>-10000.<forwarding-domain>`
+- OPA: `https://<codespace-name>-8181.<forwarding-domain>`
+- Vault: `https://<codespace-name>-8200.<forwarding-domain>`
+- Qdrant: `https://<codespace-name>-6333.<forwarding-domain>`
+- Langfuse: `https://<codespace-name>-3002.<forwarding-domain>`
+- Grafana: `https://<codespace-name>-3001.<forwarding-domain>`
+- Superset: `https://<codespace-name>-8088.<forwarding-domain>`
 
 ## Notes
 - The dashboard is the main landing page and aggregates posture from repo-owned artifacts plus supporting services.
@@ -111,7 +111,7 @@ docker compose --env-file compose/.env -f compose/docker-compose.yml down -v
 - Unauthenticated or non-live-token requests to `/launch/onyx` and `/launch/dify` should still fail closed with `403`, even after the local live bootstrap succeeds.
 - The local Keycloak smoke token must include `openid` scope. Without `openid`, Keycloak `userinfo` returns `403`, and the strict live handoff correctly denies access.
 - In this environment, Keycloak defaults to host port `18080` instead of `8080` because another local service already occupies `8080`.
-- In another Codespace, replace `orange-space-journey-7vrrp4wqq4r6h7p9` with that Codespace name and keep the same port suffix.
+- In another Codespace, replace `<codespace-name>` and `<forwarding-domain>` while keeping the same port suffixes.
 - Secrets are provided via environment variables and placeholders only.
 - `vault` remains configured in `-dev` mode only in the development compose file. The staging bootstrap uses non-dev Vault storage and init/unseal.
 - Langfuse uses the local `db` PostgreSQL service by default.

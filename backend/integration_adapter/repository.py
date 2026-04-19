@@ -25,6 +25,8 @@ RETRIEVAL_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/retrieval-evidence.js
 SECRET_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/secret-evidence.json"
 TRACE_CORRELATION_PATH = "overlays/myStarterKit/artifacts/trace-correlation.json"
 ONYX_RUNTIME_PROOF_PATH = "overlays/myStarterKit/artifacts/onyx-runtime-proof.json"
+DIFY_RUNTIME_PROOF_PATH = "overlays/myStarterKit/artifacts/dify-runtime-proof.json"
+RUNTIME_PROOF_PATH = "overlays/myStarterKit/artifacts/runtime-proof.json"
 AUDIT_RECORDS_PATH = "overlays/myStarterKit/artifacts/audit-records.jsonl"
 UPSTREAM_INVENTORY_CLASSIFICATIONS = {
     "used_now",
@@ -603,6 +605,14 @@ def load_latest_trace_correlation(root: Path | None = None) -> dict[str, Any]:
 
 def load_latest_onyx_runtime_proof(root: Path | None = None) -> dict[str, Any]:
     return read_json(repo_root(root) / ONYX_RUNTIME_PROOF_PATH)
+
+
+def load_latest_dify_runtime_proof(root: Path | None = None) -> dict[str, Any]:
+    return read_json(repo_root(root) / DIFY_RUNTIME_PROOF_PATH)
+
+
+def load_latest_runtime_proof(root: Path | None = None) -> dict[str, Any]:
+    return read_json(repo_root(root) / RUNTIME_PROOF_PATH)
 
 
 def load_latest_audit_records(root: Path | None = None) -> list[dict[str, Any]]:

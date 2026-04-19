@@ -43,6 +43,9 @@ printf '\n'
 printf '\n==> Live smoke\n'
 python "$ROOT_DIR/scripts/smoke-live-onyx-handoff.py" --control-plane-base-url http://127.0.0.1:3000
 
+printf '\n==> Dual-runtime evidence bootstrap\n'
+python "$ROOT_DIR/scripts/bootstrap_runtime_evidence.py" --control-plane-base-url http://127.0.0.1:3000
+
 printf '\n==> Focused pytest bundle\n'
 pytest -q \
   "$ROOT_DIR/tests/dashboard/test_control_plane_dashboard.py" \

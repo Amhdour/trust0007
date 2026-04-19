@@ -112,8 +112,19 @@ class LiveStackHarness:
         )
         return str(payload["access_token"])
 
-    def launch(self, *, path: str = "/app", token: str | None = None, view: str = "") -> HTTPResponse:
-        url = f"{self.control_plane_base_url}/launch/onyx?path={quote(path, safe='/?=&')}&mode=live"
+    def launch(
+        self,
+        *,
+        path: str = "/app",
+        token: str | None = None,
+        view: str = "",
+        runtime: str = "onyx",
+        mcp_server: str = "",
+    ) -> HTTPResponse:
+        normalized_runtime = runtime.strip().lower() or "onyx"
+        url = f"{self.control_plane_base_url}/launch/{quote(normalized_runtime, safe='')}?path={quote(path, safe='/?=&')}&mode=live"
+        if mcp_server:
+            url = f"{url}&mcp={quote(mcp_server, safe='._-')}"
         if view:
             url = f"{url}&view={quote(view, safe='')}"
         headers = {"Accept": "text/html"}

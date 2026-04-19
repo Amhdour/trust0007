@@ -21,23 +21,23 @@ Suggested short repository description:
 
 If you only have a minute, start here:
 
-1. Proof matrix: [docs/strict-live-proof-matrix.md](/workspaces/beta011/docs/strict-live-proof-matrix.md)
-2. Main strict-live integration proof: [tests/integration/test_strict_live_http_end_to_end.py](/workspaces/beta011/tests/integration/test_strict_live_http_end_to_end.py)
-3. Reviewer landing page: [docs/reviewer-fast-path.md](/workspaces/beta011/docs/reviewer-fast-path.md)
-4. Passing live flow artifact: [allowed-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
-5. Denied identity artifact: [denied-identity-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
-6. Denied OPA artifact: [denied-opa-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
-7. Denied retrieval artifact: [denied-retrieval-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
-8. Denied secret artifact: [denied-secret-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
-9. Launch-gate no-go artifact: [live-launch-gate-downgrade.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
-10. Visual dashboard proof guide: [docs/dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md)
+1. Proof matrix: [docs/strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md)
+2. Main strict-live integration proof: [tests/integration/test_strict_live_http_end_to_end.py](tests/integration/test_strict_live_http_end_to_end.py)
+3. Reviewer landing page: [docs/reviewer-fast-path.md](docs/reviewer-fast-path.md)
+4. Passing live flow artifact: [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
+5. Denied identity artifact: [denied-identity-flow.json](evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
+6. Denied OPA artifact: [denied-opa-flow.json](evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
+7. Denied retrieval artifact: [denied-retrieval-flow.json](evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
+8. Denied secret artifact: [denied-secret-flow.json](evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
+9. Launch-gate no-go artifact: [live-launch-gate-downgrade.json](evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
+10. Visual dashboard proof guide: [docs/dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
 
 ## Client Overview
 
 If you need the simplest presentation layer first:
 
 - client-facing page: `/client-overview`
-- explainer notes: [docs/client-overview.md](/workspaces/beta011/docs/client-overview.md)
+- explainer notes: [docs/client-overview.md](docs/client-overview.md)
 - technical dashboard: `/`
 
 The client overview is intentionally lighter than the technical dashboard. It explains what the system checks, what it blocks, why that matters, and whether it looks safe to use now, while linking back to the technical proof.
@@ -54,10 +54,10 @@ It supports three repeatable engagement tracks:
 
 The client-template model is dual-runtime by default (Onyx for RAG and Dify for Autonomous Agents), while still supporting extensions to other governed runtimes.
 
-- template guide: [docs/client-template-kit.md](/workspaces/beta011/docs/client-template-kit.md)
-- engagement tracks: [docs/client-engagement-tracks.md](/workspaces/beta011/docs/client-engagement-tracks.md)
-- tokenized scaffold: [overlays/client-template/README.md](/workspaces/beta011/overlays/client-template/README.md)
-- stripped template readme: [README.template.md](/workspaces/beta011/README.template.md)
+- template guide: [docs/client-template-kit.md](docs/client-template-kit.md)
+- engagement tracks: [docs/client-engagement-tracks.md](docs/client-engagement-tracks.md)
+- tokenized scaffold: [overlays/client-template/README.md](overlays/client-template/README.md)
+- stripped template readme: [README.template.md](README.template.md)
 
 Materialize a client-ready overlay scaffold:
 
@@ -75,11 +75,11 @@ The intended client-facing outputs are a technical review dashboard, a lighter c
 
 The strongest “see a pass” path is:
 
-- test: [tests/integration/test_strict_live_http_end_to_end.py](/workspaces/beta011/tests/integration/test_strict_live_http_end_to_end.py)
+- test: [tests/integration/test_strict_live_http_end_to_end.py](tests/integration/test_strict_live_http_end_to_end.py)
   - `test_strict_live_handoff_passes_through_http_dependency_chain`
-- proof summary: [docs/strict-live-proof-matrix.md](/workspaces/beta011/docs/strict-live-proof-matrix.md)
-- reviewer artifact: [allowed-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
-- dashboard visual callout: [docs/dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md)
+- proof summary: [docs/strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md)
+- reviewer artifact: [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
+- dashboard visual callout: [docs/dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
 
 That path proves:
 
@@ -101,9 +101,19 @@ make bootstrap-live
 make smoke-live
 ```
 
+For explicit runtime separation, keep local development on the default compose and use the live profile only with explicit live env values:
+
+```bash
+cp .env.live.example .env.live
+make up-dev
+make verify-live
+make up-live
+```
+
 That workflow:
 
 - starts `compose/docker-compose.production.yml`
+- can enforce `compose/docker-compose.live.yml` + `.env.live` for fail-fast live env validation
 - initializes and unseals non-dev Vault storage under `.runtime/live-governed/`
 - imports or reuses the governed Keycloak realm
 - applies a user-attribute-backed `tenant_id` mapper to the live web and smoke clients
@@ -115,35 +125,35 @@ That workflow:
 
 The precise claim after `make smoke-live` passes is: a staging-style governed live path is proven against a running Keycloak, OPA, Qdrant, and Vault stack. That is intentionally narrower and more accurate than claiming every supporting service or every runtime-health surface is fully production-ready.
 
-For the full runbook, see [docs/staging-governed-stack.md](/workspaces/beta011/docs/staging-governed-stack.md).
+For the full runbook, see [docs/staging-governed-stack.md](docs/staging-governed-stack.md).
 
 ## Failing Strict Live Flow Examples
 
 The strongest “see a deny” and “see a no-go” paths are:
 
-- flagship denied governed handoff proof: [denied-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-flow.json)
-- identity denial: [denied-identity-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
-- OPA denial/unavailable: [denied-opa-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
-- retrieval denial: [denied-retrieval-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
-- secret denial: [denied-secret-flow.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
-- launch-gate no-go from missing live evidence: [live-launch-gate-downgrade.json](/workspaces/beta011/evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
+- flagship denied governed handoff proof: [denied-flow.json](evidence/reviewer/inspectable-live-runtime/denied-flow.json)
+- identity denial: [denied-identity-flow.json](evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
+- OPA denial/unavailable: [denied-opa-flow.json](evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
+- retrieval denial: [denied-retrieval-flow.json](evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
+- secret denial: [denied-secret-flow.json](evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
+- launch-gate no-go from missing live evidence: [live-launch-gate-downgrade.json](evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
 
-The main fail-closed test coverage is in [tests/integration/test_strict_live_http_end_to_end.py](/workspaces/beta011/tests/integration/test_strict_live_http_end_to_end.py) and [tests/integration/test_live_governed_runtime_dependencies.py](/workspaces/beta011/tests/integration/test_live_governed_runtime_dependencies.py).
+The main fail-closed test coverage is in [tests/integration/test_strict_live_http_end_to_end.py](tests/integration/test_strict_live_http_end_to_end.py) and [tests/integration/test_live_governed_runtime_dependencies.py](tests/integration/test_live_governed_runtime_dependencies.py).
 
 ## Evidence Artifacts To Inspect
 
 Primary governed-flow artifacts:
 
-- [governed-request-feed.json](/workspaces/beta011/overlays/myStarterKit/artifacts/governed-request-feed.json)
-- [governed-flow-summary.json](/workspaces/beta011/overlays/myStarterKit/artifacts/governed-flow-summary.json)
-- [identity-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/identity-evidence.json)
-- [policy-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/policy-evidence.json)
-- [retrieval-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/retrieval-evidence.json)
-- [secret-evidence.json](/workspaces/beta011/overlays/myStarterKit/artifacts/secret-evidence.json)
-- [audit-records.jsonl](/workspaces/beta011/overlays/myStarterKit/artifacts/audit-records.jsonl)
-- [trace-correlation.json](/workspaces/beta011/overlays/myStarterKit/artifacts/trace-correlation.json)
-- [launch-gate-result.json](/workspaces/beta011/overlays/myStarterKit/artifacts/launch-gate-result.json)
-- [reviewer evidence bundle](/workspaces/beta011/evidence/reviewer_evidence_bundle.json)
+- [governed-request-feed.json](overlays/myStarterKit/artifacts/governed-request-feed.json)
+- [governed-flow-summary.json](overlays/myStarterKit/artifacts/governed-flow-summary.json)
+- [identity-evidence.json](overlays/myStarterKit/artifacts/identity-evidence.json)
+- [policy-evidence.json](overlays/myStarterKit/artifacts/policy-evidence.json)
+- [retrieval-evidence.json](overlays/myStarterKit/artifacts/retrieval-evidence.json)
+- [secret-evidence.json](overlays/myStarterKit/artifacts/secret-evidence.json)
+- [audit-records.jsonl](overlays/myStarterKit/artifacts/audit-records.jsonl)
+- [trace-correlation.json](overlays/myStarterKit/artifacts/trace-correlation.json)
+- [launch-gate-result.json](overlays/myStarterKit/artifacts/launch-gate-result.json)
+- [reviewer evidence bundle](evidence/reviewer_evidence_bundle.json)
 
 Panel evidence sources:
 
@@ -349,8 +359,8 @@ See `docs/strict-live-proof-matrix.md` for the acceptance criteria and pass/fail
 
 ## Proof And Dashboard Docs
 
-- [docs/client-overview.md](/workspaces/beta011/docs/client-overview.md): client-facing explanation layer and how it maps back to the technical dashboard
-- [docs/reviewer-fast-path.md](/workspaces/beta011/docs/reviewer-fast-path.md): shortest path to see a pass, a deny, and a no-go
-- [docs/strict-live-proof-matrix.md](/workspaces/beta011/docs/strict-live-proof-matrix.md): acceptance criteria and dependency-by-dependency proof matrix
-- [docs/dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md): what to look for in the dashboard for pass and deny cases
-- [docs/control-plane-dashboard-homepage.md](/workspaces/beta011/docs/control-plane-dashboard-homepage.md): dashboard structure and data sourcing
+- [docs/client-overview.md](docs/client-overview.md): client-facing explanation layer and how it maps back to the technical dashboard
+- [docs/reviewer-fast-path.md](docs/reviewer-fast-path.md): shortest path to see a pass, a deny, and a no-go
+- [docs/strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md): acceptance criteria and dependency-by-dependency proof matrix
+- [docs/dashboard-visual-proof.md](docs/dashboard-visual-proof.md): what to look for in the dashboard for pass and deny cases
+- [docs/control-plane-dashboard-homepage.md](docs/control-plane-dashboard-homepage.md): dashboard structure and data sourcing

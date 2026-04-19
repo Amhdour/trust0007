@@ -4,9 +4,9 @@ This document defines when the repo is allowed to claim that the strict live gov
 
 Fast supporting links:
 
-- reviewer landing page: [reviewer-fast-path.md](/workspaces/beta011/docs/reviewer-fast-path.md)
-- visual proof guide: [dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md)
-- reviewer evidence bundle: [reviewer_evidence_bundle.json](/workspaces/beta011/evidence/reviewer_evidence_bundle.json)
+- reviewer landing page: [reviewer-fast-path.md](reviewer-fast-path.md)
+- visual proof guide: [dashboard-visual-proof.md](dashboard-visual-proof.md)
+- reviewer evidence bundle: [reviewer_evidence_bundle.json](../evidence/reviewer_evidence_bundle.json)
 
 ## Acceptance criteria
 
@@ -27,6 +27,8 @@ The strict HTTP dependency matrix below uses the Onyx lane as the deepest tested
 | Scenario | Endpoint exercised | Expected result | Primary proof test | Reviewer artifact | Dashboard signal |
 | --- | --- | --- | --- | --- | --- |
 | Live pass | `/launch/onyx?path=/app&mode=live` | allow | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_passes_through_http_dependency_chain` | `evidence/reviewer/inspectable-live-runtime/allowed-flow.json` | `Latest handoff=ALLOW`, `Evidence mode=LIVE`, `Readiness=GO` |
+| Dify live pass | `/launch/dify?path=/apps&mode=live&mcp=mcp_server.dashboard_control_plane` | allow | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_dify_handoff_passes_with_runtime_specific_governance` | `overlays/myStarterKit/artifacts/dify-runtime-proof.json` | `Dify runtime proof updated`, `Latest handoff=ALLOW` |
+| Dify MCP deny | `/launch/dify?path=/apps&mode=live&mcp=mcp_server.unapproved` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_dify_handoff_denies_unapproved_mcp_server` | `overlays/myStarterKit/artifacts/governed-flow-summary.json` | `Reason=policy.mcp_server_not_allowed` |
 | Missing bearer token | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[identity missing token]` | `evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json` | `Identity result=DENY` |
 | Invalid bearer token | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[identity invalid token]` | `evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json` | `Identity result=DENY` |
 | Missing tenant claim | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[identity tenant missing]` | `evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json` | `Identity result=DENY` |
