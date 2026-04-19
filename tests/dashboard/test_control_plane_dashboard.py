@@ -270,6 +270,43 @@ def test_fallback_mode_banner_uses_review_only_copy(monkeypatch) -> None:
     assert mode_banner["disclosure_label"] == "What this mode means"
 
 
+def test_live_mode_without_bootstrapped_artifacts_does_not_fall_back_to_demo(monkeypatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_GOVERNANCE_MODE", "live")
+    monkeypatch.setattr(
+        posture_service_module,
+        "_event_feed",
+        lambda resolved_root: ([], "Live governed artifacts missing; governed bootstrap has not completed", "overlays/myStarterKit/artifacts/events.jsonl"),
+    )
+    monkeypatch.setattr(posture_service_module, "load_latest_governed_flow_summary", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_identity_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_policy_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_retrieval_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_secret_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_trace_correlation", lambda resolved_root: {})
+
+    payload = build_control_plane_dashboard()
+    mode_banner = payload["mode_banner"]
+    chip_lookup = {chip["display_label"]: chip["display_value"] for chip in mode_banner["chips"]}
+
+    assert mode_banner["label"] == "LIVE GOVERNED MODE"
+    assert mode_banner["status"] == "warning"
+    assert mode_banner["status_label"] == "Live proof"
+    assert chip_lookup["Proof source"] == "Live mode awaiting governed artifacts"
+    assert "bootstrap path" in mode_banner["display_summary"].lower()
+
+
+def test_event_feed_refuses_sample_fallback_in_live_mode(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_GOVERNANCE_MODE", "live")
+    monkeypatch.setattr(posture_service_module, "has_live_governed_flow_artifacts", lambda root: False)
+    monkeypatch.setattr(posture_service_module, "load_sample_events", lambda root: [{"event_type": "sample"}])
+
+    events, label, path = posture_service_module._event_feed(tmp_path)
+
+    assert events == []
+    assert "missing" in label.lower()
+    assert path == "overlays/myStarterKit/artifacts/events.jsonl"
+
+
 def test_dashboard_tabs_and_sections_have_reviewer_operator_grouping() -> None:
     payload = build_control_plane_dashboard()
 
