@@ -712,6 +712,25 @@ def _section_meta(contract: dict[str, Any]) -> dict[str, dict[str, str]]:
     }
 
 
+def _section_contract_meta(section_contracts: dict[str, dict[str, str]], section_id: str) -> dict[str, str]:
+    """Return contract metadata for a section id with a safe fallback.
+
+    This keeps legacy section builders from crashing when the contract intentionally
+    narrows the homepage/drill-down section list.
+    """
+    fallback_title = section_id.replace("-", " ").title()
+    return section_contracts.get(
+        section_id,
+        {
+            "id": section_id,
+            "title": fallback_title,
+            "description": f"Legacy section: {fallback_title}.",
+            "group": "operator",
+            "group_label": "Technical Details",
+        },
+    )
+
+
 def _upstream_components_by_classification(components: list[dict[str, Any]]) -> Counter[str]:
     return Counter(str(component.get("classification", "reference_only")) for component in components)
 
@@ -2749,11 +2768,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
 
     sections = [
         {
-            **section_contracts["overview"],
+            **_section_contract_meta(section_contracts, "overview"),
             "blocks": overview_blocks,
         },
         {
-            **section_contracts["governed-requests"],
+            **_section_contract_meta(section_contracts, "governed-requests"),
             "blocks": [
                 {
                     "type": "cards",
@@ -2805,7 +2824,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["blocked-actions"],
+            **_section_contract_meta(section_contracts, "blocked-actions"),
             "blocks": [
                 {
                     "type": "records",
@@ -2872,7 +2891,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["upstream-posture"],
+            **_section_contract_meta(section_contracts, "upstream-posture"),
             "blocks": [
                 {
                     "type": "cards",
@@ -2936,7 +2955,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["identity-session"],
+            **_section_contract_meta(section_contracts, "identity-session"),
             "blocks": [
                 {
                     "type": "cards",
@@ -2992,7 +3011,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["policy-enforcement"],
+            **_section_contract_meta(section_contracts, "policy-enforcement"),
             "blocks": [
                 {
                     "type": "cards",
@@ -3052,7 +3071,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["retrieval-boundaries"],
+            **_section_contract_meta(section_contracts, "retrieval-boundaries"),
             "blocks": [
                 {
                     "type": "cards",
@@ -3123,7 +3142,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["secret-access"],
+            **_section_contract_meta(section_contracts, "secret-access"),
             "blocks": [
                 {
                     "type": "cards",
@@ -3170,7 +3189,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["tool-mcp-governance"],
+            **_section_contract_meta(section_contracts, "tool-mcp-governance"),
             "blocks": [
                 {
                     "type": "cards",
@@ -3234,7 +3253,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["audit-replay"],
+            **_section_contract_meta(section_contracts, "audit-replay"),
             "blocks": [
                 {
                     "type": "cards",
@@ -3315,7 +3334,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["trace-correlation"],
+            **_section_contract_meta(section_contracts, "trace-correlation"),
             "blocks": [
                 {
                     "type": "cards",
@@ -3358,7 +3377,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["launch-gate"],
+            **_section_contract_meta(section_contracts, "launch-gate"),
             "blocks": [
                 {
                     "type": "cards",
@@ -3413,7 +3432,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["asset-coverage"],
+            **_section_contract_meta(section_contracts, "asset-coverage"),
             "blocks": [
                 {
                     "type": "cards",
@@ -3454,7 +3473,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["evidence-integrity"],
+            **_section_contract_meta(section_contracts, "evidence-integrity"),
             "blocks": [
                 {
                     "type": "cards",
@@ -3508,7 +3527,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
         },
         {
-            **section_contracts["entry-points"],
+            **_section_contract_meta(section_contracts, "entry-points"),
             "blocks": [
                 {
                     "type": "cards",
@@ -3543,6 +3562,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
     ]
     section_order = {str(section.get("id", "")): index for index, section in enumerate(contract.get("sections", []))}
+    allowed_section_ids = set(section_order)
+    # Contract is now the source of truth for what the homepage/drill-down should expose.
+    # Keep legacy section builders above intact for compatibility, but only emit contract-listed sections.
+    sections = [section for section in sections if str(section.get("id", "")) in allowed_section_ids]
     sections.sort(key=lambda section: section_order.get(str(section.get("id", "")), len(section_order)))
 
     sources = [
@@ -3558,6 +3581,53 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         _link("Dashboard ingestion feed", ingestion_href, "Dashboard export sample used for evidence drill-through and replay references.", "neutral", id="dashboard_ingestion_feed"),
     ]
 
+    readiness_decision = str(launch_summary.get("status", "")).upper().replace("-", "_")
+    readiness_decision = {
+        "GO": "GO",
+        "CONDITIONAL": "CONDITIONAL_GO",
+        "NO_GO": "NO_GO",
+    }.get(readiness_decision, readiness_decision or "NO_GO")
+
+    # Mapping note: these three compact blocks are derived from the previous
+    # command_center/readiness_panel/kpi style payload to keep homepage scope focused.
+    readiness = {
+        "decision": readiness_decision,
+        "readiness_score": int(launch_summary.get("readiness_score", 0)),
+        "top_blocker": str(top_failing_control.get("summary", "No active blocker listed.")),
+        "last_updated": launch_report_timestamp or dashboard_generated_at,
+        "evidence_mode": "live" if live_evidence_mode else "demo",
+        "latest_handoff_decision": _allow_deny_label(latest_handoff_allowed),
+    }
+
+    trust_proof = {
+        "identity_proven": bool(identity_authenticated and identity_live_step),
+        "policy_proven": bool(policy_allowed and policy_engine_step.lower() == "opa"),
+        "retrieval_proven": bool(retrieval_allowed and retrieval_live_step),
+        "tool_governance_proven": bool(len(tool_attempts) == 0 or len(tool_decisions) > 0),
+        "audit_proven": bool(audit_linkage.get("complete") or audit_linkage.get("record_count")),
+        "evidence_freshness": evidence_freshness_value,
+        "launch_report_available": bool(launch_report_href),
+        "governed_flow_summary_available": bool(governed_flow_summary),
+        "reviewer_bundle_available": bool(reviewer),
+    }
+
+    security_posture = {
+        "denied_events_count": len(deny_events),
+        "blocked_actions_count": len(blocked_actions),
+        "confirmation_required_count": len(confirmation_events),
+        "retrieval_denials_count": blocked_retrievals,
+        "tool_denials_count": denied_tool_attempts,
+        "failing_controls": [
+            {
+                "control": str(item.get("control", "")),
+                "status": str(item.get("status", "")),
+                "summary": str(item.get("summary", "")),
+            }
+            for item in failing_controls[:3]
+        ],
+        "residual_risk_count": len(residual_risks),
+    }
+
     return {
         "title": str(contract.get("title", "AI Trust & Security Stack Control Plane")),
         "subtitle": str(contract.get("subtitle", "")),
@@ -3571,6 +3641,9 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "detail": f"Primary event feed: {event_feed_path}",
             "display_label": "Live proof" if live_evidence_mode else ("Recent generated proof" if has_live_governed_flow_artifacts(resolved_root) else "Sample or demo proof"),
         },
+        "readiness": readiness,
+        "trust_proof": trust_proof,
+        "security_posture": security_posture,
         "repo_description_suggestion": str(contract.get("repo_description_suggestion", "")),
         "mode_banner": mode_banner,
         "reading_guide": reading_guide,

@@ -1,136 +1,64 @@
 {
-  "title": "AI Safety and Review Dashboard",
-  "subtitle": "A plain-language view of what the system watched, what it stopped, what proof exists, and whether it is safe to use now.",
-  "hero_copy": "This page is the first safety and review layer for the repository. It shows what the system is watching, what it stopped, why it stopped it, what proof we have, and whether the AI system can be used safely now. Onyx is the AI system behind it; this dashboard is the review layer that decides whether access is allowed and what evidence is required.",
+  "title": "Onyx Readiness Dashboard",
+  "subtitle": "Trust, Security, and Launch Posture for Governed Onyx Runtime.",
+  "hero_copy": "Onyx is the governed runtime plane. This page is the readiness, trust, and security decision surface: the homepage gives the decision now, and the drill-down sections provide the supporting evidence.",
   "landing_steps": [
-    "Check who is trying to use it",
-    "Apply rules and data limits",
-    "Record what happened and what was blocked",
-    "Decide whether it is safe to use now"
+    "Read the current readiness decision",
+    "Confirm trust proof freshness and completeness",
+    "Review the top failing or missing security control",
+    "Open drill-down sections for detailed evidence"
   ],
-  "repo_description_suggestion": "Dashboard-first AI safety and review layer for access decisions, proof quality, launch readiness, and auditable Onyx handoffs.",
+  "repo_description_suggestion": "Decision-first dashboard for governed Onyx runtime readiness, trust proof, and security posture.",
   "tabs": [
-    { "id": "overview", "label": "Big Picture", "group": "reviewer", "group_label": "Plain-Language Review" },
-    { "id": "governed-requests", "label": "Recent Requests", "group": "reviewer", "group_label": "Plain-Language Review" },
-    { "id": "blocked-actions", "label": "What Was Stopped", "group": "reviewer", "group_label": "Plain-Language Review" },
-    { "id": "launch-gate", "label": "Safety Check", "group": "reviewer", "group_label": "Plain-Language Review" },
-    { "id": "entry-points", "label": "AI System Access", "group": "reviewer", "group_label": "Plain-Language Review" },
-    { "id": "evidence-integrity", "label": "Proof Quality", "group": "reviewer", "group_label": "Plain-Language Review" },
-    { "id": "upstream-posture", "label": "Connected Systems", "group": "reviewer", "group_label": "Plain-Language Review" },
-    { "id": "identity-session", "label": "Who Is Trying To Use It", "group": "operator", "group_label": "Technical Details" },
-    { "id": "policy-enforcement", "label": "Rules Being Applied", "group": "operator", "group_label": "Technical Details" },
-    { "id": "retrieval-boundaries", "label": "What Information It Can Access", "group": "operator", "group_label": "Technical Details" },
-    { "id": "secret-access", "label": "Protected Keys And Passwords", "group": "operator", "group_label": "Technical Details" },
-    { "id": "tool-mcp-governance", "label": "What Actions The AI Can Take", "group": "operator", "group_label": "Technical Details" },
-    { "id": "audit-replay", "label": "What Happened And How We Review It", "group": "operator", "group_label": "Technical Details" },
-    { "id": "trace-correlation", "label": "Did We Follow The Full Process?", "group": "operator", "group_label": "Technical Details" },
-    { "id": "asset-coverage", "label": "What The System Is Watching", "group": "operator", "group_label": "Technical Details" }
+    { "id": "launch-gate", "label": "Readiness", "group": "reviewer", "group_label": "Homepage Decision" },
+    { "id": "entry-points", "label": "Onyx Access", "group": "reviewer", "group_label": "Homepage Decision" },
+    { "id": "policy-enforcement", "label": "Policy", "group": "operator", "group_label": "Evidence Drill-Down" },
+    { "id": "retrieval-boundaries", "label": "Retrieval", "group": "operator", "group_label": "Evidence Drill-Down" },
+    { "id": "tool-mcp-governance", "label": "Tools / MCP", "group": "operator", "group_label": "Evidence Drill-Down" },
+    { "id": "audit-replay", "label": "Audit Replay", "group": "operator", "group_label": "Evidence Drill-Down" }
   ],
   "sections": [
     {
-      "id": "overview",
-      "title": "Big Picture",
-      "description": "Current safety state, strongest proof, and where to drill next.",
-      "group": "reviewer",
-      "group_label": "Plain-Language Review"
-    },
-    {
-      "id": "governed-requests",
-      "title": "Recent Requests",
-      "description": "Latest checked requests, using safe previews instead of raw prompts.",
-      "group": "reviewer",
-      "group_label": "Plain-Language Review"
-    },
-    {
-      "id": "blocked-actions",
-      "title": "What The System Stopped",
-      "description": "Requests or actions stopped to prevent unsafe or unauthorized behavior.",
-      "group": "reviewer",
-      "group_label": "Plain-Language Review"
-    },
-    {
       "id": "launch-gate",
-      "title": "Safety Check Before Use",
-      "description": "Whether the system is safe to use now, what still blocks it, and why.",
+      "title": "Onyx Readiness",
+      "description": "Current launch decision, blockers, and residual risk for governed Onyx use.",
       "group": "reviewer",
-      "group_label": "Plain-Language Review"
+      "group_label": "Homepage Decision"
     },
     {
       "id": "entry-points",
-      "title": "AI System Access",
-      "description": "When AI access was allowed or blocked, and the proof behind that decision.",
+      "title": "Onyx Access",
+      "description": "Latest governed handoff outcomes and required access evidence.",
       "group": "reviewer",
-      "group_label": "Plain-Language Review"
-    },
-    {
-      "id": "evidence-integrity",
-      "title": "How Reliable The Proof Is",
-      "description": "Whether the proof is present, current, and complete enough to trust.",
-      "group": "reviewer",
-      "group_label": "Plain-Language Review"
-    },
-    {
-      "id": "upstream-posture",
-      "title": "Connected Parts Of The System",
-      "description": "Which connected components are on the proven path today and which are supporting or reference-only.",
-      "group": "reviewer",
-      "group_label": "Plain-Language Review"
-    },
-    {
-      "id": "identity-session",
-      "title": "Who Is Trying To Use It",
-      "description": "Identity and session checks behind protected access.",
-      "group": "operator",
-      "group_label": "Technical Details"
+      "group_label": "Homepage Decision"
     },
     {
       "id": "policy-enforcement",
-      "title": "Rules Being Applied",
-      "description": "Rules applied, what they blocked, and why.",
+      "title": "Policy Enforcement",
+      "description": "Allow/deny decisions, reason codes, and policy sources.",
       "group": "operator",
-      "group_label": "Technical Details"
+      "group_label": "Evidence Drill-Down"
     },
     {
       "id": "retrieval-boundaries",
-      "title": "What Information It Can Access",
-      "description": "What data the AI can access and what was refused.",
+      "title": "Retrieval Boundaries",
+      "description": "What data access was allowed or denied for governed requests.",
       "group": "operator",
-      "group_label": "Technical Details"
-    },
-    {
-      "id": "secret-access",
-      "title": "Protected Keys And Passwords",
-      "description": "Whether protected credentials were needed and handled safely.",
-      "group": "operator",
-      "group_label": "Technical Details"
+      "group_label": "Evidence Drill-Down"
     },
     {
       "id": "tool-mcp-governance",
-      "title": "What Actions The AI Can Take",
-      "description": "Which AI actions are allowed, blocked, or approval-gated.",
+      "title": "Tool and MCP Governance",
+      "description": "Governed tool actions, denials, and approval-gated operations.",
       "group": "operator",
-      "group_label": "Technical Details"
+      "group_label": "Evidence Drill-Down"
     },
     {
       "id": "audit-replay",
-      "title": "What Happened And How We Review It",
-      "description": "What was recorded, what can be replayed, and where the detailed proof lives.",
+      "title": "Audit and Replay",
+      "description": "Trace-linked records used to verify and replay governed decisions.",
       "group": "operator",
-      "group_label": "Technical Details"
-    },
-    {
-      "id": "trace-correlation",
-      "title": "Did We Follow The Full Process?",
-      "description": "Whether the full checked process stayed tied together from start to finish.",
-      "group": "operator",
-      "group_label": "Technical Details"
-    },
-    {
-      "id": "asset-coverage",
-      "title": "What The System Is Watching",
-      "description": "The product, data, tools, and users currently under protection.",
-      "group": "operator",
-      "group_label": "Technical Details"
+      "group_label": "Evidence Drill-Down"
     }
   ]
 }

@@ -1,11 +1,11 @@
-# AI Trust & Security Stack Control Plane
+# Onyx Readiness Dashboard
 
-This repository is a **dashboard-first AI Trust & Security control plane**. It proves a governed runtime handoff into Onyx, a strict live governed path, dependency-specific fail-closed behavior, and evidence-backed launch readiness without treating every vendored upstream as equally active.
+This repository is a **dashboard-first Onyx readiness, trust, and security review surface**. It proves a governed runtime handoff into Onyx, a strict live governed path, dependency-specific fail-closed behavior, and evidence-backed launch readiness without treating every vendored upstream as equally active.
 
-The homepage is a repo-owned **Trust & Security Operations Dashboard for RAG and Autonomous Agents**. Onyx is the governed runtime plane behind that dashboard, not the primary visible product entry. This dashboard is the trust/security control plane that decides whether, how, and with what evidence access to Onyx is allowed.
+The homepage is a repo-owned **Onyx Readiness Dashboard for trust, security, and launch posture**. Onyx is the governed runtime plane behind that dashboard, not the primary visible product entry. This dashboard is the review/readiness/security surface that decides whether, how, and with what evidence access to Onyx is allowed.
 
 Suggested short repository description:
-`Dashboard-first AI Trust & Security Stack Control Plane for governed AI runtime launch readiness, policy enforcement, evidence integrity, and auditable Onyx handoffs.`
+`Onyx Readiness Dashboard for trust, security, launch posture, policy enforcement, evidence integrity, and auditable governed handoffs.`
 
 ## What This Repo Proves
 
@@ -107,7 +107,7 @@ That workflow:
 - applies a user-attribute-backed `tenant_id` mapper to the live web and smoke clients
 - creates or refreshes the governed live bootstrap user
 - seeds tenant-scoped Qdrant content and the required Vault runtime secret
-- starts the control plane in `live` / `staging` mode
+- starts the dashboard stack in `live` / `staging` mode
 - mints a real Keycloak token with `openid email profile`
 - verifies `/launch/onyx?path=/app&mode=live` and the live dashboard evidence
 
