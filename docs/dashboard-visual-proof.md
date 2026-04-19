@@ -36,7 +36,7 @@ Open [dashboard-live-deny.svg](/workspaces/beta011/docs/images/dashboard-live-de
 
 - mode banner: `LIVE GOVERNED MODE`
 - top command summary showing `DENY` or `NO-GO`
-- flagship denied `/launch/onyx` proof spotlight near the top
+- flagship denied governed runtime proof spotlight near the top (Onyx example lane)
 - one dependency card showing a fail state
 - `Trace complete`: `no` or a dependency result showing `DENY`
 - `Missing evidence`: non-zero when launch-gate blocked the flow

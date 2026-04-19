@@ -72,6 +72,42 @@ class RuntimePolicyContext:
     source: str
 
 
+@dataclass(frozen=True)
+class RuntimeTarget:
+    key: str
+    label: str
+    runtime_class: str
+    default_path: str
+    tool_name: str
+    secret_path_suffix: str
+    port_env_var: str
+    default_port: int
+
+
+RUNTIME_REGISTRY: dict[str, RuntimeTarget] = {
+    "onyx": RuntimeTarget(
+        key="onyx",
+        label="Onyx",
+        runtime_class="rag",
+        default_path="/app",
+        tool_name="onyx",
+        secret_path_suffix="onyx",
+        port_env_var="CONTROL_PLANE_ONYX_PORT",
+        default_port=3010,
+    ),
+    "dify": RuntimeTarget(
+        key="dify",
+        label="Dify",
+        runtime_class="autonomous_agents",
+        default_path="/apps",
+        tool_name="dify",
+        secret_path_suffix="dify",
+        port_env_var="CONTROL_PLANE_DIFY_PORT",
+        default_port=8088,
+    ),
+}
+
+
 def _runtime_policy_context() -> RuntimePolicyContext:
     bundle = load_runtime_policy_bundle(REPO_ROOT)
     return RuntimePolicyContext(
@@ -91,11 +127,15 @@ def _public_service_url(port: int, path: str = "") -> str:
     return f"{base}{path}"
 
 
-def _onyx_runtime_port() -> int:
+def _runtime_target(runtime_key: str) -> RuntimeTarget:
+    return RUNTIME_REGISTRY.get(runtime_key.strip().lower(), RUNTIME_REGISTRY["onyx"])
+
+
+def _runtime_port(target: RuntimeTarget) -> int:
     try:
-        return int(os.environ.get("CONTROL_PLANE_ONYX_PORT", "3010"))
+        return int(os.environ.get(target.port_env_var, str(target.default_port)))
     except ValueError:
-        return 3010
+        return target.default_port
 
 
 def _governance_mode(explicit: str = "") -> str:
@@ -143,6 +183,15 @@ def _required_secret_path(tenant_id: str = "") -> str:
     return f"secret/data/runtime/{resolved_tenant}/governed-flow"
 
 
+def _runtime_secret_path(target: RuntimeTarget, tenant_id: str = "") -> str:
+    env_var = f"CONTROL_PLANE_{target.key.upper()}_SECRET_PATH"
+    explicit = os.environ.get(env_var, "").strip()
+    if explicit:
+        return explicit
+    resolved_tenant = tenant_id or _default_tenant_id()
+    return f"secret/data/runtime/{resolved_tenant}/{target.secret_path_suffix}"
+
+
 def _cookie_map(raw_cookie: str) -> dict[str, str]:
     cookie = SimpleCookie()
     cookie.load(raw_cookie or "")
@@ -186,6 +235,12 @@ def _resolve_surface(policy: dict, requested_path: str) -> dict:
     }
 
 
+def _runtime_controls(policy: dict, runtime_key: str) -> dict:
+    controls = policy.get("runtime_controls", {})
+    runtime = controls.get(runtime_key, {})
+    return runtime if isinstance(runtime, dict) else {}
+
+
 class RuntimePolicyChecker(PolicyChecker):
     def __init__(self, policy_context: RuntimePolicyContext) -> None:
         self._context = policy_context
@@ -210,6 +265,24 @@ class RuntimePolicyChecker(PolicyChecker):
                 )
 
         requested_path = str(request.metadata.get("requested_path", ""))
+        runtime_key = str(request.metadata.get("runtime_key", "onyx") or "onyx")
+        runtime_controls = _runtime_controls(self._policy, runtime_key)
+        if not runtime_controls:
+            return PolicyDecision(allow=False, reasons=[f"policy.runtime_not_configured:{runtime_key}"])
+
+        if runtime_key == "onyx" and bool(runtime_controls.get("require_data_boundary", False)):
+            tenant_sources = self._policy.get("retrieval", {}).get("tenant_allowed_sources", {}).get(request.tenant_id, [])
+            if not tenant_sources:
+                return PolicyDecision(allow=False, reasons=[f"policy.data_boundary_not_configured:{request.tenant_id}"])
+
+        if runtime_key == "dify" and bool(runtime_controls.get("require_mcp_governance", False)):
+            allowed_mcp_servers = set(runtime_controls.get("mcp_allowed_servers", []))
+            if not allowed_mcp_servers:
+                return PolicyDecision(allow=False, reasons=["policy.mcp_not_configured:dify"])
+            requested_mcp_server = str(request.metadata.get("requested_mcp_server", "")).strip()
+            if requested_mcp_server and requested_mcp_server not in allowed_mcp_servers:
+                return PolicyDecision(allow=False, reasons=[f"policy.mcp_server_not_allowed:{requested_mcp_server}"])
+
         if requested_path:
             surface_info = _resolve_surface(self._policy, requested_path)
             surface_name = surface_info.get("surface", "")
@@ -362,6 +435,8 @@ class RuntimeToolExecutor(ToolExecutor):
 def _runtime_tool_policy_config(policy_context: RuntimePolicyContext) -> ToolPolicyConfig:
     tool_policy = policy_context.document.get("tools", {})
     confirmation_required = set(tool_policy.get("confirmation_required_tools", []))
+    dify_controls = _runtime_controls(policy_context.document, "dify")
+    confirmation_required.update(dify_controls.get("approval_required_tools", []))
     argument_policies = tool_policy.get("argument_policies", {})
     return ToolPolicyConfig(
         tool_allowlist=set(tool_policy.get("allowed_tools", [])),
@@ -419,8 +494,9 @@ def _load_json_array(path: Path) -> list[dict]:
     return payload if isinstance(payload, list) else []
 
 
-def _onyx_reachability_summary(
+def _runtime_reachability_summary(
     *,
+    runtime_label: str,
     governance_allowed: bool,
     local_ready: bool | None,
     public_ready: bool | None,
@@ -430,23 +506,23 @@ def _onyx_reachability_summary(
     if not governance_allowed:
         status = "blocked_before_runtime"
         label = "Blocked before runtime"
-        detail = "Governance denied the handoff before the control plane could rely on Onyx runtime availability."
+        detail = f"Governance denied the handoff before the control plane could rely on {runtime_label} runtime availability."
     elif local_ready and public_ready:
         status = "local_and_public_ready"
         label = "Local + public reachable"
-        detail = "The governed target is reachable from the local Onyx runtime and from the public handoff URL."
+        detail = f"The governed target is reachable from the local {runtime_label} runtime and from the public handoff URL."
     elif local_ready:
         status = "local_ready_public_pending"
         label = "Local reachable, public pending"
-        detail = "The local Onyx runtime is up, but the public tunnel still needs attention before outside browser access will work cleanly."
+        detail = f"The local {runtime_label} runtime is up, but the public tunnel still needs attention before outside browser access will work cleanly."
     elif public_ready:
         status = "public_visible_local_unhealthy"
         label = "Public visible, local unhealthy"
-        detail = "The public URL responds, but the local Onyx runtime behind it is not healthy yet."
+        detail = f"The public URL responds, but the local {runtime_label} runtime behind it is not healthy yet."
     else:
         status = "runtime_unreachable"
         label = "Runtime not reachable"
-        detail = "Governance approved the handoff, but the configured Onyx runtime is not responding yet."
+        detail = f"Governance approved the handoff, but the configured {runtime_label} runtime is not responding yet."
     return {
         "status": status,
         "label": label,
@@ -458,12 +534,20 @@ def _onyx_reachability_summary(
     }
 
 
-def _sync_runtime_proof_refs(trace_id: str, proof: dict, refs: dict[str, str]) -> None:
+def _sync_runtime_proof_refs(trace_id: str, proof: dict, refs: dict[str, str], *, artifact_key: str, runtime_key: str) -> None:
     runtime_summary = {
+        "runtime_key": str(proof.get("runtime_key", runtime_key)),
+        "runtime_label": str(proof.get("runtime_label", "")),
+        "runtime_class": str(proof.get("runtime_class", "")),
         "captured_at": str(proof.get("generated_at", "")),
         "artifact": refs.get("latest", ""),
+        "canonical_artifact": refs.get("canonical", refs.get("latest", "")),
         "history_artifact": refs.get("history", refs.get("latest", "")),
         "requested_path": str(proof.get("requested_path", "")),
+        "handoff_allowed": bool(proof.get("handoff_allowed", False)),
+        "evidence_mode": str(proof.get("evidence_mode", "")),
+        "policy_source": str(proof.get("policy_source", "")),
+        "policy_path": str(proof.get("policy_path", "")),
         "reachability": dict(proof.get("reachability", {})),
         "continuity": dict(proof.get("continuity", {})),
         "latest_activity": dict(proof.get("latest_activity", {})),
@@ -481,6 +565,9 @@ def _sync_runtime_proof_refs(trace_id: str, proof: dict, refs: dict[str, str]) -
         if trace_id and str(payload.get("trace_id", "")) not in {"", trace_id}:
             continue
         payload["runtime_proof"] = runtime_summary
+        runtime_proofs = dict(payload.get("runtime_proofs", {}))
+        runtime_proofs[runtime_key] = runtime_summary
+        payload["runtime_proofs"] = runtime_proofs
         _write_json(summary_path, payload)
 
     feed_path = ARTIFACT_DIR / "governed-request-feed.json"
@@ -492,16 +579,20 @@ def _sync_runtime_proof_refs(trace_id: str, proof: dict, refs: dict[str, str]) -
         if str(item.get("trace_id", "")) != trace_id:
             continue
         artifact_refs = dict(item.get("artifact_refs", {}))
-        artifact_refs["onyx_runtime_proof"] = refs.get("history", refs.get("latest", ""))
+        artifact_refs[artifact_key] = refs.get("history", refs.get("latest", ""))
         item["artifact_refs"] = artifact_refs
         item["runtime_proof"] = runtime_summary
+        runtime_proofs = dict(item.get("runtime_proofs", {}))
+        runtime_proofs[runtime_key] = runtime_summary
+        item["runtime_proofs"] = runtime_proofs
         updated = True
     if updated:
         _write_json(feed_path, feed)
 
 
-def _record_onyx_runtime_proof(
+def _record_runtime_proof(
     *,
+    target: RuntimeTarget,
     requested_path: str,
     governance_allowed: bool,
     flow_result: GovernedFlowEvaluator | object | None,
@@ -513,28 +604,60 @@ def _record_onyx_runtime_proof(
 ) -> dict:
     trace_id = str(getattr(flow_result, "trace_id", "") if flow_result else "")
     session_id = str(getattr(flow_result, "session_id", "") if flow_result else "")
-    proof = build_onyx_runtime_proof(
-        REPO_ROOT,
-        requested_path=requested_path,
-        trace_id=trace_id,
-        session_id=session_id,
-    )
-    latest_path = ARTIFACT_DIR / "onyx-runtime-proof.json"
-    history_path = ARTIFACT_DIR / "governed-request-history" / trace_id / "onyx-runtime-proof.json" if trace_id else None
+    if target.key == "onyx":
+        proof = build_onyx_runtime_proof(
+            REPO_ROOT,
+            requested_path=requested_path,
+            trace_id=trace_id,
+            session_id=session_id,
+        )
+    else:
+        proof = {
+            "requested_path": requested_path,
+            "trace_id": trace_id,
+            "session_id": session_id,
+            "continuity": {
+                "status": "runtime_activity_observed" if governance_allowed else "blocked_before_runtime",
+                "label": "Runtime continuity observed" if governance_allowed else "Blocked before runtime",
+                "detail": (
+                    f"Governed {target.label} handoff approved; continuity is currently inferred from handoff telemetry."
+                    if governance_allowed
+                    else f"Governed {target.label} handoff was denied before runtime continuity checks."
+                ),
+            },
+            "latest_activity": {
+                "summary": (
+                    f"Latest governed {target.label} handoff event recorded."
+                    if governance_allowed
+                    else f"No governed {target.label} runtime activity because handoff was denied."
+                )
+            },
+            "matched_activity": {},
+        }
+    runtime_artifact = f"{target.key}-runtime-proof.json"
+    latest_path = ARTIFACT_DIR / runtime_artifact
+    canonical_latest_path = ARTIFACT_DIR / "runtime-proof.json"
+    history_path = ARTIFACT_DIR / "governed-request-history" / trace_id / runtime_artifact if trace_id else None
     refs = {
         "latest": _artifact_relative_path(latest_path),
+        "canonical": _artifact_relative_path(canonical_latest_path),
         "history": _artifact_relative_path(history_path) if history_path else _artifact_relative_path(latest_path),
     }
     proof.update(
         {
             "artifact": refs["latest"],
+            "canonical_artifact": refs["canonical"],
             "history_artifact": refs["history"],
             "handoff_allowed": governance_allowed,
             "evidence_mode": str(getattr(flow_result, "evidence_mode", flow_mode) if flow_result else flow_mode),
             "launch_gate_decision": str(getattr(flow_result, "launch_gate_decision", "") if flow_result else ""),
             "policy_source": str(getattr(flow_result, "policy_source", "") if flow_result else ""),
             "policy_path": str(getattr(flow_result, "policy_path", "") if flow_result else ""),
-            "reachability": _onyx_reachability_summary(
+            "runtime_key": target.key,
+            "runtime_label": target.label,
+            "runtime_class": target.runtime_class,
+            "reachability": _runtime_reachability_summary(
+                runtime_label=target.label,
                 governance_allowed=governance_allowed,
                 local_ready=local_ready,
                 public_ready=public_ready,
@@ -544,9 +667,16 @@ def _record_onyx_runtime_proof(
         }
     )
     _write_json(latest_path, proof)
+    _write_json(canonical_latest_path, proof)
     if history_path:
         _write_json(history_path, proof)
-        _sync_runtime_proof_refs(trace_id, proof, refs)
+        _sync_runtime_proof_refs(
+            trace_id,
+            proof,
+            refs,
+            artifact_key=f"{target.key}_runtime_proof",
+            runtime_key=target.key,
+        )
     return proof
 
 
@@ -554,7 +684,8 @@ def _runtime_proof_markup(runtime_proof: dict) -> str:
     continuity = dict(runtime_proof.get("continuity", {}))
     reachability = dict(runtime_proof.get("reachability", {}))
     latest_activity = dict(runtime_proof.get("matched_activity") or runtime_proof.get("latest_activity") or {})
-    latest_summary = str(latest_activity.get("summary", "")) or "No recent Onyx runtime activity captured yet."
+    runtime_label = str(runtime_proof.get("runtime_label", "Runtime"))
+    latest_summary = str(latest_activity.get("summary", "")) or f"No recent {runtime_label} runtime activity captured yet."
     latest_timestamp = str(latest_activity.get("timestamp", ""))
     latest_activity_markup = escape(latest_summary)
     if latest_timestamp:
@@ -572,7 +703,7 @@ def _runtime_proof_markup(runtime_proof: dict) -> str:
         <div class="muted">Reachability: <code>{escape(str(reachability.get("label", "Unavailable")))}</code></div>
         <div class="muted">Continuity: <code>{escape(str(continuity.get("label", "Unavailable")))}</code></div>
         <div class="muted">{escape(str(continuity.get("detail", "")))}</div>
-        <div class="muted">Latest Onyx activity: {latest_activity_markup}</div>
+        <div class="muted">Latest {escape(runtime_label)} activity: {latest_activity_markup}</div>
         {artifact_markup}
       </div>
 """
@@ -789,10 +920,12 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             self._serve_repo_file(path.removeprefix("/raw/"))
             return
 
-        if path == "/launch/onyx":
-            requested_path = parse_qs(parsed.query).get("path", ["/app"])[0]
-            self._serve_onyx_handoff(requested_path)
-            return
+        if path.startswith("/launch/"):
+            runtime_key = path.removeprefix("/launch/").strip().lower()
+            if runtime_key in RUNTIME_REGISTRY:
+                requested_path = parse_qs(parsed.query).get("path", [RUNTIME_REGISTRY[runtime_key].default_path])[0]
+                self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+                return
 
         self._serve_static(path)
 
@@ -901,10 +1034,10 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             return
         self._send_file(candidate)
 
-    def _serve_onyx_handoff(self, requested_path: str) -> None:
-        """Serve Onyx handoff with governance enforcement.
+    def _serve_runtime_handoff(self, requested_path: str, *, runtime: str = "onyx") -> None:
+        """Serve runtime handoff with governance enforcement.
         
-        Before allowing handoff to Onyx, check governance policies.
+        Before allowing handoff to a runtime, check governance policies.
         Block handoff if policy/retrieval/tools deny the access.
         Emit decision events for audit trail.
         """
@@ -912,16 +1045,19 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         safe_path_html = escape(safe_path)
         flow_result = None
         error_reason = None
-        parsed = urlparse(getattr(self, "path", f"/launch/onyx?path={quote(safe_path, safe='/?=&')}"))
+        target = _runtime_target(runtime or "onyx")
+        runtime_name = target.key
+        runtime_title = target.label
+        parsed = urlparse(getattr(self, "path", f"/launch/{runtime_name}?path={quote(safe_path, safe='/?=&')}"))
         query = parse_qs(parsed.query)
         flow_mode = _governance_mode(query.get("mode", [""])[-1] if query.get("mode") else "")
         view_mode = query.get("view", [""])[-1].strip().lower()
         dashboard_workspace_view = view_mode in {"dashboard", "embedded", "workspace"}
         live_mode = flow_mode == "live"
-        question = query.get("question", [f"Navigate to Onyx path: {safe_path}"])[-1]
+        question = query.get("question", [f"Navigate to {runtime_title} path: {safe_path}"])[-1]
 
         def launch_view_href(path: str, *, mode: str = "", view: str = "") -> str:
-            href = f"/launch/onyx?path={quote(path, safe='/?=&')}"
+            href = f"/launch/{runtime_name}?path={quote(path, safe='/?=&')}"
             if mode:
                 href = f"{href}&mode={quote(mode, safe='')}"
             if view:
@@ -930,32 +1066,57 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
         default_tenant_id = _default_tenant_id()
 
-        # Run governance check for Onyx handoff
+        # Run governance check for runtime handoff
         try:
             policy_context = _runtime_policy_context()
+            runtime_controls = _runtime_controls(policy_context.document, runtime_name)
             surface_info = _resolve_surface(policy_context.document, safe_path)
             evaluator = _build_governed_flow_evaluator(policy_context, flow_mode=flow_mode)
+            retrieval_needed_for_runtime = live_mode and bool(runtime_controls.get("require_retrieval_security", target.runtime_class == "rag"))
+            requested_mcp_server = query.get("mcp", ["mcp_server.dashboard_control_plane"])[-1]
+            requested_action = query.get("action", [""])[-1].strip().lower()
+            requested_tools = [target.tool_name]
+            if runtime_name == "dify":
+                approval_required_actions = set(runtime_controls.get("approval_required_actions", []))
+                approval_required_tools = list(runtime_controls.get("approval_required_tools", []))
+                if requested_action and requested_action in approval_required_actions:
+                    requested_tools.extend(approval_required_tools)
 
             flow_result = evaluator.run(
                 user_id=_dashboard_user_id(),
                 tenant_id=default_tenant_id,
                 prompt=question,
-                requested_tools=["onyx"],
+                requested_tools=requested_tools,
                 retrieval_source="qdrant",
-                retrieval_needed=live_mode,
+                retrieval_needed=retrieval_needed_for_runtime,
                 roles=["tenant_user"],
                 request_metadata={
                     "requested_path": safe_path,
+                    "runtime_key": runtime_name,
+                    "runtime_class": target.runtime_class,
+                    "requested_mcp_server": requested_mcp_server if runtime_name == "dify" else "",
                     "surface": surface_info.get("surface", ""),
                     "surface_query": surface_info.get("query", {}),
                 },
                 tool_arguments={
-                    "onyx": {
+                    target.tool_name: {
                         "surface": surface_info.get("surface", ""),
                         "path": surface_info.get("path", safe_path),
                         "chat_mode": surface_info.get("query", {}).get("chatMode", ""),
+                        **({"mcp_server": requested_mcp_server} if runtime_name == "dify" else {}),
+                        **({"action": requested_action} if runtime_name == "dify" and requested_action else {}),
                     }
-                },
+                }
+                | (
+                    {
+                        tool: {
+                            "action": requested_action,
+                            "runtime": runtime_name,
+                        }
+                        for tool in requested_tools
+                        if tool != target.tool_name
+                    }
+                ),
                 policy_source=policy_context.source,
                 policy_path=policy_context.relative_path,
                 authorization_header=self.headers.get("Authorization", ""),
@@ -963,9 +1124,9 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 evidence_mode=flow_mode,
                 secret_request={
                     "needed": live_mode,
-                    "secret_path": _onyx_secret_path(default_tenant_id),
-                    "secret_key": os.environ.get("CONTROL_PLANE_ONYX_SECRET_KEY", "api_token"),
-                    "purpose": "onyx_runtime_handoff",
+                    "secret_path": _runtime_secret_path(target, default_tenant_id),
+                    "secret_key": os.environ.get("CONTROL_PLANE_RUNTIME_SECRET_KEY", "api_token"),
+                    "purpose": f"{runtime_name}_runtime_handoff",
                 }
                 if live_mode
                 else None,
@@ -975,12 +1136,13 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
         # Determine if handoff is allowed
         governance_allowed = flow_result.decision if flow_result else False
-        onyx_port = _onyx_runtime_port()
-        local_url = f"http://127.0.0.1:{onyx_port}{safe_path}"
-        public_url = _public_service_url(onyx_port, safe_path)
+        runtime_port = _runtime_port(target)
+        local_url = f"http://127.0.0.1:{runtime_port}{safe_path}"
+        public_url = _public_service_url(runtime_port, safe_path)
 
         if not governance_allowed:
-            runtime_proof = _record_onyx_runtime_proof(
+            runtime_proof = _record_runtime_proof(
+                target=target,
                 requested_path=safe_path,
                 governance_allowed=False,
                 flow_result=flow_result,
@@ -991,7 +1153,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 public_url=public_url,
             )
             if flow_result:
-                flow_result.artifacts["onyx_runtime_proof"] = str(runtime_proof.get("artifact", ""))
+                flow_result.artifacts[f"{runtime_name}_runtime_proof"] = str(runtime_proof.get("artifact", ""))
             denial_reasons = [escape(reason) for reason in (flow_result.reasons if flow_result else [f"Evaluator error: {error_reason or 'governance check failed'}"])]
             artifact_markup = _artifact_list_markup(flow_result.artifacts if flow_result else {})
             dependency_markup = _dependency_summary_markup(flow_result)
@@ -1061,7 +1223,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
       <p>Present a valid Keycloak-backed bearer token or enter through the deployment's OIDC front door before retrying the live workspace.</p>
       <p><a href="/">Return to dashboard</a></p>
       <div class="status">
-        <strong>Handoff to Onyx was denied by control-plane policy.</strong>
+        <strong>Handoff to {runtime_title} was denied by control-plane policy.</strong>
         <div class="muted">Evidence mode: <code>{escape(flow_result.evidence_mode if flow_result else flow_mode)}</code></div>
         <div class="muted">Governance decision: {flow_result.launch_gate_decision if flow_result else 'error'}</div>
         <div class="muted">Trace ID: <code>{flow_result.trace_id if flow_result else 'unknown'}</code></div>
@@ -1097,8 +1259,9 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
         # Governance allowed the handoff, proceed with link
         local_ready = self._url_is_reachable(local_url)
-        codespaces_visible = self._url_is_reachable(_public_service_url(onyx_port))
-        runtime_proof = _record_onyx_runtime_proof(
+        codespaces_visible = self._url_is_reachable(_public_service_url(runtime_port))
+        runtime_proof = _record_runtime_proof(
+            target=target,
             requested_path=safe_path,
             governance_allowed=True,
             flow_result=flow_result,
@@ -1109,75 +1272,83 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             public_url=public_url,
         )
         if flow_result:
-            flow_result.artifacts["onyx_runtime_proof"] = str(runtime_proof.get("artifact", ""))
+            flow_result.artifacts[f"{runtime_name}_runtime_proof"] = str(runtime_proof.get("artifact", ""))
         runtime_proof_section = _runtime_proof_markup(runtime_proof)
 
         if local_ready and codespaces_visible:
             runtime_summary = (
-                "The control plane found a reachable Onyx runtime on local port <code>3010</code> "
+                f"The control plane found a reachable {runtime_title} runtime on local port <code>{runtime_port}</code> "
                 f"and prepared the link for <code>{safe_path_html}</code>."
             )
-            status_headline = "Local Onyx is running."
+            status_headline = f"Local {runtime_title} is running."
             status_detail = "The public Codespaces URL appears reachable."
             next_steps = """
       <p>The governed runtime looks reachable from both the local service and the public Codespaces URL.</p>
 """
         elif local_ready and not codespaces_visible:
             runtime_summary = (
-                "The control plane found a reachable Onyx runtime on local port <code>3010</code> "
+                f"The control plane found a reachable {runtime_title} runtime on local port <code>{runtime_port}</code> "
                 f"and prepared the link for <code>{safe_path_html}</code>."
             )
-            status_headline = "Local Onyx is running."
-            status_detail = "The public Codespaces port for 3010 is still protected by the tunnel."
-            next_steps = """
-      <p>If this still opens a <code>401 tunnel</code> page, expose port <code>3010</code> in the Codespaces <strong>Ports</strong> tab and then try again.</p>
+            status_headline = f"Local {runtime_title} is running."
+            status_detail = f"The public Codespaces port for {runtime_port} is still protected by the tunnel."
+            next_steps = f"""
+      <p>If this still opens a <code>401 tunnel</code> page, expose port <code>{runtime_port}</code> in the Codespaces <strong>Ports</strong> tab and then try again.</p>
       <ol>
         <li>Open the <strong>Ports</strong> tab in Codespaces.</li>
-        <li>Find port <code>3010</code>.</li>
+        <li>Find port <code>{runtime_port}</code>.</li>
         <li>Use <strong>Open in Browser</strong> or change visibility from <code>Private</code> to <code>Public</code> or <code>Organization</code>.</li>
       </ol>
 """
         elif not local_ready and codespaces_visible:
             runtime_summary = (
-                "Governance approved the handoff, but the configured Onyx runtime on local port <code>3010</code> "
+                f"Governance approved the handoff, but the configured {runtime_title} runtime on local port <code>{runtime_port}</code> "
                 f"is not responding for <code>{safe_path_html}</code>."
             )
-            status_headline = "Local Onyx is not responding yet."
-            status_detail = "The public Codespaces URL is reachable, so the remaining issue is the local Onyx service itself."
-            next_steps = """
-      <p>Port exposure is not the blocker here. Start or repair the local Onyx runtime bound to port <code>3010</code>, then retry the governed handoff.</p>
+            status_headline = f"Local {runtime_title} is not responding yet."
+            status_detail = f"The public Codespaces URL is reachable, so the remaining issue is the local {runtime_title} service itself."
+            next_steps = f"""
+      <p>Port exposure is not the blocker here. Start or repair the local {runtime_title} runtime bound to port <code>{runtime_port}</code>, then retry the governed handoff.</p>
 """
         else:
             runtime_summary = (
-                "Governance approved the handoff, but the configured Onyx runtime on local port <code>3010</code> "
+                f"Governance approved the handoff, but the configured {runtime_title} runtime on local port <code>{runtime_port}</code> "
                 f"is not responding for <code>{safe_path_html}</code>."
             )
-            status_headline = "Local Onyx is not responding yet."
-            status_detail = "The public Codespaces port is also not reachable, but exposing the port alone will not fix this until the Onyx service is running."
-            next_steps = """
-      <p>Start the local Onyx runtime on port <code>3010</code> first. After that, if the public URL still shows a tunnel page, expose port <code>3010</code> in the Codespaces <strong>Ports</strong> tab.</p>
+            status_headline = f"Local {runtime_title} is not responding yet."
+            status_detail = f"The public Codespaces port is also not reachable, but exposing the port alone will not fix this until the {runtime_title} service is running."
+            next_steps = f"""
+      <p>Start the local {runtime_title} runtime on port <code>{runtime_port}</code> first. After that, if the public URL still shows a tunnel page, expose port <code>{runtime_port}</code> in the Codespaces <strong>Ports</strong> tab.</p>
       <ol>
-        <li>Start or repair the Onyx runtime bound to port <code>3010</code>.</li>
+        <li>Start or repair the {runtime_title} runtime bound to port <code>{runtime_port}</code>.</li>
         <li>Open the <strong>Ports</strong> tab in Codespaces.</li>
-        <li>Find port <code>3010</code>.</li>
+        <li>Find port <code>{runtime_port}</code>.</li>
         <li>Use <strong>Open in Browser</strong> or change visibility from <code>Private</code> to <code>Public</code> or <code>Organization</code>.</li>
       </ol>
 """
 
         if dashboard_workspace_view:
-            workspace_activity = build_onyx_workspace_activity(
-                REPO_ROOT,
-                requested_path=safe_path,
-                trace_id=str(flow_result.trace_id if flow_result else ""),
-                session_id=str(flow_result.session_id if flow_result and flow_result.session_id else ""),
-                limit=4,
-            )
-            activity_api_href = f"{str(workspace_activity.get('source_href', ''))}&format=html"
-            workspace_activity_markup = _workspace_activity_panel_markup(workspace_activity)
+            workspace_poll_ms = 5000
+            if target.key == "onyx":
+                workspace_activity = build_onyx_workspace_activity(
+                    REPO_ROOT,
+                    requested_path=safe_path,
+                    trace_id=str(flow_result.trace_id if flow_result else ""),
+                    session_id=str(flow_result.session_id if flow_result and flow_result.session_id else ""),
+                    limit=4,
+                )
+                activity_api_href = f"{str(workspace_activity.get('source_href', ''))}&format=html"
+                workspace_poll_ms = int(workspace_activity.get("poll_interval_ms", 5000))
+                workspace_activity_markup = _workspace_activity_panel_markup(workspace_activity)
+            else:
+                activity_api_href = ""
+                workspace_activity_markup = (
+                    f"<section class='activity-panel-shell'><div class='activity-panel-head'><div><p class='eyebrow'>Current {escape(runtime_title)} activity</p><h2>Current {escape(runtime_title)} Activity</h2><p class='activity-panel-summary'>Runtime-specific activity feed is not yet instrumented in this view.</p></div><div class='activity-panel-summary-badge activity-panel-summary-neutral'>Preview</div></div></section>"
+                )
             workspace_nav = [
-                ("Chat", launch_view_href("/app", mode="live", view="embedded")),
-                ("Search", launch_view_href("/app?chatMode=search", mode="live", view="embedded")),
-                ("Agents", launch_view_href("/app/agents", mode="live", view="embedded")),
+                ("Chat", launch_view_href("/app", mode="live", view="embedded")) if runtime_name == "onyx" else ("Apps", launch_view_href("/apps", mode="live", view="embedded")),
+                ("Search", launch_view_href("/app?chatMode=search", mode="live", view="embedded")) if runtime_name == "onyx" else ("Workflows", launch_view_href("/apps/workflows", mode="live", view="embedded")),
+                ("Agents", launch_view_href("/app/agents", mode="live", view="embedded")) if runtime_name == "onyx" else ("Tools", launch_view_href("/apps/tools", mode="live", view="embedded")),
             ]
             workspace_nav_markup = "".join(
                 f'<a class="surface-link{" is-active" if href == launch_view_href(safe_path, mode="live", view="embedded") else ""}" href="{href}">{label}</a>'
@@ -1187,30 +1358,30 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             frame_callout_markup = ""
             if codespaces_visible:
                 frame_callout_markup = (
-                    '<p class="frame-status">The live runtime target responded to the public dashboard handoff, so you can use Onyx here without leaving the control-plane shell.</p>'
+                    f'<p class="frame-status">The live runtime target responded to the public dashboard handoff, so you can use {runtime_title} here without leaving the control-plane shell.</p>'
                 )
                 workspace_main_markup = f"""
-      <section class="workspace-runtime" aria-label="Live Onyx runtime">
+      <section class="workspace-runtime" aria-label="Live {runtime_title} runtime">
         <iframe
           class="runtime-frame"
           src="{public_url}"
-          title="Live Onyx runtime for {safe_path_html}"
+          title="Live {runtime_title} runtime for {safe_path_html}"
           loading="eager"
           referrerpolicy="no-referrer"
         ></iframe>
       </section>
 """
             else:
-                frame_callout_markup = """
-        <div class="status-note">The live handoff passed, but the browser still cannot reach the public Onyx port yet. Use the checklist below to bring the runtime online and then re-check governance.</div>
+                frame_callout_markup = f"""
+        <div class="status-note">The live handoff passed, but the browser still cannot reach the public {runtime_title} port yet. Use the checklist below to bring the runtime online and then re-check governance.</div>
 """
                 workspace_main_markup = f"""
       <div class="runtime-placeholder">
         <h2>Runtime frame is not reachable yet</h2>
-        <p>The dashboard approved this live handoff, but the public Onyx port is not reachable from the browser yet for <code>{safe_path_html}</code>.</p>
+        <p>The dashboard approved this live handoff, but the public {runtime_title} port is not reachable from the browser yet for <code>{safe_path_html}</code>.</p>
         <ol class="runtime-fallback-list">
-          <li>Start or repair the local Onyx service with <code>bash scripts/start-onyx-lite.sh</code>.</li>
-          <li>Expose port <code>3010</code> in the Codespaces <strong>Ports</strong> tab if the public URL is still hidden behind the tunnel.</li>
+          <li>Start or repair the local {runtime_title} service.</li>
+          <li>Expose port <code>{runtime_port}</code> in the Codespaces <strong>Ports</strong> tab if the public URL is still hidden behind the tunnel.</li>
           <li>Use <strong>Re-check governance</strong> after the runtime responds so the embedded frame can load inside this workspace.</li>
         </ol>
         <div class="runtime-fallback-actions">
@@ -1607,7 +1778,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
           class="activity-panel"
           id="workspace-activity-root"
           data-activity-url="{escape(activity_api_href, quote=True)}"
-          data-poll-ms="{escape(str(workspace_activity.get('poll_interval_ms', 5000)), quote=True)}"
+          data-poll-ms="{escape(str(workspace_poll_ms), quote=True)}"
         >
           {workspace_activity_markup}
         </div>
@@ -1654,7 +1825,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
           try {{
             const response = await fetch(activityUrl, {{ cache: "no-store" }});
             if (!response.ok) {{
-              throw new Error(`Onyx activity API returned ${{response.status}}`);
+              throw new Error(`${runtime_title} activity API returned ${{response.status}}`);
             }}
             activityRoot.innerHTML = await response.text();
           }} catch (error) {{
@@ -1662,8 +1833,8 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
               <section class="activity-panel-shell">
                 <div class="activity-panel-head">
                   <div>
-                    <p class="eyebrow">Current Onyx activity</p>
-                    <h2>Current Onyx Activity</h2>
+                    <p class="eyebrow">Current {runtime_title} activity</p>
+                    <h2>Current {runtime_title} Activity</h2>
                     <p class="activity-panel-error">${{String(error.message || "Unknown error")}}</p>
                   </div>
                   <div class="activity-panel-summary-badge activity-panel-summary-warning">Refresh issue</div>
@@ -1694,7 +1865,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Open Onyx</title>
+    <title>Open {runtime_title}</title>
     <style>
       :root {{
         color-scheme: light;
@@ -1772,7 +1943,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
   </head>
   <body>
     <main>
-      <h1>Onyx Launch Handoff</h1>
+      <h1>{runtime_title} Launch Handoff</h1>
       <p>{runtime_summary}</p>
       <p><strong>Governance Status:</strong> ✓ Approved by control-plane policy.</p>
       <div class="status">
@@ -1783,7 +1954,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         <div class="muted">Missing evidence: <code>{escape(', '.join(flow_result.launch_gate_missing_evidence) if flow_result and flow_result.launch_gate_missing_evidence else 'none')}</code></div>
       </div>
       <div class="actions">
-        <a class="button" href="{public_url}">Open Onyx</a>
+        <a class="button" href="{public_url}">Open {runtime_title}</a>
       </div>
       <p class="muted">Target URL: <code>{public_url}</code></p>
       {next_steps}

@@ -1,12 +1,12 @@
-# Onyx Readiness Dashboard Homepage
+# AI Trust & Security Control Plane Homepage
 
 ## Architecture intent
 
-The dashboard now follows a strict three-layer information architecture:
+The dashboard follows a strict three-layer information architecture:
 
 1. **Homepage = decision surface**
    - answers only:
-     - Is Onyx ready now?
+     - Are governed runtime lanes ready now?
      - Why should I trust that answer?
      - What security control is failing?
 2. **Drill-down = evidence**
@@ -19,8 +19,11 @@ The dashboard now follows a strict three-layer information architecture:
 The homepage should stay compact and reviewer-friendly:
 
 - Minimal hero with current readiness signal
+- Runtime portfolio panel for governed lanes:
+  - **Onyx (RAG)**
+  - **Dify (Autonomous Agents)**
 - Three primary panels:
-  - **Onyx Readiness**
+  - **Runtime Readiness**
   - **Trust Proof**
   - **Security Posture**
 - Compact **Trust Scorecard** for core controls:

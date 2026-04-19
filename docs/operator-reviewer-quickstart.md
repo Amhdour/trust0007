@@ -15,10 +15,11 @@ Configure the live-mode variables in `compose/.env` before expecting live enforc
 
 - Dashboard path:
   - open `/`
-  - use the Onyx launch entry points
+  - use the Onyx or Dify launch entry points
 - API path:
   - call `/api/control-plane/governed-flow?mode=live`
   - or `/launch/onyx?path=/app&mode=live`
+  - or `/launch/dify?path=/apps&mode=live`
 
 ## 3. Verify live evidence on the dashboard
 

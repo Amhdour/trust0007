@@ -43,7 +43,9 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="live-runtime-link"' in html
     assert 'id="view-evidence-link"' in html
     assert "Open Onyx" in html
+    assert "Open Dify" in html
     assert "/launch/onyx?path=/app&mode=live&view=embedded" in html
+    assert "/launch/dify?path=/apps&mode=live&view=embedded" in html
     assert 'id="tab-strip"' in html
     assert 'id="dashboard-root"' in html
     assert "payload.title" in js
@@ -56,7 +58,7 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "renderDecisionHero" in js
     assert "renderDrilldownTabs" in js
     assert "ACTIVE_DRILLDOWN_SECTION_IDS" in js
-    assert "Onyx Readiness" in js
+    assert "AI Trust & Security Control Plane" in js
     assert "Trust Proof" in js
     assert "Security Posture" in js
     assert "readiness.decision" in js
@@ -123,7 +125,7 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
         "evidence_freshness",
     }
     assert payload["command_center"]["latest_request"]["title"]
-    assert payload["command_center"]["flagship_proof"]["title"] == "Denied /launch/onyx handoff"
+    assert payload["command_center"]["flagship_proof"]["title"] == "Denied governed runtime handoff (Onyx example)"
     assert payload["command_center"]["incident_banner"]["visible"] is True
     assert payload["command_center"]["incident_banner"]["status"] in {"healthy", "warning", "critical"}
     assert payload["command_center"]["incident_banner"]["title"]
@@ -181,7 +183,7 @@ def test_dashboard_payload_includes_runtime_summary_and_stack_health() -> None:
     runtime_summary = payload["command_center"]["runtime_summary"]
     stack_health = payload["stack_health"]
 
-    assert runtime_summary["title"] == "Onyx runtime status"
+    assert runtime_summary["title"] == "Governed runtime status (Onyx spotlight)"
     assert runtime_summary["actions"]
     assert any(item["label"] == "Reachability" for item in runtime_summary["items"])
     assert any(item["label"] == "Continuity" for item in runtime_summary["items"])
@@ -189,6 +191,50 @@ def test_dashboard_payload_includes_runtime_summary_and_stack_health() -> None:
     assert stack_health["groups"]
     assert any(group["title"] == "Core governed path" for group in stack_health["groups"])
     assert stack_health["action"]["href"] == "/raw/scripts/check-project-health.sh"
+    assert payload["runtime_portfolio"]["runtimes"]
+    assert {item["id"] for item in payload["runtime_portfolio"]["runtimes"]} >= {"onyx", "dify"}
+    runtime_portfolio = {item["runtime_key"]: item for item in payload["runtime_portfolio"]["runtimes"]}
+    assert runtime_portfolio["onyx"]["runtime_class"] == "rag"
+    assert runtime_portfolio["dify"]["runtime_class"] == "autonomous_agents"
+    assert runtime_portfolio["onyx"]["launch_route"]
+    assert runtime_portfolio["dify"]["launch_href"]
+    assert runtime_portfolio["onyx"]["evidence_href"]
+    assert runtime_portfolio["dify"]["primary_controls"]
+
+
+def test_runtime_portfolio_exposes_runtime_specific_launch_and_governance_fields() -> None:
+    payload = build_control_plane_dashboard()
+    runtime_portfolio = {item["runtime_key"]: item for item in payload["runtime_portfolio"]["runtimes"]}
+
+    onyx = runtime_portfolio["onyx"]
+    dify = runtime_portfolio["dify"]
+
+    for runtime in (onyx, dify):
+        assert runtime["launch_route"].startswith("/launch/")
+        assert runtime["launch_href"].endswith(runtime["launch_route"])
+        assert runtime["workspace_href"].endswith(runtime["launch_route"])
+        assert runtime["evidence_href"]
+        assert runtime["governance_focus"]
+        assert runtime["primary_controls"]
+
+    assert onyx["launch_route"].startswith("/launch/onyx?path=/app")
+    assert dify["launch_route"].startswith("/launch/dify?path=/apps")
+    assert any("Retrieval" in control for control in onyx["primary_controls"])
+    assert any("MCP" in control or "Tool" in control for control in dify["primary_controls"])
+
+
+def test_frontend_runtime_portfolio_has_dual_runtime_fallback_and_link_binding_logic() -> None:
+    js = Path("frontend/main-dashboard/app.js").read_text(encoding="utf-8")
+
+    assert "function defaultRuntimePortfolio()" in js
+    assert 'runtime_key: "onyx"' in js
+    assert 'runtime_key: "dify"' in js
+    assert 'launch_href: "/launch/onyx?path=/app&mode=live&view=embedded"' in js
+    assert 'launch_href: "/launch/dify?path=/apps&mode=live&view=embedded"' in js
+    assert "runtimeByKey.get(\"onyx\")?.launch_href" in js
+    assert "runtimeByKey.get(\"dify\")?.launch_href" in js
+    assert "liveRuntimeLink.setAttribute(\"href\", onyxLaunchHref)" in js
+    assert "liveDifyLink.setAttribute(\"href\", difyLaunchHref)" in js
 
 
 def test_fallback_mode_banner_uses_review_only_copy(monkeypatch) -> None:
@@ -324,6 +370,7 @@ def test_dashboard_prefers_overlay_policy_bundle_when_present() -> None:
     assert source_hrefs["Policy bundle"] == "/raw/overlays/myStarterKit/policies/bundles/default/policy.json"
     assert source_hrefs["Reviewer evidence bundle"] == "/raw/evidence/reviewer_evidence_bundle.json"
     assert "onyx-runtime-proof.json" in source_hrefs["Onyx runtime proof"]
+    assert "dify-runtime-proof.json" in source_hrefs["Dify runtime proof"]
 
     onyx_runtime = next(section for section in payload["sections"] if section["id"] == "entry-points")
     link_items = []
@@ -332,11 +379,14 @@ def test_dashboard_prefers_overlay_policy_bundle_when_present() -> None:
             link_items.extend(block["items"])
 
     links = {item["label"]: item for item in link_items}
-    assert links["Live Workspace"]["href"].endswith("/launch/onyx?path=/app&mode=live&view=embedded")
+    assert links["Open Onyx Workspace"]["href"].endswith("/launch/onyx?path=/app&mode=live&view=embedded")
     assert links["Open Chat"]["href"].endswith("/launch/onyx?path=/app")
     assert links["Open Agents"]["href"].endswith("/launch/onyx?path=/app/agents")
     assert links["Search Knowledge"]["href"].endswith("/launch/onyx?path=/app?chatMode=search")
-    assert "onyx-runtime-proof.json" in links["Latest runtime proof"]["href"]
+    assert links["Open Dify Apps"]["href"].endswith("/launch/dify?path=/apps")
+    assert links["Open Dify Workspace"]["href"].endswith("/launch/dify?path=/apps&mode=live&view=embedded")
+    assert "onyx-runtime-proof.json" in links["Latest Onyx runtime proof"]["href"]
+    assert "dify-runtime-proof.json" in links["Latest Dify runtime proof"]["href"]
     assert links["Onyx integration note"]["href"].endswith("/raw/docs/onyx-integration.md")
 
 
@@ -393,7 +443,7 @@ def test_dashboard_surfaces_flagship_denied_onyx_proof_and_audit_source() -> Non
         for item in block["items"]
     }
 
-    assert payload["command_center"]["flagship_proof"]["title"] == "Denied /launch/onyx handoff"
+    assert payload["command_center"]["flagship_proof"]["title"] == "Denied governed runtime handoff (Onyx example)"
     assert payload["security_posture"]["blocked_actions_count"] >= 0
     assert "Audit record source" in audit_card_labels
 

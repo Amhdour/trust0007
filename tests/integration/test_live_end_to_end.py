@@ -216,6 +216,60 @@ def test_live_onyx_agents_handoff_requires_admin_role() -> None:
         server.stop()
 
 
+def test_live_dify_handoff_route_is_governed() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    server = APIServer(repo_root)
+    server.start()
+
+    try:
+        response = http_get(server.url("/launch/dify?path=/apps"), timeout=10)
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        assert "Governance Status:</strong> ✓ Approved" in response.text
+        assert "Dify Launch Handoff" in response.text
+    finally:
+        server.stop()
+
+
+def test_live_dify_handoff_defaults_to_apps_path() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    server = APIServer(repo_root)
+    server.start()
+
+    try:
+        response = http_get(server.url("/launch/dify"), timeout=10)
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        assert "<code>/apps</code>" in response.text
+        assert "Dify Launch Handoff" in response.text
+    finally:
+        server.stop()
+
+
+def test_live_dify_handoff_blocks_unapproved_mcp_server() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    server = APIServer(repo_root)
+    server.start()
+
+    try:
+        response = http_get(server.url("/launch/dify?path=/apps&mcp=mcp_server.unapproved"), timeout=10)
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}"
+        assert "policy.mcp_server_not_allowed:mcp_server.unapproved" in response.text
+    finally:
+        server.stop()
+
+
+def test_live_dify_agents_handoff_requires_admin_role() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    server = APIServer(repo_root)
+    server.start()
+
+    try:
+        response = http_get(server.url("/launch/dify?path=/apps/agents"), timeout=10)
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}"
+        assert "policy.surface_role_denied:dify.agents" in response.text
+    finally:
+        server.stop()
+
+
 def test_live_dashboard_consumes_artifacts():
     """Test that dashboard API consumes live governed flow artifacts."""
     repo_root = Path(__file__).resolve().parents[2]

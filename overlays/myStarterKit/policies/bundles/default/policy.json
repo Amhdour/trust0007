@@ -66,6 +66,21 @@
         "allowed_roles": [
           "tenant_admin"
         ]
+      },
+      {
+        "path": "/apps",
+        "surface": "dify.apps",
+        "allowed_roles": [
+          "tenant_user",
+          "tenant_admin"
+        ]
+      },
+      {
+        "path": "/apps/agents",
+        "surface": "dify.agents",
+        "allowed_roles": [
+          "tenant_admin"
+        ]
       }
     ]
   },
@@ -105,17 +120,58 @@
       "uri"
     ]
   },
+  "runtime_controls": {
+    "onyx": {
+      "runtime_class": "rag",
+      "required_controls": [
+        "identity",
+        "policy",
+        "retrieval_security",
+        "data_boundary_enforcement",
+        "trace_audit",
+        "launch_gate"
+      ],
+      "require_retrieval_security": true,
+      "require_data_boundary": true
+    },
+    "dify": {
+      "runtime_class": "autonomous_agents",
+      "required_controls": [
+        "identity",
+        "policy",
+        "tool_authorization",
+        "mcp_governance",
+        "trace_audit",
+        "launch_gate"
+      ],
+      "require_retrieval_security": false,
+      "require_mcp_governance": true,
+      "mcp_allowed_servers": [
+        "mcp_server.dashboard_control_plane"
+      ],
+      "approval_required_actions": [
+        "publish",
+        "external_execute",
+        "privileged_tooling"
+      ],
+      "approval_required_tools": [
+        "dify_admin"
+      ]
+    }
+  },
   "tools": {
-    "allowed_tools": [
-      "onyx",
-      "search",
-      "summarize"
-    ],
+      "allowed_tools": [
+        "onyx",
+        "dify",
+        "search",
+        "summarize"
+      ],
     "forbidden_tools": [
       "admin_shell"
     ],
     "confirmation_required_tools": [
-      "export_evidence"
+      "export_evidence",
+      "dify_admin"
     ],
     "argument_policies": {
       "onyx": {
@@ -135,6 +191,35 @@
             "bypass"
           ]
         }
+      },
+      "dify": {
+        "allowed_arguments": [
+          "surface",
+          "path",
+          "chat_mode",
+          "mcp_server",
+          "action"
+        ],
+        "required_arguments": [
+          "surface",
+          "path"
+        ],
+        "forbidden_value_substrings": {
+          "path": [
+            "..",
+            "/admin",
+            "bypass"
+          ]
+        }
+      },
+      "dify_admin": {
+        "allowed_arguments": [
+          "action",
+          "runtime"
+        ],
+        "required_arguments": [
+          "action"
+        ]
       },
       "search": {
         "allowed_arguments": [
