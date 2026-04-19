@@ -297,6 +297,7 @@ fi
 
 vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault secrets enable -path=secret kv-v2 >/dev/null 2>&1 || true"
 vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault kv put secret/runtime/${TENANT_ID}/onyx api_token=runtime-secret >/dev/null"
+vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault kv put secret/runtime/${TENANT_ID}/dify api_token=runtime-secret >/dev/null"
 vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault kv put secret/runtime/${TENANT_ID}/governed-flow api_token=runtime-secret >/dev/null"
 
 echo "Copying Keycloak bootstrap assets into the container..."
@@ -407,3 +408,4 @@ echo "Vault state: ${VAULT_INIT_FILE}"
 echo
 echo "Next step:"
 echo "  python scripts/smoke-live-onyx-handoff.py"
+echo "  python scripts/bootstrap_runtime_evidence.py"

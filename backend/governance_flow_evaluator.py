@@ -238,6 +238,7 @@ class GovernedFlowEvaluator:
             "identity_evidence": self._artifact_dir / "identity-evidence.json",
             "policy_evidence": self._artifact_dir / "policy-evidence.json",
             "retrieval_evidence": self._artifact_dir / "retrieval-evidence.json",
+            "tool_evidence": self._artifact_dir / "tool-evidence.json",
             "secret_evidence": self._artifact_dir / "secret-evidence.json",
             "trace_correlation": self._artifact_dir / "trace-correlation.json",
             "governed_flow_summary": self._artifact_dir / "governed-flow-summary.json",
@@ -256,8 +257,11 @@ class GovernedFlowEvaluator:
         audit_stage_sequence: list[str] = []
         audit_record_count = 0
         question_telemetry = sanitize_question(prompt)
+        runtime_target = str(base_metadata.get("runtime_key", base_metadata.get("runtime_target", "onyx")) or "onyx")
+        runtime_class = str(base_metadata.get("runtime_class", "rag" if runtime_target == "onyx" else "autonomous_agents"))
         request_telemetry_common = {
-            "runtime_target": "onyx",
+            "runtime_target": runtime_target,
+            "runtime_class": runtime_class,
             "surface": surface_id,
             "requested_path": requested_path,
             "evidence_mode": mode,
@@ -313,7 +317,8 @@ class GovernedFlowEvaluator:
                     "tenant_id": tenant_value,
                     "surface": surface_id,
                     "requested_path": requested_path,
-                    "runtime_target": "onyx",
+                    "runtime_target": runtime_target,
+                    "runtime_class": runtime_class,
                     "stage": stage,
                     "action": action,
                     "outcome": outcome,
@@ -894,6 +899,8 @@ class GovernedFlowEvaluator:
                 "actor_id": effective_user_id,
                 "tenant_id": effective_tenant_id,
                 "surface": surface_id,
+                "runtime_target": runtime_target,
+                "runtime_class": runtime_class,
             },
             severity="info" if not tools_denied else "warning",
         )
@@ -909,6 +916,29 @@ class GovernedFlowEvaluator:
             severity="info" if not tools_denied else "warning",
             details={"allowed": tools_allowed, "denied": tools_denied},
         )
+        mcp_server = str(base_metadata.get("requested_mcp_server", "")).strip()
+        tool_evidence = {
+            "step": "tool_governance",
+            "captured_at": _now_iso(),
+            "trace_id": trace_id,
+            "request_id": request_id,
+            "session_id": session_id,
+            "actor_id": effective_user_id,
+            "tenant_id": effective_tenant_id,
+            "surface": surface_id,
+            "runtime_target": runtime_target,
+            "runtime_class": runtime_class,
+            "evidence_mode": mode,
+            "requested_tools": list(requested_tools),
+            "allowed_tools": list(tools_allowed),
+            "denied_tools": list(tools_denied),
+            "reason_codes": list(dict.fromkeys(tool_reasons)),
+            "mcp_server": mcp_server,
+            "mcp_governance_required": runtime_target == "dify",
+            "mcp_governed": runtime_target != "dify" or bool(mcp_server),
+            "provenance": "runtime-generated",
+        }
+        _write_json(artifact_paths["tool_evidence"], tool_evidence)
 
         final_reasons = list(
             dict.fromkeys(
@@ -1026,6 +1056,7 @@ class GovernedFlowEvaluator:
             "handoff.decision",
             {
                 "runtime_target": "onyx",
+                "runtime_class": runtime_class,
                 "actor_id": effective_user_id,
                 "tenant_id": effective_tenant_id,
                 "surface": surface_id,
@@ -1040,18 +1071,19 @@ class GovernedFlowEvaluator:
         )
         emit_audit(
             stage="handoff",
-            action="onyx.handoff",
+            action=f"{runtime_target}.handoff",
             outcome="allow" if final_decision else "deny",
             actor_id=effective_user_id,
             tenant_value=effective_tenant_id,
             session_value=session_id,
             reason_codes=list(final_reasons),
-            component="onyx",
+            component=runtime_target,
             severity="info" if final_decision else "warning",
             details={
                 "policy_source": policy_source,
                 "policy_path": policy_path,
-                "runtime_target": "onyx",
+                "runtime_target": runtime_target,
+                "runtime_class": runtime_class,
             },
         )
         repo_root = Path(__file__).resolve().parent.parent
@@ -1068,7 +1100,8 @@ class GovernedFlowEvaluator:
             "user_id": effective_user_id,
             "surface": surface_id,
             "requested_path": requested_path,
-            "runtime_target": "onyx",
+            "runtime_target": runtime_target,
+            "runtime_class": runtime_class,
             "evidence_mode": mode,
             "environment_mode": self._environment_mode,
             "identity_authenticated": identity_result.authenticated,
@@ -1273,7 +1306,8 @@ class GovernedFlowEvaluator:
             "surface": surface_id,
             "decision": final_decision,
             "reasons": final_reasons,
-            "runtime_target": "onyx",
+            "runtime_target": runtime_target,
+            "runtime_class": runtime_class,
             "requested_path": requested_path,
             "evidence_mode": mode,
             "environment_mode": self._environment_mode,

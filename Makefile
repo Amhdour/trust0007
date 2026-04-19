@@ -1,4 +1,4 @@
-.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check
+.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check up-dev up-live down-dev down-live verify-live
 
 CLIENT_NAME ?= Example Client
 CLIENT_SLUG ?= example-client
@@ -62,3 +62,18 @@ test-live-stack:
 
 health-check:
 	bash scripts/check-project-health.sh
+
+up-dev:
+	docker compose --env-file compose/.env -f compose/docker-compose.yml up -d
+
+down-dev:
+	docker compose --env-file compose/.env -f compose/docker-compose.yml down
+
+verify-live:
+	bash scripts/verify-live-env.sh .env.live
+
+up-live: verify-live
+	docker compose --env-file .env.live -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml up -d
+
+down-live:
+	docker compose --env-file .env.live -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml down

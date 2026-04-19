@@ -146,6 +146,60 @@ def _control_plane_environment_mode() -> str:
     return os.environ.get("CONTROL_PLANE_ENVIRONMENT_MODE", "dev").strip().lower() or "dev"
 
 
+def _is_local_url(url: str) -> bool:
+    lowered = url.strip().lower()
+    return any(token in lowered for token in ("localhost", "127.0.0.1", "0.0.0.0"))
+
+
+def _validate_startup_configuration() -> None:
+    governance_mode = _governance_mode()
+    environment_mode = _control_plane_environment_mode()
+    live_like_environment = environment_mode in {"staging", "stage", "production", "prod", "live"}
+    errors: list[str] = []
+
+    if governance_mode == "live" and environment_mode in {"dev", "local"}:
+        errors.append("startup.environment_mode_dev_not_allowed_for_live_governance")
+    if live_like_environment and governance_mode != "live":
+        errors.append("startup.governance_mode_must_be_live_for_staging_or_production")
+
+    keycloak_dev_mode = os.environ.get("CONTROL_PLANE_KEYCLOAK_DEV_MODE", "").strip().lower() in {"1", "true", "yes"}
+    vault_dev_mode = os.environ.get("CONTROL_PLANE_VAULT_DEV_MODE", "").strip().lower() in {"1", "true", "yes"}
+    if live_like_environment and keycloak_dev_mode:
+        errors.append("startup.keycloak_dev_mode_not_allowed")
+    if live_like_environment and vault_dev_mode:
+        errors.append("startup.vault_dev_mode_not_allowed")
+
+    if governance_mode == "live":
+        required_env = [
+            "CONTROL_PLANE_VAULT_TOKEN",
+            "CONTROL_PLANE_KEYCLOAK_BASE_URL",
+            "CONTROL_PLANE_OPA_URL",
+            "CONTROL_PLANE_QDRANT_URL",
+            "CONTROL_PLANE_ONYX_SECRET_PATH",
+            "CONTROL_PLANE_DIFY_SECRET_PATH",
+        ]
+        for env_name in required_env:
+            if not os.environ.get(env_name, "").strip():
+                errors.append(f"startup.missing_required_env:{env_name}")
+        if not os.environ.get("CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS", "").strip():
+            errors.append("startup.missing_required_env:CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS")
+
+    allow_local_targets = os.environ.get("CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS", "true").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    externally_reachable = os.environ.get("CONTROL_PLANE_EXTERNAL_REACHABLE", "false").strip().lower() in {"1", "true", "yes"}
+    if governance_mode == "live" and externally_reachable and not allow_local_targets:
+        for target in RUNTIME_REGISTRY.values():
+            runtime_url = _public_service_url(_runtime_port(target))
+            if _is_local_url(runtime_url):
+                errors.append(f"startup.local_runtime_target_not_allowed:{target.key}")
+
+    if errors:
+        raise RuntimeError("Live configuration validation failed: " + ", ".join(errors))
+
+
 def _keycloak_userinfo_url() -> str:
     explicit = os.environ.get("CONTROL_PLANE_KEYCLOAK_USERINFO_URL", "").strip()
     if explicit:
@@ -2009,6 +2063,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
 
 def run() -> None:
+    _validate_startup_configuration()
     host = os.environ.get("CONTROL_PLANE_HOST", "0.0.0.0")
     port = int(os.environ.get("CONTROL_PLANE_PORT", "3000"))
     server = ThreadingHTTPServer((host, port), ControlPlaneRequestHandler)
