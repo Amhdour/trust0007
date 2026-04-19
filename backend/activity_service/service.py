@@ -440,10 +440,57 @@ def _load_langfuse_activity(root: Path, limit: int) -> tuple[list[dict[str, str]
     return [], "connected, no traces yet"
 
 
+def _load_governed_onyx_activity(root: Path, limit: int) -> tuple[list[dict[str, str]], str]:
+    feed_path = root / "overlays/myStarterKit/artifacts/governed-request-feed.json"
+    if not feed_path.exists():
+        return [], "no governed runtime handoff records yet"
+    try:
+        records = json.loads(feed_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return [], "governed request feed unreadable"
+    if not isinstance(records, list):
+        return [], "governed request feed shape invalid"
+
+    entries: list[dict[str, str]] = []
+    for item in records:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("runtime_target", "")).lower() != "onyx":
+            continue
+        handoff_allowed = bool(item.get("handoff_allowed"))
+        timestamp_raw = str(item.get("timestamp", "")).strip() or _now_iso()
+        try:
+            timestamp = _parse_iso_timestamp(timestamp_raw)
+        except ValueError:
+            timestamp = datetime.now(timezone.utc)
+        requested_path = str(item.get("requested_path", "")).strip() or "/app"
+        entries.append(
+            _format_entry(
+                timestamp=timestamp,
+                source="governed_handoff",
+                source_label="Governed Onyx handoff",
+                event_type="Governed Onyx handoff",
+                summary=(
+                    f"Handoff {'allowed' if handoff_allowed else 'denied'} for {requested_path}"
+                ),
+                severity="info" if handoff_allowed else "warning",
+                request_id=str(item.get("session_id", "")),
+                trace_id=str(item.get("trace_id", "")),
+                tenant_id=str(item.get("tenant_id", "")),
+            )
+        )
+
+    if not entries:
+        return [], "no governed Onyx handoff records yet"
+    entries.sort(key=lambda item: item["timestamp"], reverse=True)
+    return entries[: limit * 2], "connected"
+
+
 def build_activity_snapshot(root: Path, limit: int = DEFAULT_ACTIVITY_LIMIT) -> dict[str, Any]:
     onyx_entries, onyx_status = _load_onyx_activity(limit)
+    governed_entries, governed_status = _load_governed_onyx_activity(root, limit)
     langfuse_entries, langfuse_status = _load_langfuse_activity(root, limit)
-    real_entries = onyx_entries + langfuse_entries
+    real_entries = onyx_entries + governed_entries + langfuse_entries
 
     combined_entries = list(real_entries)
     if not langfuse_entries:
@@ -492,6 +539,7 @@ def build_activity_snapshot(root: Path, limit: int = DEFAULT_ACTIVITY_LIMIT) -> 
         },
         "sources": {
             "onyx": onyx_status,
+            "governed_handoff": governed_status,
             "langfuse": langfuse_status,
         },
     }
@@ -815,8 +863,15 @@ def build_onyx_runtime_proof(
         for entry in snapshot.get("entries", [])
         if entry.get("source") == "onyx" and entry.get("event_type") != "Onyx status"
     ]
+    governed_onyx_entries = [
+        entry
+        for entry in snapshot.get("entries", [])
+        if entry.get("source") == "governed_handoff" and "Onyx" in str(entry.get("event_type", ""))
+    ]
     matched_entries = [entry for entry in onyx_entries if _matches_requested_path(entry, normalized_path)]
     latest_activity = matched_entries[0] if matched_entries else (onyx_entries[0] if onyx_entries else {})
+    if not latest_activity and governed_onyx_entries:
+        latest_activity = governed_onyx_entries[0]
 
     if matched_entries:
         continuity_status = "path_activity_observed"
@@ -831,6 +886,13 @@ def build_onyx_runtime_proof(
         continuity_detail = (
             "Recent Onyx activity is visible, but the current runtime logs do not expose the same trace or session "
             "identifiers, so continuity remains anchored in the control-plane trace."
+        )
+    elif governed_onyx_entries:
+        continuity_status = "governed_handoff_observed"
+        continuity_label = "Governed handoff observed"
+        continuity_detail = (
+            "Recent governed Onyx handoff activity is available from control-plane runtime records. "
+            "Container-level Onyx activity was not visible yet."
         )
     else:
         continuity_status = "no_runtime_activity"
@@ -847,8 +909,10 @@ def build_onyx_runtime_proof(
         "trace_id": trace_id,
         "session_id": session_id,
         "activity_source_status": str(snapshot.get("sources", {}).get("onyx", "")),
-        "activity_observed": bool(onyx_entries),
+        "activity_source_status_governed": str(snapshot.get("sources", {}).get("governed_handoff", "")),
+        "activity_observed": bool(onyx_entries or governed_onyx_entries),
         "activity_count": len(onyx_entries),
+        "governed_activity_count": len(governed_onyx_entries),
         "requested_path_activity_observed": bool(matched_entries),
         "requested_path_activity_count": len(matched_entries),
         "latest_activity": _activity_entry_summary(latest_activity) if latest_activity else {},

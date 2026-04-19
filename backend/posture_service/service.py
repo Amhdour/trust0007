@@ -639,12 +639,19 @@ def _artifact_integrity(path: Path, relative_path: str, root: Path) -> tuple[str
 
 
 def _event_feed(root: Path) -> tuple[list[dict[str, Any]], str, str]:
+    governance_mode = os.environ.get("CONTROL_PLANE_GOVERNANCE_MODE", "demo").strip().lower() or "demo"
     if has_live_governed_flow_artifacts(root):
         summary = load_latest_governed_flow_summary(root)
         evidence_mode = str(summary.get("evidence_mode", "live")).lower()
         return (
             load_latest_governed_flow_events(root),
             "Live governed flow artifacts" if evidence_mode == "live" else "Recent generated demo/local governed artifacts",
+            "overlays/myStarterKit/artifacts/events.jsonl",
+        )
+    if governance_mode == "live":
+        return (
+            [],
+            "Live governed artifacts missing; governed bootstrap has not completed",
             "overlays/myStarterKit/artifacts/events.jsonl",
         )
     return (
@@ -771,6 +778,7 @@ def _onyx_runtime_continuity_status(runtime_proof: dict[str, Any]) -> str:
     return {
         "path_activity_observed": "healthy",
         "runtime_activity_observed": "warning",
+        "governed_handoff_observed": "warning",
         "no_runtime_activity": "warning",
     }.get(status, "warning")
 
@@ -1265,6 +1273,7 @@ def build_control_plane_live_log(root: Path | None = None, limit: int = 12) -> d
 
 def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     resolved_root = repo_root(root)
+    governance_mode = os.environ.get("CONTROL_PLANE_GOVERNANCE_MODE", "demo").strip().lower() or "demo"
     contract = load_dashboard_contract(resolved_root)
     section_contracts = _section_meta(contract)
     services = load_service_inventory(resolved_root)
@@ -1322,6 +1331,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     request_ends = [event for event in events if event.get("event_type") == "request.end"]
     trace_ids = sorted({str(event.get("trace_id", "")) for event in events if event.get("trace_id")})
     live_evidence_mode = str(governed_flow_summary.get("evidence_mode", "")).lower() == "live"
+    live_mode_bootstrap_missing = governance_mode == "live" and not live_evidence_mode
     latest_trace_id = str(governed_flow_summary.get("trace_id", "")) or str(trace_correlation.get("trace_id", ""))
     latest_session_id = str(governed_flow_summary.get("session_id", "")) or str(trace_correlation.get("session_id", ""))
     latest_governed_flow_href = _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json")
@@ -1467,27 +1477,35 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     runtime_generated_demo = (not live_evidence_mode) and event_feed_path == "overlays/myStarterKit/artifacts/events.jsonl"
     mode_banner_label = (
         "LIVE GOVERNED MODE"
-        if live_evidence_mode
+        if live_evidence_mode or live_mode_bootstrap_missing
         else ("GOVERNED DEMO MODE" if runtime_generated_demo else "DEMO FALLBACK MODE")
     )
-    mode_banner_status = "healthy" if live_evidence_mode else "neutral"
-    mode_banner_status_label = "Live proof" if live_evidence_mode else "Review only"
+    mode_banner_status = "healthy" if live_evidence_mode else ("warning" if live_mode_bootstrap_missing else "neutral")
+    mode_banner_status_label = "Live proof" if (live_evidence_mode or live_mode_bootstrap_missing) else "Review only"
     mode_banner_display_label = (
         "Live governed mode"
         if live_evidence_mode
         else (
+            "Live governed mode is configured, but governed evidence bootstrap has not completed yet."
+            if live_mode_bootstrap_missing
+            else (
             "Review mode: generated local proof"
             if runtime_generated_demo
             else "Review mode: sample proof"
+            )
         )
     )
     mode_banner_display_summary = (
         "This page is backed by a live governed run with current identity, policy, retrieval, secret, trace, and launch evidence."
         if live_evidence_mode
         else (
+            "Live mode is configured, but no current governed live artifacts were found. Run the governed live bootstrap path before treating this as launch proof."
+            if live_mode_bootstrap_missing
+            else (
             "This page is backed by repo-generated demo artifacts. It is useful for review, but it does not prove the full live dependency chain."
             if runtime_generated_demo
             else "This page is using sample or fallback artifacts for review. It is not claiming a fresh governed live run."
+            )
         )
     )
     latest_governed_decision_display = _allow_deny_display(latest_handoff_allowed)
@@ -1705,6 +1723,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         f"Latest run posture: {latest_governed_posture}. Baseline posture: {baseline_posture_display}."
         if live_evidence_mode
         else (
+            f"Source: {event_feed_label}. Latest decision: {latest_governed_decision_display}. "
+            f"Fresh governed run: Not available. Baseline posture: {baseline_posture_display}."
+            if live_mode_bootstrap_missing
+            else (
             f"Source: governed local artifacts. Latest decision: {latest_governed_decision_display}. "
             f"Latest run posture: {latest_governed_posture}. Baseline posture: {baseline_posture_display}."
             if runtime_generated_demo
@@ -1712,17 +1734,26 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 f"Source: sample or fallback artifacts. Latest decision: {latest_governed_decision_display}. "
                 f"Fresh governed run: Not available. Baseline posture: {baseline_posture_display}."
             )
+            )
         )
     )
     mode_banner_chips = [
         {
             "label": "Evidence mode",
-            "value": "LIVE" if live_evidence_mode else ("GOVERNED DEMO" if runtime_generated_demo else "DEMO FALLBACK"),
+            "value": (
+                "LIVE"
+                if live_evidence_mode
+                else ("LIVE (BOOTSTRAP REQUIRED)" if live_mode_bootstrap_missing else ("GOVERNED DEMO" if runtime_generated_demo else "DEMO FALLBACK"))
+            ),
             "display_label": "Proof source",
             "display_value": (
                 "Live governed artifacts"
                 if live_evidence_mode
-                else ("Generated local proof" if runtime_generated_demo else "Sample review artifacts")
+                else (
+                    "Live mode awaiting governed artifacts"
+                    if live_mode_bootstrap_missing
+                    else ("Generated local proof" if runtime_generated_demo else "Sample review artifacts")
+                )
             ),
         },
         {
@@ -3664,7 +3695,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "readiness_score": int(launch_summary.get("readiness_score", 0)),
         "top_blocker": str(top_failing_control.get("summary", "No active blocker listed.")),
         "last_updated": launch_report_timestamp or dashboard_generated_at,
-        "evidence_mode": "live" if live_evidence_mode else "demo",
+        "evidence_mode": "live" if (live_evidence_mode or live_mode_bootstrap_missing) else "demo",
         "latest_handoff_decision": _allow_deny_label(latest_handoff_allowed),
     }
 
@@ -3705,10 +3736,26 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "generated_at": dashboard_generated_at,
         "runtime_module": "Safety review layer over governed Onyx (RAG) and Dify (Autonomous Agents) runtime lanes",
         "data_mode": {
-            "label": "Live current evidence" if live_evidence_mode else ("Recent generated governed evidence" if has_live_governed_flow_artifacts(resolved_root) else "Sample/demo governed evidence"),
-            "status": "healthy" if live_evidence_mode else ("healthy" if has_live_governed_flow_artifacts(resolved_root) else "warning"),
+            "label": (
+                "Live current evidence"
+                if live_evidence_mode
+                else (
+                    "Live evidence required (bootstrap missing)"
+                    if live_mode_bootstrap_missing
+                    else ("Recent generated governed evidence" if has_live_governed_flow_artifacts(resolved_root) else "Sample/demo governed evidence")
+                )
+            ),
+            "status": (
+                "healthy"
+                if live_evidence_mode
+                else ("warning" if live_mode_bootstrap_missing else ("healthy" if has_live_governed_flow_artifacts(resolved_root) else "warning"))
+            ),
             "detail": f"Primary event feed: {event_feed_path}",
-            "display_label": "Live proof" if live_evidence_mode else ("Recent generated proof" if has_live_governed_flow_artifacts(resolved_root) else "Sample or demo proof"),
+            "display_label": (
+                "Live proof"
+                if (live_evidence_mode or live_mode_bootstrap_missing)
+                else ("Recent generated proof" if has_live_governed_flow_artifacts(resolved_root) else "Sample or demo proof")
+            ),
         },
         "readiness": readiness,
         "trust_proof": trust_proof,
