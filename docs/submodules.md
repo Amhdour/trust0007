@@ -20,6 +20,7 @@ These are tracked as normal directories by the main repository, not as git submo
 - `upstream/gvisor`
 - `upstream/langfuse`
 - `upstream/langfuse-python`
+- `upstream/dify`
 - `upstream/grafana`
 - `upstream/superset`
 
