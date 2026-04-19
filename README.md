@@ -237,7 +237,7 @@ When `CONTROL_PLANE_GOVERNANCE_MODE=live` or a request uses `mode=live`, a gover
 - `apps/`: logical runtime/governance grouping for Onyx and myStarterKit.
 - `infra/`: logical mapping for identity, policy, retrieval, telemetry, and evidence systems.
 - `evidence/`: dashboard-owned evidence export area.
-- `upstream/`: vendored copies of Keycloak, Envoy, Onyx, OPA, Vault, Qdrant, optional gVisor, Langfuse, Grafana, and Superset sources tracked by the main repo checkout.
+- `upstream/`: vendored copies of Keycloak, Envoy, Onyx, OPA, Vault, Qdrant, optional gVisor, Langfuse, Dify, Grafana, and Superset sources tracked by the main repo checkout.
 - `overlays/myStarterKit/`: governance-overlay submodule.
 - `overlays/governance-overlay/`: local, additive overlay contracts and integration wiring (this repo).
 - `adapters/`: Python adapters for policy/runtime/retrieval/secrets/sandbox/observability bridges.
