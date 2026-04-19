@@ -15,7 +15,7 @@ Minimal secrets-access design for local development. Not production hardening.
 - Be explicit about assumptions and fail-safe behavior.
 
 ## Access assumptions
-- Vault is reachable at the configured preview address (e.g., `https://orange-space-journey-7vrrp4wqq4r6h7p9-8200.app.github.dev` in this Codespace).
+- Vault is reachable at the configured preview address (for example, `https://<codespace-name>-8200.<forwarding-domain>` in Codespaces).
 - Caller provides a valid logical secret path and key reference.
 - Vault auth/token lifecycle is handled outside this minimal adapter.
 

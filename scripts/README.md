@@ -4,7 +4,7 @@ Helper scripts for demo, vendored upstream source management, and local control-
 
 - `run-demo.sh`: executes the minimal governed request flow.
 - `test-demo.sh`: validates demo artifacts.
-- `test-onyx-target.sh`: validates that the repo is still wired around Onyx as the primary runtime target.
+- `test-onyx-target.sh`: validates that governed Onyx runtime routes remain wired for the RAG lane.
 - `start-control-plane.sh`: serves the local dashboard API/UI shell.
 - `bootstrap-live-governed-path.sh`: starts the production-like compose stack, initializes Vault, configures Keycloak, seeds Qdrant/Vault, and brings the control plane up in `live` / `staging` mode.
 - `smoke-live-onyx-handoff.py`: mints a real Keycloak token and verifies the governed `/launch/onyx?mode=live` handoff plus live dashboard evidence.
