@@ -35,6 +35,12 @@ STACK_HEALTH_OPTIONAL_SERVICES = (
 
 ONYX_CONTAINERS = (
     {
+        "name": "compose-onyx_runtime-1",
+        "source": "onyx",
+        "source_label": "Onyx Runtime",
+        "event_type": "Onyx runtime request",
+    },
+    {
         "name": "onyx-nginx-1",
         "source": "onyx",
         "source_label": "Onyx Web",

@@ -262,9 +262,10 @@ services:
   onyx_runtime:
     image: nginx:1.27-alpine
     ports:
-      - "127.0.0.1:${CONTROL_PLANE_ONYX_PORT:-3010}:80"
+      - "${CONTROL_PLANE_ONYX_PORT:-3010}:80"
     volumes:
-      - ./runtime/onyx/index.html:/usr/share/nginx/html/index.html:ro
+      - ./runtime/onyx:/usr/share/nginx/html:ro
+      - ./runtime/onyx/default.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null 2>&1"]
       interval: 10s
@@ -278,9 +279,10 @@ services:
   dify_runtime:
     image: nginx:1.27-alpine
     ports:
-      - "127.0.0.1:${CONTROL_PLANE_DIFY_PORT:-8088}:80"
+      - "${CONTROL_PLANE_DIFY_PORT:-8088}:80"
     volumes:
-      - ./runtime/dify/index.html:/usr/share/nginx/html/index.html:ro
+      - ./runtime/dify:/usr/share/nginx/html:ro
+      - ./runtime/dify/default.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null 2>&1"]
       interval: 10s
