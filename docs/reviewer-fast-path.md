@@ -1,6 +1,7 @@
 # Reviewer Fast Path
 
 This page is the fastest audit route. For full operator flow, use [reviewer-runbook.md](reviewer-runbook.md).
+For deployment-mode boundaries, use [README deployment maturity](../README.md#deployment-maturity-and-modes).
 
 ## 30-second path
 
@@ -21,13 +22,11 @@ This page is the fastest audit route. For full operator flow, use [reviewer-runb
 
 ## See A Pass
 
-
 - Onyx pass test: `test_strict_live_onyx_handoff_passes_through_real_stack`
 - Dify pass test: `test_strict_live_dify_handoff_passes_with_runtime_specific_governance`
 - Visual cues guide: [dashboard-visual-proof.md](dashboard-visual-proof.md)
 
 ## See A Deny
-
 
 - Onyx fail-closed checks (identity/OPA/retrieval/secret): `test_strict_live_onyx_end_to_end.py`
 - Dify MCP deny check: `test_strict_live_dify_handoff_denies_unapproved_mcp_server`

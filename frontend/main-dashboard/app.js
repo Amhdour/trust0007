@@ -603,30 +603,77 @@ function renderSectionsEmptyState() {
   bindDashboardFilterControls(root);
 }
 
+const HERO_VIEW_CONTENT = {
+  default: {
+    eyebrow: "AI Trust & Security Control Plane",
+    title: (payload) => payload.title || "AI Trust & Security Control Plane",
+    copy: (payload) => `${payload.subtitle ? `${payload.subtitle} ` : ""}${payload.hero_copy || ""}`.trim(),
+    landingSteps: (payload) => (Array.isArray(payload.landing_steps) ? payload.landing_steps : []),
+  },
+  executive: {
+    eyebrow: "Executive review mode",
+    title: () => "AI Trust & Security Review Brief",
+    copy: () =>
+      "Use this audience-facing view to explain the current posture, main blocker, and strongest governed proof without the operator-only drill-down.",
+    landingSteps: () => [
+      "Start with the posture banner.",
+      "Use the guided walkthrough to tell the story.",
+      "Open blocked or approved proof as needed.",
+      "Return to full view for operator detail.",
+    ],
+  },
+  runtime: {
+    eyebrow: "Live runtime focus",
+    title: () => "Governed Live Runtime Workspace",
+    copy: () =>
+      "Focus on governed runtime paths, runtime proof, authentication requirements, and the activity that confirms governed handoff behavior.",
+    landingSteps: () => [
+      "Confirm the live session and stack state.",
+      "Open the governed runtime workspace.",
+      "Watch runtime activity and trace continuity.",
+      "Drop into technical sections only when runtime proof looks off.",
+    ],
+  },
+};
+
+function currentHeroView() {
+  if (isExecutiveView()) {
+    return HERO_VIEW_CONTENT.executive;
+  }
+
+  if (isRuntimeView()) {
+    return HERO_VIEW_CONTENT.runtime;
+  }
+
+  return HERO_VIEW_CONTENT.default;
+}
+
+function renderLandingSteps(steps) {
+  return steps
+    .map(
+      (label, index) => `
+        <article class="step-card">
+          <span class="step-index">${index + 1}</span>
+          <span class="step-label">${escapeHtml(label)}</span>
+        </article>
+      `,
+    )
+    .join("");
+}
+
 function renderHero(payload) {
-  const defaultTitle = payload.title || "AI Trust & Security Control Plane";
-  const defaultCopy = `${payload.subtitle ? `${payload.subtitle} ` : ""}${payload.hero_copy || ""}`.trim();
-  const presenterTitle = "AI Trust & Security Review Brief";
-  const presenterCopy =
-    "Use this audience-facing view to explain the current posture, main blocker, and strongest governed proof without the operator-only drill-down.";
-  const runtimeTitle = "Governed Live Runtime Workspace";
-  const runtimeCopy =
-    "Focus on governed runtime paths, runtime proof, authentication requirements, and the activity that confirms governed handoff behavior.";
+  const heroView = currentHeroView();
 
   if (heroEyebrow) {
-    heroEyebrow.textContent = isExecutiveView()
-      ? "Executive review mode"
-      : isRuntimeView()
-        ? "Live runtime focus"
-        : "AI Trust & Security Control Plane";
+    heroEyebrow.textContent = heroView.eyebrow;
   }
 
   if (heroTitle) {
-    heroTitle.textContent = isExecutiveView() ? presenterTitle : isRuntimeView() ? runtimeTitle : defaultTitle;
+    heroTitle.textContent = heroView.title(payload);
   }
 
   if (heroCopy) {
-    heroCopy.textContent = isExecutiveView() ? presenterCopy : isRuntimeView() ? runtimeCopy : defaultCopy;
+    heroCopy.textContent = heroView.copy(payload);
   }
 
   const mode = payload.data_mode || {};
@@ -638,33 +685,7 @@ function renderHero(payload) {
     <span class="chip">Generated ${escapeHtml(formatTimestamp(payload.generated_at))}</span>
   `;
 
-  const landingSteps = isExecutiveView()
-    ? [
-        "Start with the posture banner.",
-        "Use the guided walkthrough to tell the story.",
-        "Open blocked or approved proof as needed.",
-        "Return to full view for operator detail.",
-      ]
-    : isRuntimeView()
-      ? [
-          "Confirm the live session and stack state.",
-          "Open the governed runtime workspace.",
-          "Watch runtime activity and trace continuity.",
-          "Drop into technical sections only when runtime proof looks off.",
-        ]
-    : Array.isArray(payload.landing_steps)
-      ? payload.landing_steps
-      : [];
-  heroSteps.innerHTML = landingSteps
-    .map(
-      (label, index) => `
-        <article class="step-card">
-          <span class="step-index">${index + 1}</span>
-          <span class="step-label">${escapeHtml(label)}</span>
-        </article>
-      `,
-    )
-    .join("");
+  heroSteps.innerHTML = renderLandingSteps(heroView.landingSteps(payload));
 }
 
 function compactSectionDescription(section) {
@@ -709,6 +730,15 @@ function buildAccessRequirementsMeta(payload) {
   return items.filter(Boolean);
 }
 
+function renderLiveSessionActions() {
+  return `
+    <div class="live-session-actions">
+      <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/onyx-integration.md">Onyx runtime note</a>
+      <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/dify-integration.md">Dify runtime note</a>
+    </div>
+  `;
+}
+
 function renderAccessRequirements(payload) {
   if (!liveSessionRoot) {
     return;
@@ -728,10 +758,7 @@ function renderAccessRequirements(payload) {
       </div>
       ${renderMetaBadges(buildAccessRequirementsMeta(payload), "live-session-meta")}
       <p class="live-session-detail">Live handoffs still fail closed when identity, policy, retrieval, secret, trace, or launch-gate evidence is missing on the same request trace.</p>
-      <div class="live-session-actions">
-        <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/onyx-integration.md">Onyx runtime note</a>
-        <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/dify-integration.md">Dify runtime note</a>
-      </div>
+      ${renderLiveSessionActions()}
     </section>
   `;
 }
@@ -1670,19 +1697,18 @@ function blockTypeLabel(type) {
   }[type] || "Section";
 }
 
+const BLOCK_RENDERERS = {
+  cards: (block) => renderCards(block.items),
+  records: (block) => renderRecords(block.items),
+  table: (block) => renderTable(block),
+  links: (block) => renderLinks(block.items),
+};
+
 function renderBlocks(blocks) {
   return (Array.isArray(blocks) ? blocks : [])
     .map((block) => {
-      let content = "";
-      if (block.type === "cards") {
-        content = renderCards(block.items);
-      } else if (block.type === "records") {
-        content = renderRecords(block.items);
-      } else if (block.type === "table") {
-        content = renderTable(block);
-      } else if (block.type === "links") {
-        content = renderLinks(block.items);
-      }
+      const renderBlock = BLOCK_RENDERERS[block.type];
+      const content = renderBlock ? renderBlock(block) : "";
 
       return `
         <section class="block block-type-${escapeHtml(block.type || "default")}" data-block-type="${escapeHtml(block.type || "default")}">
@@ -1697,6 +1723,49 @@ function renderBlocks(blocks) {
     .join("");
 }
 
+function renderSectionGroupBanner(section, nextGroup) {
+  if (!nextGroup) {
+    return "";
+  }
+
+  return `
+    <section class="section-group-banner section-group-${escapeHtml(nextGroup)}" data-group="${escapeHtml(nextGroup)}">
+      <p class="eyebrow">${escapeHtml(section.group_label || nextGroup)}</p>
+      <h2>${escapeHtml(section.group_label || nextGroup)}</h2>
+      <p class="section-description">${
+        nextGroup === "reviewer"
+          ? "Start here for the plain-language story: current state, blocked actions, proof, and readiness."
+          : "Continue here for traces, raw reasons, evidence links, and control detail."
+      }</p>
+    </section>
+  `;
+}
+
+function renderSectionShell(section, sectionOpen) {
+  return `
+    <section class="dashboard-section section-${escapeHtml(section.id || "")}" data-section="${escapeHtml(section.id || "")}" data-group="${escapeHtml(section.group || "")}" id="${escapeHtml(section.id || "")}">
+      <details class="dashboard-section-shell" data-section-shell="${escapeHtml(section.id || "")}"${sectionOpen ? " open" : ""}>
+        <summary class="dashboard-section-summary">
+          <div class="section-summary-copy">
+            <div class="section-head">
+              <p class="eyebrow">${escapeHtml(humanizeLabel(section.id || section.title || "Section"))}</p>
+              <h2>${escapeHtml(section.title || "")}</h2>
+              <p class="section-description">${escapeHtml(compactSectionDescription(section))}</p>
+            </div>
+            ${renderSectionSummaryPills(section)}
+          </div>
+          <div class="section-summary-aside">
+            <span class="section-toggle-hint" data-section-toggle-label>${sectionOpen ? "Hide detail" : "Show detail"}</span>
+          </div>
+        </summary>
+        <div class="section-body">
+          ${renderBlocks(section.blocks)}
+        </div>
+      </details>
+    </section>
+  `;
+}
+
 function renderSections(sections) {
   let activeGroup = "";
   const filteredSections = filteredSectionsForView(sections);
@@ -1709,44 +1778,12 @@ function renderSections(sections) {
     .map((section) => {
       const nextGroup = section.group || "";
       const sectionOpen = isSectionOpen(section);
-      const groupBanner =
-        nextGroup && nextGroup !== activeGroup
-          ? `
-            <section class="section-group-banner section-group-${escapeHtml(nextGroup)}" data-group="${escapeHtml(nextGroup)}">
-              <p class="eyebrow">${escapeHtml(section.group_label || nextGroup)}</p>
-              <h2>${escapeHtml(section.group_label || nextGroup)}</h2>
-              <p class="section-description">${
-                nextGroup === "reviewer"
-                  ? "Start here for the plain-language story: current state, blocked actions, proof, and readiness."
-                  : "Continue here for traces, raw reasons, evidence links, and control detail."
-              }</p>
-            </section>
-          `
-          : "";
+      const groupBanner = nextGroup !== activeGroup ? renderSectionGroupBanner(section, nextGroup) : "";
       activeGroup = nextGroup;
 
       return `
         ${groupBanner}
-        <section class="dashboard-section section-${escapeHtml(section.id || "")}" data-section="${escapeHtml(section.id || "")}" data-group="${escapeHtml(section.group || "")}" id="${escapeHtml(section.id || "")}">
-          <details class="dashboard-section-shell" data-section-shell="${escapeHtml(section.id || "")}"${sectionOpen ? " open" : ""}>
-            <summary class="dashboard-section-summary">
-              <div class="section-summary-copy">
-                <div class="section-head">
-                  <p class="eyebrow">${escapeHtml(humanizeLabel(section.id || section.title || "Section"))}</p>
-                  <h2>${escapeHtml(section.title || "")}</h2>
-                  <p class="section-description">${escapeHtml(compactSectionDescription(section))}</p>
-                </div>
-                ${renderSectionSummaryPills(section)}
-              </div>
-              <div class="section-summary-aside">
-                <span class="section-toggle-hint" data-section-toggle-label>${sectionOpen ? "Hide detail" : "Show detail"}</span>
-              </div>
-            </summary>
-            <div class="section-body">
-              ${renderBlocks(section.blocks)}
-            </div>
-          </details>
-        </section>
+        ${renderSectionShell(section, sectionOpen)}
       `;
     })
     .join("");
