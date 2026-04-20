@@ -83,7 +83,7 @@ def test_strict_live_onyx_workspace_shell_embeds_runtime_when_reachable(live_sta
     assert "Open in new tab" in response.text
     assert "Return to dashboard" in response.text
     assert 'src="' in response.text
-    assert '/app"' in response.text
+    assert '/app/"' in response.text
     assert 'title="Live Onyx runtime for /app"' in response.text
     assert "Trace ID" in response.text
     assert "Current Onyx Activity" in response.text
