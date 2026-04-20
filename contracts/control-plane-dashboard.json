@@ -12,96 +12,96 @@
   "tabs": [
     {
       "id": "launch-gate",
-      "label": "Runtime Portfolio",
       "group": "reviewer",
-      "group_label": "Homepage Decision"
+      "group_label": "Homepage Decision",
+      "label": "Runtime Portfolio"
     },
     {
       "id": "entry-points",
-      "label": "Onyx RAG Access",
       "group": "reviewer",
-      "group_label": "Homepage Decision"
+      "group_label": "Homepage Decision",
+      "label": "Onyx RAG Access"
     },
     {
       "id": "dify-agent-access",
-      "label": "Dify Agent Access",
       "group": "reviewer",
-      "group_label": "Homepage Decision"
+      "group_label": "Homepage Decision",
+      "label": "Dify Agent Access"
     },
     {
       "id": "policy-enforcement",
-      "label": "Policy",
       "group": "operator",
-      "group_label": "Evidence Drill-Down"
+      "group_label": "Evidence Drill-Down",
+      "label": "Policy"
     },
     {
       "id": "retrieval-boundaries",
-      "label": "Retrieval",
       "group": "operator",
-      "group_label": "Evidence Drill-Down"
+      "group_label": "Evidence Drill-Down",
+      "label": "Retrieval"
     },
     {
       "id": "tool-mcp-governance",
-      "label": "Tools / MCP",
       "group": "operator",
-      "group_label": "Evidence Drill-Down"
+      "group_label": "Evidence Drill-Down",
+      "label": "Tools / MCP"
     },
     {
       "id": "audit-replay",
-      "label": "Audit Replay",
       "group": "operator",
-      "group_label": "Evidence Drill-Down"
+      "group_label": "Evidence Drill-Down",
+      "label": "Audit Replay"
     }
   ],
   "sections": [
     {
       "id": "launch-gate",
-      "title": "Runtime Portfolio",
-      "description": "Cross-runtime readiness decision, blockers, and residual risk posture for Onyx (RAG) and Dify (Autonomous Agents).",
       "group": "reviewer",
-      "group_label": "Homepage Decision"
+      "group_label": "Homepage Decision",
+      "title": "Runtime Portfolio",
+      "description": "Cross-runtime readiness decision, blockers, and residual risk posture for Onyx (RAG) and Dify (Autonomous Agents)."
     },
     {
       "id": "entry-points",
-      "title": "Onyx RAG Access",
-      "description": "Governed handoff outcomes, retrieval-boundary controls, and evidence required for Onyx runtime access.",
       "group": "reviewer",
-      "group_label": "Homepage Decision"
+      "group_label": "Homepage Decision",
+      "title": "Onyx RAG Access",
+      "description": "Governed handoff outcomes, retrieval-boundary controls, and evidence required for Onyx runtime access."
     },
     {
       "id": "dify-agent-access",
-      "title": "Dify Agent Access",
-      "description": "Governed handoff outcomes, tool/MCP authorization posture, and evidence required for Dify agent runtime access.",
       "group": "reviewer",
-      "group_label": "Homepage Decision"
+      "group_label": "Homepage Decision",
+      "title": "Dify Agent Access",
+      "description": "Governed handoff outcomes, tool/MCP authorization posture, and evidence required for Dify agent runtime access."
     },
     {
       "id": "policy-enforcement",
-      "title": "Policy Enforcement",
-      "description": "Allow/deny decisions, reason codes, and policy sources across both runtime lanes.",
       "group": "operator",
-      "group_label": "Evidence Drill-Down"
+      "group_label": "Evidence Drill-Down",
+      "title": "Policy Enforcement",
+      "description": "Allow/deny decisions, reason codes, and policy sources across both runtime lanes."
     },
     {
       "id": "retrieval-boundaries",
-      "title": "Retrieval Boundaries",
-      "description": "What data access was allowed or denied for governed retrieval requests (Onyx emphasis).",
       "group": "operator",
-      "group_label": "Evidence Drill-Down"
+      "group_label": "Evidence Drill-Down",
+      "title": "Retrieval Boundaries",
+      "description": "What data access was allowed or denied for governed retrieval requests (Onyx emphasis)."
     },
     {
       "id": "tool-mcp-governance",
-      "title": "Tool and MCP Governance",
-      "description": "Governed tool actions, MCP authorizations, denials, and approval-gated operations (Dify emphasis).",
       "group": "operator",
-      "group_label": "Evidence Drill-Down"
+      "group_label": "Evidence Drill-Down",
+      "title": "Tool and MCP Governance",
+      "description": "Governed tool actions, MCP authorizations, denials, and approval-gated operations (Dify emphasis)."
     },
     {
       "id": "audit-replay",
-      "title": "Audit and Replay",
-      "description": "Trace-linked records used to verify and replay governed decisions.",
       "group": "operator",
-      "group_label": "Evidence Drill-Down"
+      "group_label": "Evidence Drill-Down",
+      "title": "Audit and Replay",
+      "description": "Trace-linked records used to verify and replay governed decisions."
     }
   ]
 }

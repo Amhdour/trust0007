@@ -1,85 +1,69 @@
 # Dashboard Visual Proof
 
-This page gives reviewers a fast visual layer for the strict live governed path.
+This guide gives reviewers a fast visual companion for the strict live governed path.
 
-For command-by-command validation, use [reviewer-runbook.md](reviewer-runbook.md).
+For command-by-command execution, use [reviewer-runbook.md](reviewer-runbook.md). For the overall checklist, use [strict-live-proof-matrix.md](strict-live-proof-matrix.md).
 
-## Visual Previews
+## Visual Previews (illustrative)
 
-- passing strict live flow:
-  - [dashboard-live-pass.svg](images/dashboard-live-pass.svg)
-- denied strict live flow:
-  - [dashboard-live-deny.svg](images/dashboard-live-deny.svg)
+These SVGs are **illustrative review aids**, not literal runtime screenshots:
 
-These are lightweight proof previews, not literal runtime screenshots. They highlight the exact dashboard cues a reviewer should look for.
+- passing strict-live flow: [dashboard-live-pass.svg](images/dashboard-live-pass.svg)
+- denied strict-live flow: [dashboard-live-deny.svg](images/dashboard-live-deny.svg)
 
-## What To Look For In A Passing Live Flow
+They show the dashboard cues a reviewer should verify against live artifacts/tests.
 
-Open [dashboard-live-pass.svg](images/dashboard-live-pass.svg) and look for:
+## What good looks like (passing visual cues)
 
-- mode banner: `LIVE GOVERNED MODE`
-- short “How to read this dashboard” help block with expandable detail
-- top command summary showing combined readiness-and-score, latest handoff, top failing control, and evidence freshness
-- newest governed request spotlight with a trace-linked record
-- primary pass / deny / generate proof links in a lighter inline strip near the top
-- `Identity result`: `ALLOW`
-- `Decision engine`: `OPA`
-- `Latest retrieval result`: `ALLOW`
-- `Secret fetched`: `yes`
-- `Trace complete`: `yes`
-- `Readiness status`: `GO`
-- `Latest handoff`: `ALLOW`
+Open [dashboard-live-pass.svg](images/dashboard-live-pass.svg) and verify:
 
-These indicators correspond to the strict live pass artifact in [allowed-flow.json](../evidence/reviewer/inspectable-live-runtime/allowed-flow.json).
+- mode banner shows `LIVE GOVERNED MODE`
+- command summary shows healthy readiness/score posture
+- newest governed request includes a trace-linked record
+- top links expose pass/deny/proof actions
+- identity result is `ALLOW`
+- decision engine is `OPA`
+- retrieval result is `ALLOW`
+- secret fetched is `yes`
+- trace complete is `yes`
+- readiness is `GO`
+- latest handoff is `ALLOW`
 
-## What To Look For In A Denied Live Flow
+Artifact match for this visual: [allowed-flow.json](../evidence/reviewer/inspectable-live-runtime/allowed-flow.json).
+
+## Common failure signals (denied visual cues)
 
 Open [dashboard-live-deny.svg](images/dashboard-live-deny.svg) and look for:
 
-- mode banner: `LIVE GOVERNED MODE`
-- top command summary showing `DENY` or `NO-GO`
-- flagship denied governed runtime proof spotlight near the top (Onyx example lane)
-- one dependency card showing a fail state
-- `Trace complete`: `no` or a dependency result showing `DENY`
-- `Missing evidence`: non-zero when launch-gate blocked the flow
-- `Latest handoff`: `DENY`
-- `Readiness status`: `NO-GO`
+- mode banner still says `LIVE GOVERNED MODE`
+- command summary flips to `DENY` and/or `NO-GO`
+- denied governed runtime proof spotlight is visible
+- one or more dependency cards show fail state
+- trace completeness drops to `no` (or dependency denies)
+- missing evidence count becomes non-zero
+- latest handoff is `DENY`
+- readiness is `NO-GO`
 
-These cues correspond to the denial and no-go artifacts under [../evidence/reviewer/inspectable-live-runtime](../evidence/reviewer/inspectable-live-runtime).
+Related denial/no-go artifacts:
 
-## Which Artifacts Match The Visuals
+- [denied-identity-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
+- [denied-opa-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
+- [denied-retrieval-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
+- [denied-secret-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
+- [live-launch-gate-downgrade.json](../evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
 
-- passing live flow:
-  - [allowed-flow.json](../evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
-- denied identity:
-  - [denied-identity-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
-- denied OPA:
-  - [denied-opa-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
-- denied retrieval:
-  - [denied-retrieval-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
-- denied secret:
-  - [denied-secret-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
-- launch-gate no-go:
-  - [live-launch-gate-downgrade.json](../evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
+## Reviewer reading order
 
-## Important Accuracy Note
+1. Check the homepage mode banner and command summary.
+2. Check runtime portfolio and latest governed handoff.
+3. Use artifact links for the corresponding trace.
+4. Use strict live tests as final proof authority.
 
-The visuals are documentation aids. The real proof remains:
+## Evidence authority note
 
-- the strict live proof matrix
-- the integration tests
-- the governed-flow artifacts
-- the reviewer evidence bundle
+Treat visuals as orientation only. The authoritative proof is:
 
-Do not treat the visuals as stronger evidence than the underlying artifacts and tests.
-
-## Viewer Lanes
-
-The current dashboard hierarchy is intentionally split into:
-
-- Plain-Language Review:
-  - mode banner, command summary, flagship proof, launch posture, governed requests, evidence freshness, upstream posture
-- Technical Details:
-  - identity, policy, retrieval, secret, audit, trace, and deeper inventories
-
-Reviewers should not need the technical-details sections to understand the top-level state.
+- strict live tests
+- governed flow artifacts
+- reviewer evidence bundle
+- proof matrix

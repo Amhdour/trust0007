@@ -160,12 +160,12 @@
     }
   },
   "tools": {
-      "allowed_tools": [
-        "onyx",
-        "dify",
-        "search",
-        "summarize"
-      ],
+    "allowed_tools": [
+      "onyx",
+      "dify",
+      "search",
+      "summarize"
+    ],
     "forbidden_tools": [
       "admin_shell"
     ],

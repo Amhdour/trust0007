@@ -2,7 +2,7 @@
 
 This stack is **development-focused** and intentionally minimal. It is not production hardened.
 
-If you want the production-like governed live path, use [docs/staging-governed-stack.md](docs/staging-governed-stack.md) instead of this page.
+If you want the production-like governed live path, use [staging-governed-stack.md](staging-governed-stack.md) instead of this page.
 
 ## Services
 - control-plane dashboard homepage

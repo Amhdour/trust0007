@@ -35,6 +35,12 @@ const refreshDashboardButton = document.getElementById("refresh-dashboard-button
 const LIVE_LOG_LIMIT = 6;
 const DEFAULT_LIVE_LOG_POLL_MS = 5000;
 const SECTION_SCROLL_OFFSET_PX = 152;
+const LIVE_LOG_STATUS_FILTERS = [
+  ["all", "All activity"],
+  ["critical", "Critical"],
+  ["warning", "Warnings"],
+  ["neutral", "Info"],
+];
 const DASHBOARD_VIEW_MODES = { operator: { label: "Operator" } };
 // Keep a single source of truth for visible drill-down sections in the
 // shared control plane. New dual-runtime IDs are primary, while legacy IDs
@@ -1835,6 +1841,61 @@ function renderFreshnessStrip(bar) {
   `;
 }
 
+function renderTabButton(tab) {
+  return `
+    <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" data-tab-group="${escapeHtml(tab.group || "")}" aria-pressed="false">
+      ${escapeHtml(tab.label || "")}
+    </button>
+  `;
+}
+
+function renderTabGroup(groupLabel, groupTabs) {
+  return `
+    <section class="tab-group" data-tab-group="${escapeHtml(groupTabs[0]?.group || "")}">
+      <p class="eyebrow">${escapeHtml(groupLabel)}</p>
+      <div class="tab-group-row">
+        ${groupTabs.map((tab) => renderTabButton(tab)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderPrimaryTabRow(primaryTabs) {
+  return `
+    <div class="tab-group-row tab-primary-row">
+      ${primaryTabs.map((tab) => renderTabButton(tab)).join("")}
+    </div>
+  `;
+}
+
+function renderTabDisclosure(groups) {
+  return `
+    <details class="tab-disclosure">
+      <summary>Show all sections</summary>
+      <div class="tab-disclosure-body">
+        ${Array.from(groups.entries())
+          .map(([groupLabel, groupTabs]) => renderTabGroup(groupLabel, groupTabs))
+          .join("")}
+      </div>
+    </details>
+  `;
+}
+
+function renderTabContent(allTabs, primaryTabs, groups) {
+  if (!allTabs.length) {
+    return `
+      <div class="tab-empty-state">
+        <p>No quick-jump sections match the current filter.</p>
+      </div>
+    `;
+  }
+
+  return `
+    ${renderPrimaryTabRow(primaryTabs)}
+    ${renderTabDisclosure(groups)}
+  `;
+}
+
 function renderTabs(tabs, freshnessBar = {}) {
   const groups = new Map();
   const allSections = Array.isArray(lastOverviewPayload?.sections) ? lastOverviewPayload.sections : [];
@@ -1900,52 +1961,7 @@ function renderTabs(tabs, freshnessBar = {}) {
         </div>
       </div>
       ${renderFreshnessStrip(freshnessBar)}
-      ${
-        allTabs.length
-          ? `
-            <div class="tab-group-row tab-primary-row">
-              ${primaryTabs
-                .map(
-                  (tab) => `
-                    <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" data-tab-group="${escapeHtml(tab.group || "")}" aria-pressed="false">
-                      ${escapeHtml(tab.label || "")}
-                    </button>
-                  `,
-                )
-                .join("")}
-            </div>
-            <details class="tab-disclosure">
-              <summary>Show all sections</summary>
-              <div class="tab-disclosure-body">
-                ${Array.from(groups.entries())
-                  .map(
-                    ([groupLabel, groupTabs]) => `
-                      <section class="tab-group" data-tab-group="${escapeHtml(groupTabs[0]?.group || "")}">
-                        <p class="eyebrow">${escapeHtml(groupLabel)}</p>
-                        <div class="tab-group-row">
-                          ${groupTabs
-                            .map(
-                              (tab) => `
-                                <button class="tab-button" type="button" data-target="${escapeHtml(tab.id || "")}" data-tab-group="${escapeHtml(tab.group || "")}" aria-pressed="false">
-                                  ${escapeHtml(tab.label || "")}
-                                </button>
-                              `,
-                            )
-                            .join("")}
-                        </div>
-                      </section>
-                    `,
-                  )
-                  .join("")}
-              </div>
-            </details>
-          `
-          : `
-            <div class="tab-empty-state">
-              <p>No quick-jump sections match the current filter.</p>
-            </div>
-          `
-      }
+      ${renderTabContent(allTabs, primaryTabs, groups)}
     </section>
   `;
 
@@ -2010,6 +2026,71 @@ function liveLogMatchesFilters(entry) {
   return matchesStatus && matchesSource;
 }
 
+function renderLiveLogStatusFilterButtons() {
+  return LIVE_LOG_STATUS_FILTERS.map(
+    ([value, label]) => `
+      <button
+        class="live-log-filter-button${liveLogStatusFilter === value ? " is-active" : ""}"
+        type="button"
+        data-live-log-status="${escapeHtml(value)}"
+        aria-pressed="${liveLogStatusFilter === value ? "true" : "false"}"
+      >
+        ${escapeHtml(label)}
+      </button>
+    `,
+  ).join("");
+}
+
+function renderLiveLogSourceOptions(sources) {
+  return sources
+    .map(
+      (source) => `
+        <option value="${escapeHtml(source)}"${liveLogSourceFilter === source ? " selected" : ""}>${escapeHtml(source)}</option>
+      `,
+    )
+    .join("");
+}
+
+function renderLiveLogMetaChips(entry) {
+  return `
+    ${entry.request_id ? `<span class="live-log-meta-chip">request ${escapeHtml(entry.request_id)}</span>` : ""}
+    ${entry.trace_id ? `<span class="live-log-meta-chip">trace ${escapeHtml(entry.trace_id)}</span>` : ""}
+    ${entry.tenant_id ? `<span class="live-log-meta-chip">tenant ${escapeHtml(entry.tenant_id)}</span>` : ""}
+  `;
+}
+
+function renderLiveLogEntry(entry) {
+  return `
+    <article class="live-log-entry">
+      <div class="live-log-entry-head">
+        <div class="live-log-title-row">
+          ${entry.source_label ? `<span class="live-log-meta-chip">${escapeHtml(entry.source_label)}</span>` : ""}
+          <span class="${statusClass(entry.status || "neutral")}">${escapeHtml(entry.severity || "info")}</span>
+          <h3>${escapeHtml(entry.event_type || "event")}</h3>
+        </div>
+        <time class="live-log-time">${escapeHtml(formatTimestamp(entry.timestamp))}</time>
+      </div>
+      <p class="live-log-summary">${escapeHtml(entry.summary || "No event summary available.")}</p>
+      <div class="live-log-meta-row">
+        ${renderLiveLogMetaChips(entry)}
+      </div>
+    </article>
+  `;
+}
+
+function renderLiveLogList(filteredEntries) {
+  if (!filteredEntries.length) {
+    return `
+      <article class="live-log-entry live-log-empty">
+        <h3>No matching activity right now</h3>
+        <p class="live-log-summary">Adjust the filters to widen the activity view, or wait for the next refresh.</p>
+      </article>
+    `;
+  }
+
+  return filteredEntries.map((entry) => renderLiveLogEntry(entry)).join("");
+}
+
 function renderLiveLog(payload) {
   if (!liveLogRoot) {
     return;
@@ -2038,76 +2119,18 @@ function renderLiveLog(payload) {
     </div>
     <div class="live-log-controls">
       <div class="live-log-filter-group" role="toolbar" aria-label="Activity severity filters">
-        ${[
-          ["all", "All activity"],
-          ["critical", "Critical"],
-          ["warning", "Warnings"],
-          ["neutral", "Info"],
-        ]
-          .map(
-            ([value, label]) => `
-              <button
-                class="live-log-filter-button${liveLogStatusFilter === value ? " is-active" : ""}"
-                type="button"
-                data-live-log-status="${escapeHtml(value)}"
-                aria-pressed="${liveLogStatusFilter === value ? "true" : "false"}"
-              >
-                ${escapeHtml(label)}
-              </button>
-            `,
-          )
-          .join("")}
+        ${renderLiveLogStatusFilterButtons()}
       </div>
       <label class="live-log-filter-select">
         <span>Source</span>
         <select id="live-log-source-filter">
           <option value="all">All sources</option>
-          ${sources
-            .map(
-              (source) => `
-                <option value="${escapeHtml(source)}"${liveLogSourceFilter === source ? " selected" : ""}>${escapeHtml(source)}</option>
-              `,
-            )
-            .join("")}
+          ${renderLiveLogSourceOptions(sources)}
         </select>
       </label>
     </div>
     <div class="live-log-list">
-      ${
-        filteredEntries.length
-          ? filteredEntries
-              .map(
-                (entry) => `
-                  <article class="live-log-entry">
-                    <div class="live-log-entry-head">
-                      <div class="live-log-title-row">
-                        ${
-                          entry.source_label
-                            ? `<span class="live-log-meta-chip">${escapeHtml(entry.source_label)}</span>`
-                            : ""
-                        }
-                        <span class="${statusClass(entry.status || "neutral")}">${escapeHtml(entry.severity || "info")}</span>
-                        <h3>${escapeHtml(entry.event_type || "event")}</h3>
-                      </div>
-                      <time class="live-log-time">${escapeHtml(formatTimestamp(entry.timestamp))}</time>
-                    </div>
-                    <p class="live-log-summary">${escapeHtml(entry.summary || "No event summary available.")}</p>
-                    <div class="live-log-meta-row">
-                      ${entry.request_id ? `<span class="live-log-meta-chip">request ${escapeHtml(entry.request_id)}</span>` : ""}
-                      ${entry.trace_id ? `<span class="live-log-meta-chip">trace ${escapeHtml(entry.trace_id)}</span>` : ""}
-                      ${entry.tenant_id ? `<span class="live-log-meta-chip">tenant ${escapeHtml(entry.tenant_id)}</span>` : ""}
-                    </div>
-                  </article>
-                `,
-              )
-              .join("")
-          : `
-            <article class="live-log-entry live-log-empty">
-              <h3>No matching activity right now</h3>
-              <p class="live-log-summary">Adjust the filters to widen the activity view, or wait for the next refresh.</p>
-            </article>
-          `
-      }
+      ${renderLiveLogList(filteredEntries)}
     </div>
   `;
 
