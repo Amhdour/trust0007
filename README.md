@@ -159,6 +159,42 @@ The precise claim after `make smoke-live` passes is: a staging-style governed li
 
 For the full runbook, see [docs/staging-governed-stack.md](docs/staging-governed-stack.md).
 
+## Minimum Serious Live Preview (Operator Definition)
+
+For this repo, a truthful first live-preview claim is:
+
+- dashboard/control-plane is enforcing governed live handoffs
+- `/launch/onyx` and `/launch/dify` are both proven in live mode
+- Keycloak + OPA + Qdrant + Vault are participating in the same governed flow
+- current evidence artifacts are generated and visible to the dashboard
+
+That claim is intentionally narrower than “all vendored upstreams are up.”
+
+Required services for first proof:
+
+- `control_plane`
+- `keycloak` (+ `keycloak_db`)
+- `opa`
+- `qdrant`
+- `vault`
+- reachable Onyx runtime target (`/launch/onyx`)
+- reachable Dify runtime target (`/launch/dify`)
+
+Optional/supporting services:
+
+- `langfuse` (evidence-plane destination)
+- `grafana` (observability support)
+- `envoy` (future ingress-depth; not required for today’s governed launch proof)
+
+Reference-only / intentionally out of first-proof scope:
+
+- vendored upstream trees not currently exercised by strict live governed tests
+- optional platform depth (for example Superset or gVisor-based isolation) unless your environment explicitly needs them
+
+Next milestone for external preview:
+
+- one externally reachable staging deployment (outside localhost) that reproduces the same governed live proof for both Onyx and Dify lanes.
+
 
 ## Deployment Maturity and Modes
 

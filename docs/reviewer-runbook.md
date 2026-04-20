@@ -2,6 +2,35 @@
 
 Use this runbook for a one-pass validation of the governed control plane.
 
+## Minimum serious live-preview scope
+
+Do **not** treat success as “run every upstream project under `upstream/`.”  
+For this repo, a meaningful live preview is the governed control plane proving **both** runtime lanes:
+
+- `/launch/onyx` (Onyx / RAG)
+- `/launch/dify` (Dify / Autonomous Agents)
+
+### Required for first-proof success
+
+- `control_plane`
+- `keycloak` + `keycloak_db`
+- `opa`
+- `qdrant`
+- `vault`
+- reachable Onyx runtime target
+- reachable Dify runtime target
+
+### Optional/supporting for first-proof success
+
+- `langfuse`
+- `grafana`
+- `envoy` (platform depth; not a current strict pass dependency)
+
+### Intentionally excluded from first-proof success criteria
+
+- reference-only vendored upstream snapshots
+- optional future depth (for example Superset or gVisor work) unless your environment specifically needs them
+
 ## Start here (5-minute validation path)
 
 1. **Prepare env files**
@@ -103,5 +132,9 @@ This repository proves a **dashboard-first trust control plane** for two governe
 - **Local/dev:** development and demo confidence only.
 - **Live/staging:** governed proof generation and realistic validation.
 - **Public production:** environment-specific; no always-on hosted deployment is bundled in this repo.
+
+## Next milestone (external preview)
+
+- Reproduce this exact governed dual-runtime proof path from **one externally reachable staging deployment outside localhost**.
 
 For top-level framing, see [README deployment maturity and operating modes](../README.md#deployment-maturity-and-modes).
