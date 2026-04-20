@@ -1,0 +1,360 @@
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 43706)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 43708)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 43722)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 43726)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 38006)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 38014)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 38030)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 38038)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 39732)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 39736)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 39750)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 39752)
+Traceback (most recent call last):
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/python/3.11.15/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/python/3.11.15/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1016, in do_GET
+    self._serve_runtime_handoff(requested_path, runtime=runtime_key)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 1244, in _serve_runtime_handoff
+    runtime_proof = _record_runtime_proof(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 745, in _record_runtime_proof
+    _write_json(latest_path, proof)
+  File "/workspaces/trust0007/backend/api_gateway/server.py", line 556, in _write_json
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1078, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.15/lib/python3.11/pathlib.py", line 1044, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/onyx-runtime-proof.json'
+----------------------------------------

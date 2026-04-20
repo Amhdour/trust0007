@@ -22,6 +22,10 @@ services:
       CONTROL_PLANE_VAULT_TOKEN: ${CONTROL_PLANE_VAULT_TOKEN:-}
       CONTROL_PLANE_ONYX_SECRET_PATH: ${CONTROL_PLANE_ONYX_SECRET_PATH:-secret/data/runtime/tenant-stage/onyx}
       CONTROL_PLANE_DIFY_SECRET_PATH: ${CONTROL_PLANE_DIFY_SECRET_PATH:-secret/data/runtime/tenant-stage/dify}
+      CONTROL_PLANE_ONYX_HOST: ${CONTROL_PLANE_ONYX_HOST:-127.0.0.1}
+      CONTROL_PLANE_ONYX_PORT: ${CONTROL_PLANE_ONYX_PORT:-3010}
+      CONTROL_PLANE_DIFY_HOST: ${CONTROL_PLANE_DIFY_HOST:-127.0.0.1}
+      CONTROL_PLANE_DIFY_PORT: ${CONTROL_PLANE_DIFY_PORT:-8088}
       CONTROL_PLANE_ONYX_SECRET_KEY: ${CONTROL_PLANE_ONYX_SECRET_KEY:-api_token}
       CONTROL_PLANE_ONYX_BASE_URL: ${CONTROL_PLANE_ONYX_BASE_URL:-http://onyx_runtime:80}
       CONTROL_PLANE_DIFY_BASE_URL: ${CONTROL_PLANE_DIFY_BASE_URL:-http://dify_runtime:80}
@@ -34,9 +38,10 @@ services:
       CODESPACE_NAME: ${CODESPACE_NAME:-}
       GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: ${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}
     ports:
-      - "3000:3000"
+      - "${CONTROL_PLANE_HOST_PORT:-3000}:3000"
     volumes:
       - control_plane_artifacts:/app/overlays/myStarterKit/artifacts
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       keycloak:
         condition: service_started
