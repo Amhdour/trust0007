@@ -218,6 +218,7 @@ class GovernedFlowEvaluator:
         policy_source: str = "",
         policy_path: str = "",
         authorization_header: str = "",
+        request_headers: dict[str, str] | None = None,
         cookies: dict[str, str] | None = None,
         evidence_mode: str | None = None,
         secret_request: dict[str, Any] | None = None,
@@ -364,6 +365,7 @@ class GovernedFlowEvaluator:
 
         identity_request = IdentityResolutionRequest(
             authorization_header=authorization_header,
+            headers=dict(request_headers or {}),
             cookies=dict(cookies or {}),
             requested_path=requested_path,
             required_live_identity=live_mode,
@@ -377,6 +379,8 @@ class GovernedFlowEvaluator:
         effective_tenant_id = identity_result.tenant_id or tenant_id
         effective_roles = list(identity_result.roles or identity_roles)
         session_linkage_status, session_linkage_reason = _session_linkage(identity_result, live_mode=live_mode)
+        auth_mechanism = str(identity_result.metadata.get("auth_mechanism", "")).strip().lower()
+        requires_live_session_linkage = live_mode and auth_mechanism in {"oidc_session"}
 
         identity_evidence = {
             "step": "identity",
@@ -403,6 +407,7 @@ class GovernedFlowEvaluator:
             "reason_codes": [identity_result.reason] if identity_result.reason else [],
             "session_linkage_status": session_linkage_status,
             "session_linkage_reason": session_linkage_reason,
+            "requires_live_session_linkage": requires_live_session_linkage,
             "provenance": "runtime-generated",
             "metadata": identity_result.metadata,
         }
@@ -431,6 +436,7 @@ class GovernedFlowEvaluator:
                 "identity_source": identity_result.source,
                 "session_linkage_status": session_linkage_status,
                 "session_linkage_reason": session_linkage_reason,
+                "requires_live_session_linkage": requires_live_session_linkage,
                 "surface": surface_id,
             },
             severity="info" if identity_result.authenticated else "warning",
@@ -450,6 +456,7 @@ class GovernedFlowEvaluator:
                 "roles": effective_roles,
                 "session_linkage_status": session_linkage_status,
                 "session_linkage_reason": session_linkage_reason,
+                "requires_live_session_linkage": requires_live_session_linkage,
             },
         )
 
@@ -507,6 +514,16 @@ class GovernedFlowEvaluator:
         policy_allow = gateway_decision.policy_allow
         policy_metadata = _metadata_for(self._policy_checker)
         gateway_reasons = list(getattr(gateway_decision, "reasons", []))
+        if live_mode and str(policy_metadata.get("engine", "")).strip().lower() != "opa":
+            policy_allow = False
+            if "policy.live_opa_required" not in gateway_reasons:
+                gateway_reasons.append("policy.live_opa_required")
+            policy_metadata = {
+                **policy_metadata,
+                "engine": str(policy_metadata.get("engine", "local") or "local"),
+                "reachable": bool(policy_metadata.get("reachable", False)),
+                "downgraded": True,
+            }
         if not identity_result.authenticated:
             gateway_reasons = list(dict.fromkeys([identity_result.reason or "identity.denied"] + gateway_reasons))
 
@@ -721,6 +738,8 @@ class GovernedFlowEvaluator:
             "purpose": str(secret_request.get("purpose", "")) if secret_request else "",
             "backend": "vault" if self._secret_provider else "unconfigured",
             "backend_configured": self._secret_provider is not None,
+            "backend_available": self._secret_provider is not None,
+            "access_attempted": False,
             "fetched": False,
             "reason": secret_reason,
             "reason_codes": [secret_reason] if secret_reason else [],
@@ -751,7 +770,14 @@ class GovernedFlowEvaluator:
             )
             secret_reason = secret_fetch.reason
             secret_satisfied = secret_fetch.fetched
-            secret_evidence.update({"fetched": secret_fetch.fetched, "reason": secret_fetch.reason, "reason_codes": [secret_fetch.reason] if secret_fetch.reason else []})
+            secret_evidence.update(
+                {
+                    "access_attempted": True,
+                    "fetched": secret_fetch.fetched,
+                    "reason": secret_fetch.reason,
+                    "reason_codes": [secret_fetch.reason] if secret_fetch.reason else [],
+                }
+            )
         elif secret_required:
             secret_reason = "secret.backend_missing"
             secret_satisfied = False
@@ -768,6 +794,8 @@ class GovernedFlowEvaluator:
                 "surface": surface_id,
                 "purpose": secret_evidence["purpose"],
                 "backend": secret_evidence["backend"],
+                "backend_available": secret_evidence["backend_available"],
+                "access_attempted": secret_evidence["access_attempted"],
                 "fetched": secret_evidence["fetched"],
                 "reason": secret_evidence["reason"],
             },
@@ -971,7 +999,7 @@ class GovernedFlowEvaluator:
             "tool.decision",
         ]
         trace_missing_pre = [step for step in pre_gate_required_steps if step not in observed_event_types]
-        trace_complete = len(trace_missing_pre) == 0 and bool(session_id or not live_mode)
+        trace_complete = len(trace_missing_pre) == 0 and (not requires_live_session_linkage or bool(session_id))
 
         evidence = {
             "identity.live": identity_result.authenticated and identity_result.live,
@@ -990,7 +1018,14 @@ class GovernedFlowEvaluator:
             "tool.decision": "tool.decision" in observed_event_types,
             "incident.signal": "incident.signal" in observed_event_types,
         }
-        controls = LAUNCH_GATE.live_controls(secret_required=secret_required) if live_mode else LAUNCH_GATE.default_controls()
+        controls = (
+            LAUNCH_GATE.live_controls(
+                secret_required=secret_required,
+                retrieval_required=retrieval_needed,
+            )
+            if live_mode
+            else LAUNCH_GATE.default_controls()
+        )
         gate_result = LAUNCH_GATE.evaluate_launch_gate(
             evidence=evidence,
             controls=controls,
@@ -1161,7 +1196,7 @@ class GovernedFlowEvaluator:
         missing_identifiers = [
             key
             for key, value in required_identifiers.items()
-            if not value and not (key == "session_id" and not live_mode)
+            if not value and not (key == "session_id" and not requires_live_session_linkage)
         ]
         required_audit_stages = ["identity", "policy", "retrieval", "secret", "tool_decision", "launch_gate", "handoff"]
         if requested_tools:
@@ -1169,7 +1204,7 @@ class GovernedFlowEvaluator:
         missing_audit_stages = [stage for stage in required_audit_stages if stage not in audit_stages_observed]
         trace_reason_codes = list(final_missing_steps)
         trace_reason_codes.extend(f"identifier_missing:{name}" for name in missing_identifiers)
-        if live_mode and not session_id:
+        if requires_live_session_linkage and not session_id:
             trace_reason_codes.append("session.linkage_unavailable")
         trace_reason_codes.extend(f"audit.stage_missing:{stage}" for stage in missing_audit_stages)
         trace_correlation = {
@@ -1192,7 +1227,7 @@ class GovernedFlowEvaluator:
             "session_linkage": {
                 "status": session_linkage_status,
                 "reason": session_linkage_reason,
-                "required": live_mode,
+                "required": requires_live_session_linkage,
                 "identity_source": identity_result.source,
             },
             "audit_linkage": {
@@ -1203,7 +1238,7 @@ class GovernedFlowEvaluator:
                 "missing_stages": missing_audit_stages,
                 "complete": trace_id in audit_trace_ids and not missing_audit_stages,
             },
-            "complete": len(final_missing_steps) == 0 and not missing_identifiers and bool(session_id or not live_mode),
+            "complete": len(final_missing_steps) == 0 and not missing_identifiers and (not requires_live_session_linkage or bool(session_id)),
             "reason_codes": list(dict.fromkeys(trace_reason_codes)),
             "provenance": "runtime-generated",
         }

@@ -7,6 +7,7 @@ from typing import Any
 @dataclass(frozen=True)
 class IdentityResolutionRequest:
     authorization_header: str = ""
+    headers: dict[str, str] = field(default_factory=dict)
     cookies: dict[str, str] = field(default_factory=dict)
     requested_path: str = ""
     required_live_identity: bool = False

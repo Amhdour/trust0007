@@ -147,7 +147,7 @@ def default_controls() -> List[ControlRequirement]:
     ]
 
 
-def live_controls(*, secret_required: bool = False) -> List[ControlRequirement]:
+def live_controls(*, secret_required: bool = False, retrieval_required: bool = True) -> List[ControlRequirement]:
     controls = [
         ControlRequirement(
             control_id="live_identity",
@@ -166,8 +166,8 @@ def live_controls(*, secret_required: bool = False) -> List[ControlRequirement]:
         ControlRequirement(
             control_id="live_retrieval",
             description="Live retrieval enforcement evidence present.",
-            required_evidence=["retrieval.live_backend"],
-            mandatory=True,
+            required_evidence=["retrieval.live_backend"] if retrieval_required else [],
+            mandatory=retrieval_required,
             weight=2,
         ),
         ControlRequirement(
