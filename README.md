@@ -17,23 +17,35 @@ Suggested short repository description:
 - Fail-closed behavior when Keycloak-compatible identity, OPA policy checks, retrieval boundaries, Vault-backed secrets, or required trace/evidence signals fail.
 - Evidence-backed review surfaces for telemetry, auditability, policy reasons, and launch-readiness posture without exposing raw sensitive prompt/transcript content.
 
-## Reviewer Fast Path
+## Start here for reviewers
 
-If you only have a minute, start here:
+This project is a **dashboard-first trust control plane** with two governed runtime lanes:
 
-1. Proof matrix: [docs/strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md)
-2. Main strict-live integration proofs:
-   - [tests/integration/test_strict_live_onyx_end_to_end.py](tests/integration/test_strict_live_onyx_end_to_end.py)
-   - [tests/integration/test_strict_live_dify_end_to_end.py](tests/integration/test_strict_live_dify_end_to_end.py)
-3. Reviewer runbook: [docs/reviewer-runbook.md](docs/reviewer-runbook.md)
-4. Reviewer landing page: [docs/reviewer-fast-path.md](docs/reviewer-fast-path.md)
-5. Passing live flow artifact: [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
-6. Denied identity artifact: [denied-identity-flow.json](evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
-7. Denied OPA artifact: [denied-opa-flow.json](evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
-8. Denied retrieval artifact: [denied-retrieval-flow.json](evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
-9. Denied secret artifact: [denied-secret-flow.json](evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
-10. Launch-gate no-go artifact: [live-launch-gate-downgrade.json](evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
-11. Visual dashboard proof guide: [docs/dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
+- **Onyx = RAG** (`/launch/onyx`)
+- **Dify = Autonomous Agents** (`/launch/dify`)
+
+Quickest validation path:
+
+1. Reviewer runbook (5-minute path): [docs/reviewer-runbook.md](docs/reviewer-runbook.md)
+2. Visual proof cues (illustrative): [docs/dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
+3. Live startup/bootstrap commands:
+   - `make bootstrap-live`
+   - `make verify-live`
+   - `make up-live`
+4. Strict live tests:
+   - `pytest -q tests/integration/test_strict_live_onyx_end_to_end.py`
+   - `pytest -q tests/integration/test_strict_live_dify_end_to_end.py`
+5. Strict proof matrix: [docs/strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md)
+6. Deployment story and maturity: [Deployment Maturity and Modes](#deployment-maturity-and-modes)
+
+High-value reviewer artifacts:
+
+- pass: [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
+- denied identity: [denied-identity-flow.json](evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
+- denied OPA: [denied-opa-flow.json](evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
+- denied retrieval: [denied-retrieval-flow.json](evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
+- denied secret: [denied-secret-flow.json](evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
+- launch-gate no-go: [live-launch-gate-downgrade.json](evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
 
 ## Client Overview
 
@@ -158,17 +170,17 @@ The main fail-closed test coverage is in [tests/integration/test_strict_live_ony
 
 ## Evidence Artifacts To Inspect
 
-Primary governed-flow artifacts:
+Primary governed-flow artifacts (generated under `overlays/myStarterKit/artifacts/` after live bootstrap):
 
-- [governed-request-feed.json](overlays/myStarterKit/artifacts/governed-request-feed.json)
-- [governed-flow-summary.json](overlays/myStarterKit/artifacts/governed-flow-summary.json)
-- [identity-evidence.json](overlays/myStarterKit/artifacts/identity-evidence.json)
-- [policy-evidence.json](overlays/myStarterKit/artifacts/policy-evidence.json)
-- [retrieval-evidence.json](overlays/myStarterKit/artifacts/retrieval-evidence.json)
-- [secret-evidence.json](overlays/myStarterKit/artifacts/secret-evidence.json)
-- [audit-records.jsonl](overlays/myStarterKit/artifacts/audit-records.jsonl)
-- [trace-correlation.json](overlays/myStarterKit/artifacts/trace-correlation.json)
-- [launch-gate-result.json](overlays/myStarterKit/artifacts/launch-gate-result.json)
+- `governed-request-feed.json`
+- `governed-flow-summary.json`
+- `identity-evidence.json`
+- `policy-evidence.json`
+- `retrieval-evidence.json`
+- `secret-evidence.json`
+- `audit-records.jsonl`
+- `trace-correlation.json`
+- `launch-gate-result.json`
 - [reviewer evidence bundle](evidence/reviewer_evidence_bundle.json)
 
 Panel evidence sources:
