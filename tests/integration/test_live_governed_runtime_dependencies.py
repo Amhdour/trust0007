@@ -103,7 +103,7 @@ def _mock_urlopen_factory(
                 }
             )
 
-        if "/v1/secret/data/runtime/tenant-stage/onyx" in url:
+        if "/v1/secret/data/runtime/tenant-stage/onyx" in url or "/v1/secret/data/runtime/tenant-stage/dify" in url:
             if not vault_enabled:
                 raise _http_error(url, 503)
             if headers.get("x-vault-token", "") != "root-token":
@@ -255,14 +255,143 @@ def test_live_handoff_denies_when_secret_backend_unavailable():
     assert summary["secret"]["fetched"] is False
 
 
-def test_live_handoff_trace_breakage_causes_launch_gate_no_go():
-    result, summary = _run_live_flow(include_session=False)
+def test_live_handoff_accepts_oidc_front_door_forwarded_access_token():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        artifact_dir = Path(tmpdir)
+        evaluator = _build_live_evaluator(artifact_dir=artifact_dir)
+        fake_urlopen = _mock_urlopen_factory()
+        with (
+            patch("adapters.identity.keycloak.urlopen", side_effect=fake_urlopen),
+            patch("adapters.policy.opa.urlopen", side_effect=fake_urlopen),
+            patch("adapters.retrieval.qdrant.urlopen", side_effect=fake_urlopen),
+            patch("adapters.secrets.vault.urlopen", side_effect=fake_urlopen),
+        ):
+            result = evaluator.run(
+                user_id="dashboard-user",
+                tenant_id="tenant-stage",
+                prompt="Navigate to Onyx path: /app",
+                requested_tools=["onyx"],
+                retrieval_source="qdrant",
+                retrieval_needed=True,
+                roles=["tenant_user"],
+                request_metadata={"requested_path": "/app", "surface": "onyx.chat", "surface_query": {}},
+                tool_arguments={"onyx": {"path": "/app", "surface": "onyx.chat"}},
+                policy_source="overlay",
+                policy_path="overlays/myStarterKit/policies/bundles/default/policy.json",
+                authorization_header="",
+                request_headers={"X-Forwarded-Access-Token": "valid-live-token"},
+                cookies={},
+                evidence_mode="live",
+                secret_request={
+                    "needed": True,
+                    "secret_path": "secret/data/runtime/tenant-stage/onyx",
+                    "secret_key": "api_token",
+                    "purpose": "onyx_runtime_handoff",
+                },
+            )
+        summary = json.loads((artifact_dir / "governed-flow-summary.json").read_text(encoding="utf-8"))
+
+    assert result.decision is True
+    assert summary["identity"]["authenticated"] is True
+    assert summary["identity"]["metadata"]["auth_mechanism"] == "bearer_token"
+    assert summary["trace"]["complete"] is True
+    assert summary["trace"]["session_linkage"]["required"] is False
+
+
+def test_live_handoff_oidc_session_requires_session_linkage():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        artifact_dir = Path(tmpdir)
+        evaluator = _build_live_evaluator(include_session=False, artifact_dir=artifact_dir)
+        fake_urlopen = _mock_urlopen_factory(include_session=False)
+        with (
+            patch("adapters.identity.keycloak.urlopen", side_effect=fake_urlopen),
+            patch("adapters.policy.opa.urlopen", side_effect=fake_urlopen),
+            patch("adapters.retrieval.qdrant.urlopen", side_effect=fake_urlopen),
+            patch("adapters.secrets.vault.urlopen", side_effect=fake_urlopen),
+        ):
+            result = evaluator.run(
+                user_id="dashboard-user",
+                tenant_id="tenant-stage",
+                prompt="Navigate to Onyx path: /app",
+                requested_tools=["onyx"],
+                retrieval_source="qdrant",
+                retrieval_needed=True,
+                roles=["tenant_user"],
+                request_metadata={"requested_path": "/app", "surface": "onyx.chat", "surface_query": {}},
+                tool_arguments={"onyx": {"path": "/app", "surface": "onyx.chat"}},
+                policy_source="overlay",
+                policy_path="overlays/myStarterKit/policies/bundles/default/policy.json",
+                authorization_header="",
+                request_headers={"X-Forwarded-Access-Token": "valid-live-token"},
+                cookies={"KEYCLOAK_SESSION": "session-cookie-present"},
+                evidence_mode="live",
+                secret_request={
+                    "needed": True,
+                    "secret_path": "secret/data/runtime/tenant-stage/onyx",
+                    "secret_key": "api_token",
+                    "purpose": "onyx_runtime_handoff",
+                },
+            )
+        summary = json.loads((artifact_dir / "governed-flow-summary.json").read_text(encoding="utf-8"))
 
     assert result.decision is False
     assert summary["trace"]["complete"] is False
-    assert summary["trace"]["session_linkage"]["reason"]
+    assert summary["trace"]["session_linkage"]["required"] is True
     assert "session.linkage_unavailable" in summary["trace"]["reason_codes"]
     assert summary["launch_gate"]["decision"] == "no_go"
+
+
+def test_live_dify_flow_does_not_require_retrieval_live_backend_evidence():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        artifact_dir = Path(tmpdir)
+        evaluator = _build_live_evaluator(artifact_dir=artifact_dir)
+        fake_urlopen = _mock_urlopen_factory()
+        with (
+            patch("adapters.identity.keycloak.urlopen", side_effect=fake_urlopen),
+            patch("adapters.policy.opa.urlopen", side_effect=fake_urlopen),
+            patch("adapters.retrieval.qdrant.urlopen", side_effect=fake_urlopen),
+            patch("adapters.secrets.vault.urlopen", side_effect=fake_urlopen),
+        ):
+            result = evaluator.run(
+                user_id="dashboard-user",
+                tenant_id="tenant-stage",
+                prompt="Navigate to Dify path: /apps",
+                requested_tools=["dify"],
+                retrieval_source="qdrant",
+                retrieval_needed=False,
+                roles=["tenant_user"],
+                request_metadata={"requested_path": "/apps", "runtime_key": "dify", "surface": "dify.apps", "surface_query": {}},
+                tool_arguments={"dify": {"path": "/apps", "surface": "dify.apps", "mcp_server": "mcp_server.dashboard_control_plane"}},
+                policy_source="overlay",
+                policy_path="overlays/myStarterKit/policies/bundles/default/policy.json",
+                authorization_header="Bearer valid-live-token",
+                cookies={},
+                evidence_mode="live",
+                secret_request={
+                    "needed": True,
+                    "secret_path": "secret/data/runtime/tenant-stage/dify",
+                    "secret_key": "api_token",
+                    "purpose": "dify_runtime_handoff",
+                },
+            )
+        summary = json.loads((artifact_dir / "governed-flow-summary.json").read_text(encoding="utf-8"))
+        launch_gate = json.loads((artifact_dir / "launch-gate-result.json").read_text(encoding="utf-8"))
+
+    assert result.decision is True
+    assert summary["retrieval"]["mandatory"] is False
+    assert summary["launch_gate"]["decision"] == "pass"
+    assert "retrieval.live_backend" not in summary["launch_gate"]["missing_evidence"]
+    assert "retrieval.live_backend" not in launch_gate["machine"]["missing_evidence"]
+
+
+def test_live_handoff_bearer_token_without_session_stays_trace_complete():
+    result, summary = _run_live_flow(include_session=False)
+
+    assert result.decision is True
+    assert summary["trace"]["complete"] is True
+    assert summary["trace"]["session_linkage"]["required"] is False
+    assert "session.linkage_unavailable" not in summary["trace"]["reason_codes"]
+    assert summary["launch_gate"]["decision"] == "pass"
 
 
 def test_launch_gate_summary_prefers_live_artifacts_when_live_mode_enabled():

@@ -57,7 +57,7 @@ def build_launch_gate_summary(root: Path | None = None) -> dict[str, Any]:
     if governance_mode == "live":
         computed = launch_gate_module.evaluate_launch_gate(
             evidence={},
-            controls=launch_gate_module.live_controls(secret_required=False),
+            controls=launch_gate_module.live_controls(secret_required=False, retrieval_required=False),
         )
         findings = [
             {
@@ -65,7 +65,7 @@ def build_launch_gate_summary(root: Path | None = None) -> dict[str, Any]:
                 "status": "fail",
                 "reason": "missing_live_evidence",
             }
-            for control in launch_gate_module.live_controls(secret_required=False)
+            for control in launch_gate_module.live_controls(secret_required=False, retrieval_required=False)
         ]
         return {
             "status": _map_status(computed.decision),

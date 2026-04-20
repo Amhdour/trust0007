@@ -30,7 +30,8 @@ Demo mode is useful for fast iteration, but it is not equivalent to the strict l
 
 In live mode, governed handoff to `/launch/{runtime}` requires this order:
 
-1. Keycloak-backed bearer token or session cookie is resolved into normalized identity.
+1. Keycloak-backed bearer token or OIDC front-door forwarded access token is resolved into normalized identity.
+   Supported live inputs include `Authorization: Bearer <token>`, `X-Forwarded-Access-Token`, `X-Auth-Request-Access-Token`, and access-token cookies such as `kc_access_token`.
    The local strict-live smoke path requests `openid email profile` scope so Keycloak `userinfo` can participate. Without `openid`, identity should fail closed.
 2. OPA receives the live policy input and returns an auditable decision.
 3. Runtime-specific control checks execute:
@@ -73,7 +74,7 @@ Launch gate: no_go
 ```
 
 ```text
-Bearer token valid but no session correlation
+OIDC session flow token valid but no session correlation
   ->
 Identity: live
 Policy: allow
@@ -110,6 +111,12 @@ Supported query options:
 
 - `mode=demo|live`
 - `secret_required=true`
+
+Auth inputs for live requests:
+
+- `Authorization: Bearer <Keycloak token>`
+- `X-Forwarded-Access-Token: <Keycloak token>` (OIDC front-door pattern)
+- `X-Auth-Request-Access-Token: <Keycloak token>` (OIDC front-door pattern)
 
 ### `/launch/onyx?path=/app`
 

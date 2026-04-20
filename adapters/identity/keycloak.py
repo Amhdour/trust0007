@@ -10,11 +10,33 @@ from .interfaces import IdentityProvider
 from .schemas import IdentityResolutionRequest, IdentityResolutionResult
 
 
-def _extract_bearer_token(authorization_header: str, cookies: dict[str, str]) -> str:
+def _extract_bearer_token(
+    authorization_header: str,
+    headers: dict[str, str],
+    cookies: dict[str, str],
+) -> tuple[str, str]:
     header = authorization_header.strip()
     if header.lower().startswith("bearer "):
-        return header.split(" ", 1)[1].strip()
-    return str(cookies.get("kc_access_token", "")).strip()
+        return header.split(" ", 1)[1].strip(), "authorization_header"
+
+    lowered_headers = {str(key).lower(): str(value) for key, value in (headers or {}).items()}
+    for header_name in ("x-forwarded-access-token", "x-auth-request-access-token"):
+        value = lowered_headers.get(header_name, "").strip()
+        if value:
+            return value, f"header:{header_name}"
+
+    for cookie_name in ("kc_access_token", "oauth2_proxy_access_token", "access_token"):
+        token = str(cookies.get(cookie_name, "")).strip()
+        if token:
+            return token, f"cookie:{cookie_name}"
+    return "", "missing"
+
+
+def _has_oidc_session_cookie(cookies: dict[str, str]) -> bool:
+    return any(
+        bool(str(cookies.get(name, "")).strip())
+        for name in ("KEYCLOAK_SESSION", "KEYCLOAK_SESSION_LEGACY", "kc_session", "oidc_session")
+    )
 
 
 def _decode_token_claims(token: str) -> dict[str, Any]:
@@ -92,7 +114,9 @@ class KeycloakIdentityProvider(IdentityProvider):
         self._timeout_seconds = timeout_seconds
 
     def resolve(self, request: IdentityResolutionRequest) -> IdentityResolutionResult:
-        token = _extract_bearer_token(request.authorization_header, request.cookies)
+        token, token_source = _extract_bearer_token(request.authorization_header, request.headers, request.cookies)
+        oidc_session_present = _has_oidc_session_cookie(request.cookies)
+        auth_mechanism = "oidc_session" if oidc_session_present else "bearer_token"
         token_present = bool(token)
         if not token_present:
             if request.required_live_identity:
@@ -106,7 +130,11 @@ class KeycloakIdentityProvider(IdentityProvider):
                     token_present=False,
                     token_active=False,
                     reason="identity.missing_bearer_token",
-                    metadata={"requested_path": request.requested_path},
+                    metadata={
+                        "requested_path": request.requested_path,
+                        "token_source": token_source,
+                        "auth_mechanism": "missing",
+                    },
                 )
             return IdentityResolutionResult(
                 authenticated=True,
@@ -118,7 +146,11 @@ class KeycloakIdentityProvider(IdentityProvider):
                 token_present=False,
                 token_active=False,
                 reason="identity.synthetic_fallback",
-                metadata={"requested_path": request.requested_path},
+                metadata={
+                    "requested_path": request.requested_path,
+                    "token_source": token_source,
+                    "auth_mechanism": "demo_fallback",
+                },
             )
 
         req = Request(self._userinfo_url)
@@ -139,7 +171,11 @@ class KeycloakIdentityProvider(IdentityProvider):
                 token_present=True,
                 token_active=False,
                 reason=f"identity.keycloak_http_error:{exc.code}",
-                metadata={"requested_path": request.requested_path},
+                metadata={
+                    "requested_path": request.requested_path,
+                    "token_source": token_source,
+                    "auth_mechanism": auth_mechanism,
+                },
             )
         except (URLError, TimeoutError, json.JSONDecodeError):
             return IdentityResolutionResult(
@@ -152,7 +188,11 @@ class KeycloakIdentityProvider(IdentityProvider):
                 token_present=True,
                 token_active=False,
                 reason="identity.keycloak_unreachable",
-                metadata={"requested_path": request.requested_path},
+                metadata={
+                    "requested_path": request.requested_path,
+                    "token_source": token_source,
+                    "auth_mechanism": auth_mechanism,
+                },
             )
 
         merged_claims = _merge_verified_claims(claims, token)
@@ -174,7 +214,11 @@ class KeycloakIdentityProvider(IdentityProvider):
                 token_present=True,
                 token_active=False,
                 reason="identity.subject_missing",
-                metadata={"requested_path": request.requested_path},
+                metadata={
+                    "requested_path": request.requested_path,
+                    "token_source": token_source,
+                    "auth_mechanism": auth_mechanism,
+                },
             )
 
         if request.required_live_identity and not tenant_id:
@@ -189,7 +233,11 @@ class KeycloakIdentityProvider(IdentityProvider):
                 token_present=True,
                 token_active=False,
                 reason="identity.tenant_missing",
-                metadata={"requested_path": request.requested_path},
+                metadata={
+                    "requested_path": request.requested_path,
+                    "token_source": token_source,
+                    "auth_mechanism": auth_mechanism,
+                },
             )
 
         return IdentityResolutionResult(
@@ -207,5 +255,7 @@ class KeycloakIdentityProvider(IdentityProvider):
                 "requested_path": request.requested_path,
                 "issuer": str(merged_claims.get("iss", "")),
                 "preferred_username": str(merged_claims.get("preferred_username", "")),
+                "token_source": token_source,
+                "auth_mechanism": auth_mechanism,
             },
         )

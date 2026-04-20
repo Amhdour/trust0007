@@ -189,7 +189,6 @@ def _validate_startup_configuration() -> None:
 
     if governance_mode == "live":
         required_env = [
-            "CONTROL_PLANE_VAULT_TOKEN",
             "CONTROL_PLANE_KEYCLOAK_BASE_URL",
             "CONTROL_PLANE_OPA_URL",
             "CONTROL_PLANE_QDRANT_URL",
@@ -199,6 +198,11 @@ def _validate_startup_configuration() -> None:
         for env_name in required_env:
             if not os.environ.get(env_name, "").strip():
                 errors.append(f"startup.missing_required_env:{env_name}")
+        if not (
+            os.environ.get("CONTROL_PLANE_VAULT_TOKEN", "").strip()
+            or os.environ.get("VAULT_TOKEN", "").strip()
+        ):
+            errors.append("startup.missing_required_env:CONTROL_PLANE_VAULT_TOKEN_OR_VAULT_TOKEN")
         if not os.environ.get("CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS", "").strip():
             errors.append("startup.missing_required_env:CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS")
 
@@ -896,6 +900,8 @@ def _workspace_activity_panel_markup(activity_payload: dict) -> str:
 def _build_secret_provider() -> VaultSecretsProvider | None:
     vault_addr = os.environ.get("CONTROL_PLANE_VAULT_ADDR", "http://vault:8200").strip()
     vault_token = os.environ.get("CONTROL_PLANE_VAULT_TOKEN", "").strip()
+    if not vault_token:
+        vault_token = os.environ.get("VAULT_TOKEN", "").strip()
     if not vault_addr or not vault_token:
         return None
     return VaultSecretsProvider(VaultHTTPClient(base_url=vault_addr, token=vault_token))
@@ -1088,6 +1094,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 policy_source=policy_context.source,
                 policy_path=policy_context.relative_path,
                 authorization_header=self.headers.get("Authorization", ""),
+                request_headers=dict(self.headers.items()),
                 cookies=self._request_cookies(),
                 evidence_mode=flow_mode,
                 secret_request={
@@ -1116,6 +1123,14 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND.value, "File not found")
             return
         self._send_file(candidate)
+
+    def _serve_onyx_handoff(self, requested_path: str) -> None:
+        """Backward-compatible wrapper retained for legacy tests/callers."""
+        ControlPlaneRequestHandler._serve_runtime_handoff(self, requested_path, runtime="onyx")
+
+    def _serve_dify_handoff(self, requested_path: str) -> None:
+        """Backward-compatible wrapper retained for legacy tests/callers."""
+        ControlPlaneRequestHandler._serve_runtime_handoff(self, requested_path, runtime="dify")
 
     def _serve_runtime_handoff(self, requested_path: str, *, runtime: str = "onyx") -> None:
         """Serve runtime handoff with governance enforcement.
@@ -1203,6 +1218,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 policy_source=policy_context.source,
                 policy_path=policy_context.relative_path,
                 authorization_header=self.headers.get("Authorization", ""),
+                request_headers=dict(self.headers.items()),
                 cookies=_cookie_map(self.headers.get("Cookie", "")),
                 evidence_mode=flow_mode,
                 secret_request={
