@@ -83,3 +83,34 @@ def test_workspace_activity_reports_when_no_runtime_visibility_exists() -> None:
     assert payload["counts"]["correlated"] == 0
     assert payload["counts"]["other_runtime"] == 0
     assert payload["sources"]["onyx"] == "docker socket unavailable"
+
+
+def test_workspace_activity_correlates_on_explicit_session_id_field() -> None:
+    snapshot = {
+        "entries": [
+            {
+                "timestamp": "2026-04-01T10:00:00+00:00",
+                "source": "langfuse",
+                "source_label": "Langfuse Session",
+                "event_type": "Langfuse session",
+                "summary": "Session matched via explicit session_id",
+                "severity": "info",
+                "status": "neutral",
+                "session_id": "sess-abc",
+                "request_id": "req-1",
+            }
+        ],
+        "sources": {"onyx": "connected", "langfuse": "connected"},
+    }
+
+    payload = build_onyx_workspace_activity(
+        Path("."),
+        requested_path="/app",
+        trace_id="",
+        session_id="sess-abc",
+        activity_snapshot=snapshot,
+    )
+
+    assert payload["counts"]["correlated"] == 1
+    assert payload["groups"][1]["entries"][0]["session_match"] is True
+    assert payload["groups"][1]["entries"][0]["session_id"] == "sess-abc"

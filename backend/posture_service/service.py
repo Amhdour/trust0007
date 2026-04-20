@@ -38,6 +38,7 @@ from backend.integration_adapter.repository import (
     read_jsonl,
     repo_root,
     reviewer_bundle_relative_path,
+    validate_live_governed_flow_artifacts,
 )
 from backend.launch_gate_service.service import build_launch_gate_summary
 
@@ -1359,7 +1360,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     request_starts = [event for event in events if event.get("event_type") == "request.start"]
     request_ends = [event for event in events if event.get("event_type") == "request.end"]
     trace_ids = sorted({str(event.get("trace_id", "")) for event in events if event.get("trace_id")})
-    live_evidence_mode = str(governed_flow_summary.get("evidence_mode", "")).lower() == "live"
+    live_artifact_validation = validate_live_governed_flow_artifacts(resolved_root)
+    live_evidence_mode = bool(live_artifact_validation.get("valid"))
     live_mode_bootstrap_missing = governance_mode == "live" and not live_evidence_mode
     latest_trace_id = str(governed_flow_summary.get("trace_id", "")) or str(trace_correlation.get("trace_id", ""))
     latest_session_id = str(governed_flow_summary.get("session_id", "")) or str(trace_correlation.get("session_id", ""))
@@ -1597,11 +1599,79 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         ],
     }
     latest_request = governed_request_feed[0] if governed_request_feed else {}
+    latest_onyx_request = next(
+        (item for item in governed_request_feed if str(item.get("runtime_target", "")).strip().lower() == "onyx"),
+        latest_request,
+    )
+
+    def _request_artifact(request: dict[str, Any], key: str, fallback: dict[str, Any]) -> dict[str, Any]:
+        refs = request.get("artifact_refs", {}) if isinstance(request, dict) else {}
+        if not isinstance(refs, dict):
+            return fallback
+        relative = str(refs.get(key, "")).strip()
+        if not relative:
+            return fallback
+        loaded = read_json(resolved_root / relative)
+        return loaded if isinstance(loaded, dict) and loaded else fallback
+
+    onyx_governed_summary = _request_artifact(latest_onyx_request, "governed_flow_summary", governed_flow_summary)
+    onyx_identity_evidence = _request_artifact(latest_onyx_request, "identity_evidence", identity_evidence)
+    onyx_policy_evidence = _request_artifact(latest_onyx_request, "policy_evidence", policy_evidence)
+    onyx_retrieval_evidence = _request_artifact(latest_onyx_request, "retrieval_evidence", retrieval_evidence)
+    onyx_secret_evidence = _request_artifact(latest_onyx_request, "secret_evidence", secret_evidence)
+    onyx_trace_correlation = _request_artifact(latest_onyx_request, "trace_correlation", trace_correlation)
+    onyx_dependency = onyx_governed_summary.get("dependency_status", {})
+    onyx_dependency = onyx_dependency if isinstance(onyx_dependency, dict) else {}
+
+    latest_handoff_allowed = bool(
+        latest_onyx_request.get("handoff_allowed", onyx_governed_summary.get("handoff_allowed", onyx_governed_summary.get("decision", False)))
+    )
+    latest_reason_codes = _string_list(latest_onyx_request.get("reason_codes", [])) or _string_list(onyx_governed_summary.get("reasons", []))
+    latest_handoff_reason = latest_reason_codes[0] if latest_reason_codes else "policy.allow"
+    latest_missing_evidence = _string_list(onyx_governed_summary.get("launch_gate", {}).get("missing_evidence", []))
+    latest_governed_launch_gate = dict(onyx_governed_summary.get("launch_gate", {}))
+    latest_governed_verdict = _normalize_launch_verdict(str(latest_governed_launch_gate.get("decision", "")))
+    latest_governed_posture = _readiness_display(latest_governed_verdict) if latest_governed_verdict else "Unavailable"
+    identity_authenticated = bool(onyx_dependency.get("identity", {}).get("authenticated", onyx_identity_evidence.get("authenticated")))
+    identity_live_step = bool(onyx_dependency.get("identity", {}).get("live", onyx_identity_evidence.get("live")))
+    policy_allowed = bool(onyx_dependency.get("policy", {}).get("allow", onyx_policy_evidence.get("allow")))
+    policy_engine_step = str(onyx_dependency.get("policy", {}).get("engine", onyx_policy_evidence.get("engine", policy_engine)))
+    retrieval_allowed = bool(onyx_dependency.get("retrieval", {}).get("allow", onyx_retrieval_evidence.get("allow")))
+    retrieval_live_step = bool(
+        onyx_dependency.get("retrieval", {}).get("live_backend", onyx_retrieval_evidence.get("live_backend"))
+    )
+    secret_required_step = bool(onyx_dependency.get("secret", {}).get("mandatory", onyx_secret_evidence.get("required", secret_required)))
+    secret_fetched_step = bool(onyx_dependency.get("secret", {}).get("fetched", onyx_secret_evidence.get("fetched", secret_fetched)))
+    trace_complete_step = bool(onyx_dependency.get("trace", {}).get("complete", onyx_trace_correlation.get("complete", trace_complete)))
+    identity_timestamp = str(
+        onyx_identity_evidence.get("timestamp")
+        or onyx_identity_evidence.get("captured_at")
+        or onyx_governed_summary.get("generated_at")
+        or identity_timestamp
+    )
+    policy_timestamp = str(
+        onyx_policy_evidence.get("timestamp")
+        or onyx_policy_evidence.get("captured_at")
+        or onyx_governed_summary.get("generated_at")
+        or policy_timestamp
+    )
+    retrieval_timestamp = str(
+        onyx_retrieval_evidence.get("timestamp")
+        or onyx_retrieval_evidence.get("captured_at")
+        or onyx_governed_summary.get("generated_at")
+        or retrieval_timestamp
+    )
+    secret_timestamp = str(
+        onyx_secret_evidence.get("timestamp")
+        or onyx_secret_evidence.get("captured_at")
+        or onyx_governed_summary.get("generated_at")
+        or secret_timestamp
+    )
     latest_request_reason = ", ".join(_string_list(latest_request.get("reason_codes", []))[:2] or ["policy.allow"])
     latest_request_href = ""
     if isinstance(latest_request.get("artifact_refs"), dict) and latest_request["artifact_refs"].get("governed_flow_summary"):
         latest_request_href = _raw(str(latest_request["artifact_refs"]["governed_flow_summary"]))
-    latest_requested_path = str(latest_request.get("requested_path") or governed_flow_summary.get("requested_path") or "/app")
+    latest_requested_path = str(latest_onyx_request.get("requested_path") or governed_flow_summary.get("requested_path") or "/app")
     summary_runtime_proof = governed_flow_summary.get("runtime_proof", {})
     summary_runtime_proof = dict(summary_runtime_proof) if isinstance(summary_runtime_proof, dict) else {}
     if not onyx_runtime_proof:
@@ -1636,9 +1706,16 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         f"&session_id={quote(latest_session_id, safe='')}"
     )
     top_failing_control = failing_controls[0] if failing_controls else {}
-    governed_flow_generated_at = str(governed_flow_summary.get("generated_at", ""))
-    latest_request_timestamp = str(latest_request.get("timestamp") or governed_flow_generated_at or "")
-    trace_timestamp = str(trace_correlation.get("timestamp") or trace_correlation.get("generated_at") or governed_flow_generated_at or "")
+    governed_flow_generated_at = str(onyx_governed_summary.get("generated_at") or governed_flow_summary.get("generated_at", ""))
+    latest_request_timestamp = str(latest_onyx_request.get("timestamp") or governed_flow_generated_at or "")
+    trace_timestamp = str(
+        onyx_trace_correlation.get("timestamp")
+        or onyx_trace_correlation.get("generated_at")
+        or trace_correlation.get("timestamp")
+        or trace_correlation.get("generated_at")
+        or governed_flow_generated_at
+        or ""
+    )
     handoff_timestamp = latest_request_timestamp or governed_flow_generated_at
     launch_report_timestamp = str(launch_summary.get("generated_at") or readiness_panel["generated_at"] or "")
     evidence_summary_timestamp = str(
@@ -4034,6 +4111,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "last_updated": launch_report_timestamp or dashboard_generated_at,
         "evidence_mode": "live" if (live_evidence_mode or live_mode_bootstrap_missing) else "demo",
         "latest_handoff_decision": _allow_deny_label(latest_handoff_allowed),
+        "live_artifact_validation": live_artifact_validation,
     }
 
     trust_proof = {
