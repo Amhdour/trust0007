@@ -137,3 +137,26 @@ def test_dashboard_remains_fail_closed_when_critical_proof_missing(monkeypatch) 
 
     assert payload["readiness"]["decision"] == "NO_GO"
     assert payload["trust_proof"]["retrieval_proven"] is False
+
+
+def test_dify_health_does_not_mask_critical_onyx_runtime_failure(monkeypatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_GOVERNANCE_MODE", "live")
+    monkeypatch.setattr(posture_service_module, "load_latest_governed_flow_summary", lambda root: _healthy_live_summary())
+    monkeypatch.setattr(posture_service_module, "build_launch_gate_summary", lambda root: {
+        "status": "go",
+        "readiness_score": 100,
+        "control_coverage": "6/6",
+        "findings": [],
+        "residual_risks": [],
+        "generated_at": "2026-04-19T10:00:00+00:00",
+    })
+    monkeypatch.setattr(posture_service_module, "load_latest_onyx_runtime_proof", lambda root: {
+        "continuity": {"status": "no_runtime_activity", "label": "No recent activity", "detail": "No activity."},
+        "reachability": {"status": "runtime_unreachable", "label": "Runtime not reachable", "detail": "Onyx down."},
+        "requested_path": "/app",
+    })
+
+    payload = build_control_plane_dashboard()
+
+    assert payload["readiness"]["decision"] == "NO_GO"
+    assert any(blocker["label"].lower().startswith("onyx runtime") for blocker in payload["readiness"]["top_blockers"])

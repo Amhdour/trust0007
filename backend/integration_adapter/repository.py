@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -85,10 +87,21 @@ def list_upstream_component_paths(root: Path | None = None) -> list[str]:
     upstream_root = repo_root(root) / "upstream"
     if not upstream_root.exists():
         return []
+    lock_manifest = read_json(repo_root(root) / UPSTREAM_SOURCE_LOCK_PATH)
+    locked_paths = sorted(
+        {
+            str(component.get("upstream_path", "")).strip()
+            for component in lock_manifest.get("components", [])
+            if str(component.get("upstream_path", "")).strip()
+        }
+    )
+    if locked_paths:
+        return [path for path in locked_paths if (repo_root(root) / path).is_dir()]
+
     return sorted(
         str(path.relative_to(repo_root(root)))
         for path in upstream_root.iterdir()
-        if path.is_dir()
+        if path.is_dir() and not path.name.startswith(".") and not path.name.endswith(".orig")
     )
 
 
@@ -620,12 +633,39 @@ def load_latest_audit_records(root: Path | None = None) -> list[dict[str, Any]]:
 
 
 def has_live_governed_flow_artifacts(root: Path | None = None) -> bool:
-    """Check if live governed flow artifacts are available in the overlay directory."""
+    """Check if current live governed flow artifacts are available in the overlay directory."""
     resolved_root = repo_root(root)
     artifacts_dir = resolved_root / "overlays/myStarterKit/artifacts"
-    return (
-        artifacts_dir.exists()
-        and (artifacts_dir / "events.jsonl").exists()
-        and (artifacts_dir / "launch-gate-result.json").exists()
-        and (artifacts_dir / "governed-flow-summary.json").exists()
+    if not artifacts_dir.exists():
+        return False
+
+    required_files = (
+        "events.jsonl",
+        "governed-flow-summary.json",
+        "identity-evidence.json",
+        "policy-evidence.json",
+        "retrieval-evidence.json",
+        "trace-correlation.json",
+        "launch-gate-result.json",
+        "onyx-runtime-proof.json",
     )
+    if any(not (artifacts_dir / name).exists() for name in required_files):
+        return False
+
+    summary = read_json(artifacts_dir / "governed-flow-summary.json")
+    if str(summary.get("evidence_mode", "")).strip().lower() != "live":
+        return False
+
+    generated_at = str(summary.get("generated_at", "")).strip()
+    if not generated_at:
+        return False
+    if generated_at.endswith("Z"):
+        generated_at = f"{generated_at[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(generated_at)
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    max_age_hours = int(os.environ.get("CONTROL_PLANE_EVIDENCE_STALE_HOURS", "24"))
+    return (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds() <= max_age_hours * 3600

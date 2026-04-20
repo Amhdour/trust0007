@@ -323,6 +323,7 @@ def test_dashboard_sections_match_slim_contract_ids() -> None:
     assert section_ids == {
         "launch-gate",
         "entry-points",
+        "dify-agent-access",
         "policy-enforcement",
         "retrieval-boundaries",
         "tool-mcp-governance",

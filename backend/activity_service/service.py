@@ -532,6 +532,7 @@ def build_activity_snapshot(root: Path, limit: int = DEFAULT_ACTIVITY_LIMIT) -> 
         "counts": {
             "combined": len(real_entries),
             "onyx": counts.get("onyx", 0),
+            "governed_handoff": counts.get("governed_handoff", 0),
             "langfuse": counts.get("langfuse", 0),
             "alerts": alerts,
             "langfuse_traces": langfuse_traces,
@@ -889,10 +890,10 @@ def build_onyx_runtime_proof(
         )
     elif governed_onyx_entries:
         continuity_status = "governed_handoff_observed"
-        continuity_label = "Governed handoff observed"
+        continuity_label = "Governed interaction captured"
         continuity_detail = (
-            "Recent governed Onyx handoff activity is available from control-plane runtime records. "
-            "Container-level Onyx activity was not visible yet."
+            "Recent governed Onyx handoff activity is available from control-plane runtime records, including "
+            "trace-linked interaction evidence. Container-level Onyx activity was not visible yet."
         )
     else:
         continuity_status = "no_runtime_activity"
@@ -921,6 +922,7 @@ def build_onyx_runtime_proof(
             "status": continuity_status,
             "label": continuity_label,
             "detail": continuity_detail,
+            "governed_handoff_observed": bool(governed_onyx_entries),
             "trace_visible_in_runtime": False,
             "session_visible_in_runtime": False,
         },
