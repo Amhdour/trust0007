@@ -105,7 +105,9 @@ services:
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD}
-      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-localhost}
+      # Use a full public-facing URL so token issuer stays consistent between
+      # host-minted and in-network userinfo validation flows.
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME_URL:-http://localhost:18080}
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
     depends_on:

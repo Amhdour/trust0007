@@ -10,6 +10,57 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 
+def _env_file_candidates() -> list[Path]:
+    script_root = Path(__file__).resolve().parents[1]
+    candidates: list[Path] = []
+    explicit = os.environ.get("ENV_FILE", "").strip()
+    if explicit:
+        candidates.append(Path(explicit))
+    candidates.append(script_root / ".env.live")
+    candidates.append(script_root / "compose" / ".env.production")
+    return candidates
+
+
+def _read_env_file_value(key: str) -> str:
+    for path in _env_file_candidates():
+        if not path.exists():
+            continue
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            stripped = raw_line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in raw_line:
+                continue
+            found_key, value = raw_line.split("=", 1)
+            if found_key.strip() == key:
+                return value.strip()
+    return ""
+
+
+def _setting(key: str, default: str) -> str:
+    explicit = os.environ.get(key, "").strip()
+    if explicit:
+        return explicit
+    from_env_file = _read_env_file_value(key)
+    if from_env_file:
+        return from_env_file
+    return default
+
+
+def _default_control_plane_base_url() -> str:
+    explicit = _setting("CONTROL_PLANE_BASE_URL", "")
+    if explicit:
+        return explicit
+    host_port = _setting("CONTROL_PLANE_HOST_PORT", "3000")
+    return f"http://127.0.0.1:{host_port}"
+
+
+def _default_keycloak_base_url() -> str:
+    explicit = _setting("KEYCLOAK_BASE_URL", "")
+    if explicit:
+        return explicit
+    host_port = _setting("KEYCLOAK_HOST_PORT", "18080")
+    return f"http://127.0.0.1:{host_port}"
+
+
 def _request_json(url: str, *, method: str = "GET", data: bytes | None = None, headers: dict[str, str] | None = None) -> dict:
     req = Request(url, method=method, data=data, headers=headers or {})
     with urlopen(req, timeout=20) as resp:
@@ -51,13 +102,13 @@ def _launch(control_plane_base_url: str, runtime: str, path: str, token: str, mc
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate fresh live governed evidence for Onyx and Dify handoff lanes.")
-    parser.add_argument("--control-plane-base-url", default=os.environ.get("CONTROL_PLANE_BASE_URL", "http://127.0.0.1:3000"))
-    parser.add_argument("--keycloak-base-url", default=os.environ.get("KEYCLOAK_BASE_URL", "http://127.0.0.1:18080"))
-    parser.add_argument("--realm", default=os.environ.get("KEYCLOAK_REALM", "umbrella"))
-    parser.add_argument("--client-id", default=os.environ.get("SMOKE_CLIENT_ID", "governed-smoke-client"))
-    parser.add_argument("--username", default=os.environ.get("LIVE_USERNAME", "governed-live-admin"))
-    parser.add_argument("--password", default=os.environ.get("LIVE_PASSWORD", "change-me"))
-    parser.add_argument("--scope", default=os.environ.get("KEYCLOAK_SCOPE", "openid email profile"))
+    parser.add_argument("--control-plane-base-url", default=_default_control_plane_base_url())
+    parser.add_argument("--keycloak-base-url", default=_default_keycloak_base_url())
+    parser.add_argument("--realm", default=_setting("KEYCLOAK_REALM", "umbrella"))
+    parser.add_argument("--client-id", default=_setting("SMOKE_CLIENT_ID", "governed-smoke-client"))
+    parser.add_argument("--username", default=_setting("LIVE_USERNAME", "governed-live-admin"))
+    parser.add_argument("--password", default=_setting("LIVE_PASSWORD", "change-me"))
+    parser.add_argument("--scope", default=_setting("KEYCLOAK_SCOPE", "openid email profile"))
     parser.add_argument("--mcp-server", default="mcp_server.dashboard_control_plane")
     args = parser.parse_args()
 

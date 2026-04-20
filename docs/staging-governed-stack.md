@@ -79,7 +79,7 @@ The same compose target can be used on a staging VM or similar host.
 Required adjustments before calling it externally:
 
 - set `CONTROL_PLANE_BASE_URL` to the public dashboard origin
-- set `KEYCLOAK_HOSTNAME` to the public Keycloak hostname
+- set `KEYCLOAK_HOSTNAME_URL` to the public Keycloak origin (scheme + host + port when non-default)
 - replace every `replace-me` secret in `compose/.env.production`
 - update the Keycloak redirect URI host in the env file so `control-plane-web` matches the deployed origin
 - expose the dashboard and Keycloak through your ingress or reverse proxy
