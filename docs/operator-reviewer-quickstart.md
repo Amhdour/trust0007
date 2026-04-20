@@ -61,10 +61,22 @@ That suite covers:
 - OPA unavailable -> deny
 - retrieval backend unavailable or invalid -> deny
 - required secret unavailable -> deny
-- broken trace correlation -> launch-gate `no_go`
+- missing trace/session linkage details are recorded in `trace-correlation.json` with reason codes
 - full HTTP-level strict live pass and fail scenarios through the real control-plane server boundary
 
-## 6. Review the evidence bundle
+## 6. Denied-flow evidence expectations
+
+Denied live handoffs should still persist machine-readable pre-runtime evidence when those checks were actually executed:
+
+- `identity-evidence.json` (identity authority result)
+- `policy-evidence.json` (OPA reachability + decision metadata)
+- `retrieval-evidence.json` (backend used, boundary result, allow/deny reasons)
+- `secret-evidence.json` (required/not-required, backend, fetched outcome without secret values)
+- `trace-correlation.json` (trace/request linkage plus missing identifiers and audit-stage gaps)
+
+This keeps launch decisions fail-closed while improving diagnostics and dashboard blocker accuracy.
+
+## 7. Review the evidence bundle
 
 Use `../evidence/reviewer_evidence_bundle.json`, `../evidence/reviewer/inspectable-live-runtime/`, and `strict-live-proof-matrix.md` for reviewer-facing summaries of allowed, denied, and downgraded live-mode scenarios.
 

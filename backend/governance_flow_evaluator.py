@@ -381,6 +381,7 @@ class GovernedFlowEvaluator:
         identity_evidence = {
             "step": "identity",
             "captured_at": _now_iso(),
+            "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
@@ -484,44 +485,35 @@ class GovernedFlowEvaluator:
 
         gateway_decision = None
         policy_metadata: dict[str, Any] = {}
-        if identity_result.authenticated:
-            gateway = OnyxGatewayAdapter(
-                policy_checker=self._policy_checker,
-                retrieval_checker=self._retrieval_checker,
-                tool_checker=self._tool_checker,
-                telemetry_emitter=InMemoryTelemetryEmitter(),
-            )
-            emit(
-                "policy.input",
-                {
-                    "surface": str(base_metadata.get("surface", "")),
-                    "requested_path": requested_path,
-                    "requested_tools": requested_tools,
-                    "retrieval_source": retrieval_source,
-                    "environment_mode": self._environment_mode,
-                    "evidence_mode": mode,
-                },
-            )
-            gateway_decision = gateway.evaluate(normalized_request)
-            policy_allow = gateway_decision.policy_allow
-            policy_metadata = _metadata_for(self._policy_checker)
-        else:
-            gateway_decision = type(
-                "DeniedGatewayDecision",
-                (),
-                {
-                    "allow": False,
-                    "reasons": [identity_result.reason or "identity.denied"],
-                    "policy_allow": False,
-                    "retrieval_allow": False,
-                    "allowed_tools": [],
-                    "denied_tools": list(requested_tools),
-                },
-            )()
+        gateway = OnyxGatewayAdapter(
+            policy_checker=self._policy_checker,
+            retrieval_checker=self._retrieval_checker,
+            tool_checker=self._tool_checker,
+            telemetry_emitter=InMemoryTelemetryEmitter(),
+        )
+        emit(
+            "policy.input",
+            {
+                "surface": str(base_metadata.get("surface", "")),
+                "requested_path": requested_path,
+                "requested_tools": requested_tools,
+                "retrieval_source": retrieval_source,
+                "environment_mode": self._environment_mode,
+                "evidence_mode": mode,
+                "identity_authenticated": identity_result.authenticated,
+            },
+        )
+        gateway_decision = gateway.evaluate(normalized_request)
+        policy_allow = gateway_decision.policy_allow
+        policy_metadata = _metadata_for(self._policy_checker)
+        gateway_reasons = list(getattr(gateway_decision, "reasons", []))
+        if not identity_result.authenticated:
+            gateway_reasons = list(dict.fromkeys([identity_result.reason or "identity.denied"] + gateway_reasons))
 
         policy_evidence = {
             "step": "policy",
             "captured_at": _now_iso(),
+            "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
@@ -536,8 +528,8 @@ class GovernedFlowEvaluator:
             "engine_reachable": policy_metadata.get("reachable", policy_metadata.get("engine") != "opa"),
             "package_path": policy_metadata.get("package_path", ""),
             "allow": policy_allow,
-            "reasons": list(gateway_decision.reasons),
-            "reason_codes": list(gateway_decision.reasons),
+            "reasons": list(gateway_reasons),
+            "reason_codes": list(gateway_reasons),
             "matched_surface": str(policy_metadata.get("matched_surface", "")),
             "identity_live": identity_result.live,
             "provenance": "runtime-generated",
@@ -555,7 +547,7 @@ class GovernedFlowEvaluator:
                 "policy_engine_reachable": policy_metadata.get("reachable", policy_metadata.get("engine") != "opa"),
                 "package_path": policy_metadata.get("package_path", ""),
                 "surface": surface_id,
-                "reason_codes": list(gateway_decision.reasons),
+                "reason_codes": list(gateway_reasons),
             },
             severity="info" if policy_allow else "warning",
         )
@@ -566,7 +558,7 @@ class GovernedFlowEvaluator:
             actor_id=effective_user_id,
             tenant_value=effective_tenant_id,
             session_value=session_id,
-            reason_codes=list(gateway_decision.reasons),
+            reason_codes=list(gateway_reasons),
             component=str(policy_metadata.get("engine", "runtime_policy")),
             severity="info" if policy_allow else "warning",
             details={
@@ -580,6 +572,7 @@ class GovernedFlowEvaluator:
         retrieval_execution = {
             "step": "retrieval",
             "captured_at": _now_iso(),
+            "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
@@ -600,7 +593,7 @@ class GovernedFlowEvaluator:
             "reason_codes": [],
             "provenance": "runtime-generated",
         }
-        if retrieval_needed and policy_allow:
+        if retrieval_needed:
             retrieval_layer = RetrievalSecurityLayer(
                 backend=self._retrieval_backend,
                 policy_evaluator=self._retrieval_policy,
@@ -647,18 +640,6 @@ class GovernedFlowEvaluator:
                         "reason_codes": retrieval_reasons,
                     }
                 )
-        elif retrieval_needed:
-            retrieval_reasons = [reason for reason in gateway_decision.reasons if str(reason).startswith("retrieval.")]
-            retrieval_execution.update(
-                {
-                    "allow": False,
-                    "mode": "deny",
-                    "reasons": retrieval_reasons or ["retrieval.denied_by_policy"],
-                    "reason_codes": retrieval_reasons or ["retrieval.denied_by_policy"],
-                    "live_backend": live_mode,
-                    "backend_verified": False,
-                }
-            )
         else:
             retrieval_reasons = ["retrieval.not_needed"]
             retrieval_allow = True
@@ -727,6 +708,7 @@ class GovernedFlowEvaluator:
         secret_evidence = {
             "step": "secret",
             "captured_at": _now_iso(),
+            "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
@@ -744,7 +726,19 @@ class GovernedFlowEvaluator:
             "reason_codes": [secret_reason] if secret_reason else [],
             "provenance": "runtime-generated",
         }
-        if secret_required and policy_allow and retrieval_allow and self._secret_provider is not None:
+        if secret_required and not identity_result.authenticated:
+            secret_reason = "secret.skipped_due_to_identity"
+            secret_satisfied = False
+            secret_evidence.update({"fetched": False, "reason": secret_reason, "reason_codes": [secret_reason]})
+        elif secret_required and not policy_allow:
+            secret_reason = "secret.skipped_due_to_policy"
+            secret_satisfied = False
+            secret_evidence.update({"fetched": False, "reason": secret_reason, "reason_codes": [secret_reason]})
+        elif secret_required and not retrieval_allow:
+            secret_reason = "secret.skipped_due_to_retrieval"
+            secret_satisfied = False
+            secret_evidence.update({"fetched": False, "reason": secret_reason, "reason_codes": [secret_reason]})
+        elif secret_required and self._secret_provider is not None:
             secret_fetch = self._secret_provider.fetch_if_needed(
                 SecretFetchRequest(
                     request_id=request_id,
@@ -942,7 +936,7 @@ class GovernedFlowEvaluator:
 
         final_reasons = list(
             dict.fromkeys(
-                [reason for reason in list(getattr(gateway_decision, "reasons", [])) if reason]
+                [reason for reason in gateway_reasons if reason]
                 + retrieval_reasons
                 + tool_reasons
                 + ([] if secret_satisfied else [secret_reason])
@@ -1180,6 +1174,7 @@ class GovernedFlowEvaluator:
         trace_reason_codes.extend(f"audit.stage_missing:{stage}" for stage in missing_audit_stages)
         trace_correlation = {
             "captured_at": _now_iso(),
+            "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
             "session_id": session_id,
