@@ -170,6 +170,19 @@ h3 {
   margin-top: 18px;
 }
 
+.hero-blocker-panel {
+  width: 100%;
+  border: 1px solid rgba(176, 62, 62, 0.35);
+  background: rgba(176, 62, 62, 0.08);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.hero-blocker-panel ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
 .live-session-root {
   margin-top: 18px;
 }

@@ -122,6 +122,18 @@ function renderStatusPill(status, options = {}) {
   return `<div class="${statusClass(normalized)}" title="${escapeHtml(normalized)}">${escapeHtml(options.label || statusLabel(normalized))}</div>`;
 }
 
+function trustControlStatusPresentation(status) {
+  const normalized = String(status || "NEEDS_ATTENTION").toUpperCase();
+  return {
+    PASS: { uiStatus: "healthy", label: "PASS" },
+    FAIL: { uiStatus: "critical", label: "FAIL" },
+    MISSING_PROOF: { uiStatus: "critical", label: "MISSING_PROOF" },
+    STALE: { uiStatus: "warning", label: "STALE" },
+    DEMO_ONLY: { uiStatus: "warning", label: "DEMO_ONLY" },
+    NEEDS_ATTENTION: { uiStatus: "warning", label: "NEEDS_ATTENTION" },
+  }[normalized] || { uiStatus: "warning", label: normalized };
+}
+
 function isInternalHref(href) {
   return String(href || "").startsWith("#");
 }
@@ -2288,6 +2300,7 @@ function renderTrustScorecard(payload) {
   }
 
   const trustProof = payload.trust_proof || {};
+  const legacyIdentity = Boolean(trustProof.identity_proven);
   const readiness = payload.readiness || {};
   const commandCenter = payload.command_center || {};
   const proofPipeline = commandCenter.proof_pipeline || {};
@@ -2297,66 +2310,37 @@ function renderTrustScorecard(payload) {
   const findStep = (label) => pipelineSteps.find((step) => String(step?.label || "").toLowerCase().includes(label));
   const findSource = (id) => evidenceLinks.find((item) => item?.id === id);
 
-  const statusLabel = (proven) => (proven ? "PASS" : "CHECK");
-  const rowStatusClass = (proven) => (proven ? "healthy" : "warning");
-
   const launchReport = findSource("launch_report");
   const governedFlow = findSource("governed_flow_summary");
-  const reviewerBundle = findSource("reviewer_evidence_bundle");
-
-  const rows = [
-    {
-      control: "Identity",
-      proven: Boolean(trustProof.identity_proven),
-      lastChecked: latestCheckedLabelFromBadges(findStep("identity")?.meta_badges || []),
-      proofLabel: findStep("identity")?.label || "Identity step",
-      proofHref: findStep("identity")?.href || "",
-      blocker: trustProof.identity_proven ? "" : "Identity proof is missing or incomplete.",
-    },
-    {
-      control: "Policy",
-      proven: Boolean(trustProof.policy_proven),
-      lastChecked: latestCheckedLabelFromBadges(findStep("policy")?.meta_badges || []),
-      proofLabel: findStep("policy")?.label || "Policy step",
-      proofHref: findStep("policy")?.href || "",
-      blocker: trustProof.policy_proven ? "" : "Policy enforcement proof is missing or incomplete.",
-    },
-    {
-      control: "Retrieval",
-      proven: Boolean(trustProof.retrieval_proven),
-      lastChecked: latestCheckedLabelFromBadges(findStep("retrieval")?.meta_badges || []),
-      proofLabel: findStep("retrieval")?.label || "Retrieval step",
-      proofHref: findStep("retrieval")?.href || "",
-      blocker: trustProof.retrieval_proven ? "" : "Retrieval boundary proof is missing or incomplete.",
-    },
-    {
-      control: "Tool Governance",
-      proven: Boolean(trustProof.tool_governance_proven),
-      lastChecked: latestCheckedLabelFromBadges(findStep("tool")?.meta_badges || []),
-      proofLabel: "Tool / MCP governance",
-      proofHref: "#tool-mcp-governance",
-      blocker: trustProof.tool_governance_proven ? "" : "Tool governance checks need review.",
-    },
-    {
-      control: "Audit",
-      proven: Boolean(trustProof.audit_proven),
-      lastChecked: latestCheckedLabelFromBadges(findStep("audit")?.meta_badges || []),
-      proofLabel: reviewerBundle?.label || "Reviewer bundle",
-      proofHref: reviewerBundle?.href || "#audit-replay",
-      blocker: trustProof.audit_proven ? "" : "Audit linkage or records are incomplete.",
-    },
-    {
-      control: "Launch Gate",
-      proven: String(readiness.decision || "").toUpperCase() === "GO",
-      lastChecked: formatTimestamp(readiness.last_updated),
-      proofLabel: launchReport?.label || governedFlow?.label || "Launch evidence",
-      proofHref: launchReport?.href || governedFlow?.href || "#launch-gate",
-      blocker:
-        String(readiness.decision || "").toUpperCase() === "GO"
-          ? ""
-          : (readiness.top_blocker || "Launch gate has unresolved blockers."),
-    },
-  ];
+  const trustControlRows = Array.isArray(trustProof.controls) ? trustProof.controls : [];
+  const rows = trustControlRows.length
+    ? trustControlRows.map((row) => ({
+        control: row.control || "Control",
+        status: String(row.status || "NEEDS_ATTENTION").toUpperCase(),
+        lastChecked: formatTimestamp(row.last_checked || ""),
+        proofLabel: row.control || "Evidence",
+        proofHref: row.proof_href || "",
+        blocker: row.reason || "",
+      }))
+    : [
+        {
+          control: "Identity",
+          status: legacyIdentity ? "PASS" : "MISSING_PROOF",
+          lastChecked: latestCheckedLabelFromBadges(findStep("identity")?.meta_badges || []),
+          proofLabel: findStep("identity")?.label || "Identity step",
+          proofHref: findStep("identity")?.href || "",
+          blocker: legacyIdentity ? "" : "Identity proof is missing or incomplete.",
+        },
+      ];
+  rows.push({
+    control: "Launch Gate",
+    status: String(readiness.decision || "").toUpperCase() === "GO" ? "PASS" : "FAIL",
+    lastChecked: formatTimestamp(readiness.last_updated),
+    proofLabel: launchReport?.label || governedFlow?.label || "Launch evidence",
+    proofHref: launchReport?.href || governedFlow?.href || "#launch-gate",
+    blocker: String(readiness.decision || "").toUpperCase() === "GO" ? "" : (readiness.top_blocker || "Launch gate has unresolved blockers."),
+  });
+  const normalizedRows = rows.map((row) => ({ ...row, statusPresentation: trustControlStatusPresentation(row.status) }));
 
   trustScorecardRoot.innerHTML = `
     <div class="trust-scorecard-wrap">
@@ -2371,12 +2355,12 @@ function renderTrustScorecard(payload) {
           </tr>
         </thead>
         <tbody>
-          ${rows
+          ${normalizedRows
             .map(
               (row) => `
                 <tr>
                   <td>${escapeHtml(row.control)}</td>
-                  <td><span class="${statusClass(rowStatusClass(row.proven))}">${escapeHtml(statusLabel(row.proven))}</span></td>
+                  <td><span class="${statusClass(row.statusPresentation.uiStatus)}">${escapeHtml(row.statusPresentation.label)}</span></td>
                   <td>${escapeHtml(row.lastChecked || "Unavailable")}</td>
                   <td>${
                     row.proofHref
@@ -2410,6 +2394,8 @@ function renderDecisionHero(payload) {
   const evidenceMode = readiness.evidence_mode || "unavailable";
   const score = readiness.readiness_score ?? "n/a";
   const decision = readiness.decision || "UNKNOWN";
+  const topBlockers = Array.isArray(readiness.top_blockers) ? readiness.top_blockers.slice(0, 5) : [];
+  const freshnessSla = payload.trust_proof?.freshness_sla || {};
 
   if (heroMeta) {
     heroMeta.innerHTML = `
@@ -2417,6 +2403,29 @@ function renderDecisionHero(payload) {
       <span class="chip">Score ${escapeHtml(String(score))}</span>
       <span class="chip">Top blocker: ${escapeHtml(topBlocker)}</span>
       <span class="chip">Evidence mode: ${escapeHtml(String(evidenceMode).toUpperCase())}</span>
+      ${
+        Number.isFinite(Number(freshnessSla.fresh_hours))
+          ? `<span class="chip">Freshness SLA: fresh ≤${escapeHtml(String(freshnessSla.fresh_hours))}h · stale >${escapeHtml(
+              String(freshnessSla.stale_after_hours ?? freshnessSla.fresh_hours),
+            )}h · expired >${escapeHtml(String(freshnessSla.expired_after_hours ?? "n/a"))}h</span>`
+          : ""
+      }
+      ${
+        topBlockers.length
+          ? `<div class="hero-blocker-panel">
+              <strong>Why not GO?</strong>
+              <ul>
+                ${topBlockers
+                  .slice(0, 5)
+                  .map(
+                    (item) =>
+                      `<li><a href="${escapeHtml(item.href || "#launch-gate")}">${escapeHtml(item.label || "Unresolved blocker")}</a></li>`,
+                  )
+                  .join("")}
+              </ul>
+            </div>`
+          : ""
+      }
     `;
   }
 
@@ -2449,6 +2458,10 @@ function renderDecisionHero(payload) {
           )}</span>`,
       )
       .join("");
+    const onyxRuntime = runtimeByKey.get("onyx");
+    if (onyxRuntime) {
+      runtimeLanesMeta.innerHTML += `<span class="chip">Onyx continuity critical: ${escapeHtml(String(onyxRuntime.status || "unknown").toUpperCase())}</span>`;
+    }
   }
 }
 
@@ -2461,6 +2474,8 @@ function renderHomepagePanels(payload) {
   const readiness = payload.readiness || {};
   const trust = payload.trust_proof || {};
   const security = payload.security_posture || {};
+  const runtimeByKey = new Map((payload.runtime_portfolio?.runtimes || []).map((item) => [String(item?.runtime_key || "").toLowerCase(), item]));
+  const onyxRuntime = runtimeByKey.get("onyx") || {};
   const fallbackFailingControls = Array.isArray(security.failing_controls) && security.failing_controls.length
     ? security.failing_controls
     : [{ control: "none", summary: "No failing controls listed." }];
@@ -2479,8 +2494,17 @@ function renderHomepagePanels(payload) {
         <li><span>Latest handoff</span><strong>${escapeHtml(readiness.latest_handoff_decision || "UNKNOWN")}</strong></li>
         <li><span>Evidence mode</span><strong>${escapeHtml(String(readiness.evidence_mode || "unavailable").toUpperCase())}</strong></li>
         <li><span>Top blocker</span><strong>${escapeHtml(readiness.top_blocker || "No blocker listed.")}</strong></li>
+        <li><span>Onyx continuity</span><strong>${escapeHtml(String(onyxRuntime.status || "unknown").toUpperCase())}</strong></li>
         <li><span>Last updated</span><strong>${escapeHtml(formatTimestamp(readiness.last_updated))}</strong></li>
       </ul>
+      ${
+        Array.isArray(readiness.top_blockers) && readiness.top_blockers.length
+          ? `<div class="decision-failing-controls"><p class="metric-label">Why not GO?</p><ul>${readiness.top_blockers
+              .slice(0, 5)
+              .map((item) => `<li><strong>${escapeHtml(item.label || "Blocker")}</strong>: ${escapeHtml(item.detail || "")}</li>`)
+              .join("")}</ul></div>`
+          : ""
+      }
     </article>
     <article class="decision-panel">
       <p class="eyebrow">Panel B</p>
