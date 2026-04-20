@@ -662,6 +662,7 @@ def _workspace_activity_row(
     session_match: bool,
 ) -> dict[str, str | bool]:
     request_id = str(entry.get("request_id", ""))
+    session_id = str(entry.get("session_id", "")) or request_id
     return {
         "timestamp": str(entry.get("timestamp", "")),
         "source": str(entry.get("source", "")),
@@ -672,7 +673,7 @@ def _workspace_activity_row(
         "status": str(entry.get("status", "")),
         "trace_id": str(entry.get("trace_id", "")),
         "request_id": request_id,
-        "session_id": request_id,
+        "session_id": session_id,
         "tenant_id": str(entry.get("tenant_id", "")),
         "scope": scope,
         "scope_label": scope_label,
@@ -709,7 +710,13 @@ def build_onyx_workspace_activity(
 
         path_match = source == "onyx" and _matches_requested_path(entry, normalized_path)
         trace_match = bool(trace_id and str(entry.get("trace_id", "")) == trace_id)
-        session_match = bool(session_id and str(entry.get("request_id", "")) == session_id)
+        session_match = bool(
+            session_id
+            and (
+                str(entry.get("session_id", "")) == session_id
+                or str(entry.get("request_id", "")) == session_id
+            )
+        )
 
         if path_match:
             current_surface.append(

@@ -10,7 +10,7 @@ For command-by-command execution, use [reviewer-runbook.md](reviewer-runbook.md)
 - They are **not literal runtime screenshots** from your current environment.
 - Treat strict live tests + governed artifacts as proof authority.
 
-## Visual previews
+## Visual Previews
 
 These SVGs show the cues to compare against live artifacts/tests:
 

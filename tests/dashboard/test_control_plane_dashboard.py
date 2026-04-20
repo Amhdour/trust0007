@@ -298,6 +298,11 @@ def test_live_mode_without_bootstrapped_artifacts_does_not_fall_back_to_demo(mon
 def test_event_feed_refuses_sample_fallback_in_live_mode(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("CONTROL_PLANE_GOVERNANCE_MODE", "live")
     monkeypatch.setattr(posture_service_module, "has_live_governed_flow_artifacts", lambda root: False)
+    monkeypatch.setattr(
+        posture_service_module,
+        "validate_live_governed_flow_artifacts",
+        lambda root: {"valid": False, "reasons": ["missing"]},
+    )
     monkeypatch.setattr(posture_service_module, "load_sample_events", lambda root: [{"event_type": "sample"}])
 
     events, label, path = posture_service_module._event_feed(tmp_path)

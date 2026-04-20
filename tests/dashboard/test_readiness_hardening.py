@@ -12,6 +12,11 @@ def _ts(hours_ago: int = 0) -> str:
 
 def _configure_common(monkeypatch, *, evidence_mode: str = "live", retrieval_live: bool = True, runtime_ready: bool = True) -> None:
     monkeypatch.setattr(posture_service_module, "has_live_governed_flow_artifacts", lambda root: evidence_mode == "live")
+    monkeypatch.setattr(
+        posture_service_module,
+        "validate_live_governed_flow_artifacts",
+        lambda root: {"valid": evidence_mode == "live", "reasons": []},
+    )
     monkeypatch.setattr(posture_service_module, "_event_feed", lambda root: ([
         {"event_type": "policy.decision", "payload": {"allow": True}, "trace_id": "trace-1"},
         {"event_type": "handoff.decision", "payload": {"allow": True}, "trace_id": "trace-1"},

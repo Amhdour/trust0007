@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import subprocess
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -61,8 +62,10 @@ def main() -> int:
     args = parser.parse_args()
 
     token = _mint_token(args.keycloak_base_url, args.realm, args.client_id, args.username, args.password, args.scope)
-    _launch(args.control_plane_base_url, "onyx", "/app", token)
     _launch(args.control_plane_base_url, "dify", "/apps", token, mcp_server=args.mcp_server)
+    # Keep Onyx as the final governed run so retrieval/runtime proof in the
+    # top-level summary reflects the RAG lane truthfully.
+    _launch(args.control_plane_base_url, "onyx", "/app?chatMode=search", token)
 
     artifacts_root = Path("overlays/myStarterKit/artifacts")
     required = [
@@ -80,6 +83,10 @@ def main() -> int:
     missing = [name for name in required if not (artifacts_root / name).exists()]
     if missing:
         raise RuntimeError(f"missing expected artifacts after bootstrap: {', '.join(missing)}")
+
+    # Refresh dashboard ingestion exports after live bootstrap so stale summary
+    # feeds do not continue to surface older demo posture fragments.
+    subprocess.run(["python", "scripts/export_mystarterkit_dashboard_feed.py"], check=True)
     print("runtime evidence bootstrap passed for Onyx and Dify")
     return 0
 

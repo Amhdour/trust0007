@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import os
 import re
@@ -633,11 +633,16 @@ def load_latest_audit_records(root: Path | None = None) -> list[dict[str, Any]]:
 
 
 def has_live_governed_flow_artifacts(root: Path | None = None) -> bool:
-    """Check if current live governed flow artifacts are available in the overlay directory."""
+    return validate_live_governed_flow_artifacts(root).get("valid", False)
+
+
+def validate_live_governed_flow_artifacts(root: Path | None = None) -> dict[str, Any]:
+    """Validate that current overlay artifacts represent a fresh, real live governed run."""
     resolved_root = repo_root(root)
     artifacts_dir = resolved_root / "overlays/myStarterKit/artifacts"
+    reasons: list[str] = []
     if not artifacts_dir.exists():
-        return False
+        return {"valid": False, "reasons": ["artifacts_dir_missing"], "checked_at": datetime.now(timezone.utc).isoformat()}
 
     required_files = (
         "events.jsonl",
@@ -649,23 +654,68 @@ def has_live_governed_flow_artifacts(root: Path | None = None) -> bool:
         "launch-gate-result.json",
         "onyx-runtime-proof.json",
     )
-    if any(not (artifacts_dir / name).exists() for name in required_files):
-        return False
+    missing_files = [name for name in required_files if not (artifacts_dir / name).exists()]
+    if missing_files:
+        reasons.extend(f"missing_file:{name}" for name in missing_files)
 
     summary = read_json(artifacts_dir / "governed-flow-summary.json")
     if str(summary.get("evidence_mode", "")).strip().lower() != "live":
-        return False
+        reasons.append("summary_not_live")
 
     generated_at = str(summary.get("generated_at", "")).strip()
     if not generated_at:
-        return False
-    if generated_at.endswith("Z"):
-        generated_at = f"{generated_at[:-1]}+00:00"
-    try:
-        parsed = datetime.fromisoformat(generated_at)
-    except ValueError:
-        return False
+        reasons.append("summary_generated_at_missing")
+        parsed = datetime.now(timezone.utc) - timedelta(days=365)
+    else:
+        if generated_at.endswith("Z"):
+            generated_at = f"{generated_at[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(generated_at)
+        except ValueError:
+            parsed = datetime.now(timezone.utc) - timedelta(days=365)
+            reasons.append("summary_generated_at_invalid")
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     max_age_hours = int(os.environ.get("CONTROL_PLANE_EVIDENCE_STALE_HOURS", "24"))
-    return (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds() <= max_age_hours * 3600
+    age_seconds = (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds()
+    if age_seconds > max_age_hours * 3600:
+        reasons.append("summary_expired")
+
+    identity = read_json(artifacts_dir / "identity-evidence.json")
+    if not (bool(identity.get("authenticated")) and bool(identity.get("live"))):
+        reasons.append("identity_not_live_authenticated")
+
+    policy = read_json(artifacts_dir / "policy-evidence.json")
+    if not (
+        bool(policy.get("allow"))
+        and str(policy.get("engine", "")).strip().lower() == "opa"
+        and bool(policy.get("engine_reachable", False))
+    ):
+        reasons.append("policy_not_live_opa_allow")
+
+    retrieval = read_json(artifacts_dir / "retrieval-evidence.json")
+    if not (
+        bool(retrieval.get("allow"))
+        and bool(retrieval.get("live_backend"))
+        and bool(retrieval.get("backend_verified"))
+    ):
+        reasons.append("retrieval_not_live_verified_allow")
+
+    trace = read_json(artifacts_dir / "trace-correlation.json")
+    if not bool(trace.get("complete")):
+        reasons.append("trace_correlation_incomplete")
+
+    runtime = read_json(artifacts_dir / "onyx-runtime-proof.json")
+    reachability_status = str(runtime.get("reachability", {}).get("status", "")).strip().lower()
+    continuity_status = str(runtime.get("continuity", {}).get("status", "")).strip().lower()
+    if reachability_status in {"", "runtime_unreachable"}:
+        reasons.append("onyx_runtime_unreachable")
+    if continuity_status in {"", "no_runtime_activity"}:
+        reasons.append("onyx_continuity_missing")
+
+    return {
+        "valid": len(reasons) == 0,
+        "reasons": reasons,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "max_age_hours": max_age_hours,
+    }
