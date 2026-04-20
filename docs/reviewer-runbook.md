@@ -2,20 +2,7 @@
 
 Use this runbook for a one-pass validation of the governed control plane.
 
-Related docs:
-- Reviewer landing: [reviewer-fast-path.md](reviewer-fast-path.md)
-- Visual cues: [dashboard-visual-proof.md](dashboard-visual-proof.md)
-- Strict proof map: [strict-live-proof-matrix.md](strict-live-proof-matrix.md)
-
-## What this project proves
-
-This repository proves a **dashboard-first trust control plane** for two governed runtime lanes:
-
-- **Onyx lane (RAG):** governed retrieval handoff at `/launch/onyx`.
-- **Dify lane (Autonomous Agents):** governed tool/MCP handoff at `/launch/dify`.
-- **Shared controls before runtime access:** identity, policy, retrieval/tool controls, secrets, trace continuity, and launch-gate decision.
-
-## 5-minute validation path
+## Start here (5-minute validation path)
 
 1. **Prepare env files**
 
@@ -32,7 +19,7 @@ This repository proves a **dashboard-first trust control plane** for two governe
    make up-live
    ```
 
-3. **Run proof checks**
+3. **Run strict proof checks**
 
    ```bash
    make smoke-live
@@ -40,12 +27,12 @@ This repository proves a **dashboard-first trust control plane** for two governe
    pytest -q tests/integration/test_strict_live_dify_end_to_end.py
    ```
 
-4. **Check dashboard and governed entrypoints**
+4. **Check dashboard + governed entrypoints**
    - `/` (homepage decision + runtime portfolio)
    - `/launch/onyx?path=/app&mode=live`
    - `/launch/dify?path=/apps&mode=live&mcp=mcp_server.dashboard_control_plane`
 
-5. **Confirm artifacts updated**
+5. **Confirm fresh artifacts + trace continuity**
    - `overlays/myStarterKit/artifacts/governed-flow-summary.json`
    - `overlays/myStarterKit/artifacts/launch-gate-result.json`
    - `overlays/myStarterKit/artifacts/identity-evidence.json`
@@ -53,6 +40,21 @@ This repository proves a **dashboard-first trust control plane** for two governe
    - `overlays/myStarterKit/artifacts/retrieval-evidence.json`
    - `overlays/myStarterKit/artifacts/tool-evidence.json`
    - `overlays/myStarterKit/artifacts/audit-records.jsonl`
+
+Related docs:
+
+- Reviewer landing: [reviewer-fast-path.md](reviewer-fast-path.md)
+- Visual cues (illustrative): [dashboard-visual-proof.md](dashboard-visual-proof.md)
+- Strict proof map: [strict-live-proof-matrix.md](strict-live-proof-matrix.md)
+- README deployment modes: [Deployment Maturity and Modes](../README.md#deployment-maturity-and-modes)
+
+## What this project proves
+
+This repository proves a **dashboard-first trust control plane** for two governed runtime lanes:
+
+- **Onyx lane (RAG):** governed retrieval handoff at `/launch/onyx`.
+- **Dify lane (Autonomous Agents):** governed tool/MCP handoff at `/launch/dify`.
+- **Shared controls before runtime access:** identity, policy, retrieval/tool controls, secrets, trace continuity, and launch-gate decision.
 
 ## What good looks like
 
@@ -101,3 +103,5 @@ This repository proves a **dashboard-first trust control plane** for two governe
 - **Local/dev:** development and demo confidence only.
 - **Live/staging:** governed proof generation and realistic validation.
 - **Public production:** environment-specific; no always-on hosted deployment is bundled in this repo.
+
+For top-level framing, see [README deployment maturity and operating modes](../README.md#deployment-maturity-and-modes).

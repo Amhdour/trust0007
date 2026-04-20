@@ -7,6 +7,20 @@ The homepage is a repo-owned **AI Trust & Security Dashboard for trust, security
 Suggested short repository description:
 `AI Trust & Security control plane for governed Onyx (RAG) and Dify (Autonomous Agents) handoffs, policy enforcement, evidence integrity, and launch posture.`
 
+## Deployment Maturity at a Glance
+
+Use this table to understand what is included in-repo versus what remains environment-owned:
+
+| Operating mode | What this repo provides | What you must supply |
+| --- | --- | --- |
+| **Local/dev** (`make up-dev`) | Dashboard + wiring workflow for development/demo checks. | Real deployment hardening is not implied by dev mode alone. |
+| **Live/staging validation** (`make bootstrap-live`, `make verify-live`, `make up-live`, strict tests) | Governed runtime handoff proof path with explicit env validation and fail-closed dependency checks. | Staging-grade infrastructure/runtime endpoints and valid credentials. |
+| **Public/production** | Compose/bootstrap patterns and evidence-oriented tests for self-hosted deployment. | Environment-specific ingress, DNS/TLS, secrets operations, monitoring/ownership, and public hosting posture. |
+
+Current maturity: **self-hosted runnable**, **live/staging verifiable**, **public deployment environment-specific (not bundled as always-on hosting)**.
+
+Detailed guidance: [Deployment Maturity and Modes](#deployment-maturity-and-modes).
+
 ## What This Repo Proves
 
 - Dashboard-first **Layer Retrofit** and **Secure Starter Kit** patterns for governed AI runtime adoption.
@@ -26,17 +40,18 @@ This project is a **dashboard-first trust control plane** with two governed runt
 
 Quickest validation path:
 
-1. Reviewer runbook (5-minute path): [docs/reviewer-runbook.md](docs/reviewer-runbook.md)
-2. Visual proof cues (illustrative): [docs/dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
-3. Live startup/bootstrap commands:
+1. Reviewer fast path (30-second audit route): [docs/reviewer-fast-path.md](docs/reviewer-fast-path.md)
+2. Reviewer runbook (5-minute path): [docs/reviewer-runbook.md](docs/reviewer-runbook.md)
+3. Visual proof cues (illustrative): [docs/dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
+4. Live startup/bootstrap commands:
    - `make bootstrap-live`
    - `make verify-live`
    - `make up-live`
-4. Strict live tests:
+5. Strict live tests:
    - `pytest -q tests/integration/test_strict_live_onyx_end_to_end.py`
    - `pytest -q tests/integration/test_strict_live_dify_end_to_end.py`
-5. Strict proof matrix: [docs/strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md)
-6. Deployment story and maturity: [Deployment Maturity and Modes](#deployment-maturity-and-modes)
+6. Strict proof matrix: [docs/strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md)
+7. Deployment story and operating modes: [Deployment Maturity at a Glance](#deployment-maturity-at-a-glance) and [Deployment Maturity and Modes](#deployment-maturity-and-modes)
 
 High-value reviewer artifacts:
 

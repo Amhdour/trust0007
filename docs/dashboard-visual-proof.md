@@ -4,14 +4,18 @@ This guide gives reviewers a fast visual companion for the strict live governed 
 
 For command-by-command execution, use [reviewer-runbook.md](reviewer-runbook.md). For the overall checklist, use [strict-live-proof-matrix.md](strict-live-proof-matrix.md).
 
-## Visual Previews (illustrative)
+## Illustrative vs. literal (read this first)
 
-These SVGs are **illustrative review aids**, not literal runtime screenshots:
+- The SVGs in this document are **illustrative review aids**.
+- They are **not literal runtime screenshots** from your current environment.
+- Treat strict live tests + governed artifacts as proof authority.
+
+## Visual previews
+
+These SVGs show the cues to compare against live artifacts/tests:
 
 - passing strict-live flow: [dashboard-live-pass.svg](images/dashboard-live-pass.svg)
 - denied strict-live flow: [dashboard-live-deny.svg](images/dashboard-live-deny.svg)
-
-They show the dashboard cues a reviewer should verify against live artifacts/tests.
 
 ## What good looks like (passing visual cues)
 
