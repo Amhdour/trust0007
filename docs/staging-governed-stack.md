@@ -2,6 +2,31 @@
 
 This is the repo's production-like deployment path for proving the governed live handoff with real dependencies instead of fixture patching.
 
+## First serious live-preview scope (minimum governed stack)
+
+Success for the first serious preview is **not** “every vendored upstream is running.” It is the governed dashboard/control-plane path proving both runtime lanes with fail-closed controls and fresh evidence.
+
+### Required services (proof path)
+
+- `control_plane` (dashboard + governed launch routes)
+- `keycloak` (+ `keycloak_db`) for live identity
+- `opa` for policy decisions
+- `qdrant` for retrieval checks
+- `vault` for secret checks
+- `onyx` runtime target (behind `/launch/onyx`)
+- `dify` runtime target (behind `/launch/dify`)
+
+### Optional/supporting services
+
+- `langfuse` (evidence-plane destination)
+- `grafana` (observability convenience)
+- `envoy` (future ingress enforcement depth)
+
+### Intentionally excluded from first preview success criteria
+
+- Reference-only vendored upstreams in `upstream/` that are not in the governed launch proof path
+- Additional optional systems (for example Superset, gVisor work) unless needed by your operator goals
+
 ## Files
 
 - Compose target: `compose/docker-compose.production.yml`
@@ -25,10 +50,13 @@ cp compose/.env.production.example compose/.env.production
 make bootstrap-live
 ```
 
-3. Verify the live handoff.
+3. Verify live env guardrails, start the explicit live overlay, and run governed checks.
 
 ```bash
+make verify-live
+make up-live
 make smoke-live
+python scripts/bootstrap_runtime_evidence.py --control-plane-base-url http://127.0.0.1:3000
 make test-live-stack
 ```
 
@@ -41,7 +69,8 @@ What this does:
 - maps `tenant_id` from a real user attribute into token and userinfo claims
 - seeds Qdrant and Vault with tenant-scoped launch data
 - proves `/launch/onyx?path=/app&mode=live` against the running stack (deepest default sample lane)
-- keeps `/launch/dify?path=/apps&mode=live` under the same fail-closed governance and launch-gate model
+- proves `/launch/dify?path=/apps&mode=live&mcp=mcp_server.dashboard_control_plane` under runtime-specific MCP governance
+- writes fresh governed evidence artifacts consumed by the dashboard (`governed-flow-summary.json`, `onyx-runtime-proof.json`, `dify-runtime-proof.json`, and launch-gate-linked evidence)
 
 ## External deployment target
 
