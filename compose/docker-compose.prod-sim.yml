@@ -21,6 +21,8 @@ services:
       CONTROL_PLANE_ONYX_SECRET_PATH: ${CONTROL_PLANE_ONYX_SECRET_PATH:-secret/data/dev/tenant-dashboard/runtime}
       CONTROL_PLANE_DIFY_SECRET_PATH: ${CONTROL_PLANE_DIFY_SECRET_PATH:-secret/data/dev/tenant-dashboard/dify}
       CONTROL_PLANE_ONYX_SECRET_KEY: ${CONTROL_PLANE_ONYX_SECRET_KEY:-api_token}
+      CONTROL_PLANE_ONYX_BASE_URL: ${CONTROL_PLANE_ONYX_BASE_URL:-http://onyx_runtime:80}
+      CONTROL_PLANE_DIFY_BASE_URL: ${CONTROL_PLANE_DIFY_BASE_URL:-http://dify_runtime:80}
       CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS: ${CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS:-true}
       CONTROL_PLANE_EXTERNAL_REACHABLE: ${CONTROL_PLANE_EXTERNAL_REACHABLE:-false}
       CONTROL_PLANE_KEYCLOAK_DEV_MODE: ${CONTROL_PLANE_KEYCLOAK_DEV_MODE:-false}
@@ -209,7 +211,7 @@ services:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
     ports:
-      - "127.0.0.1:8088:8088"
+      - "127.0.0.1:${SUPERSET_HOST_PORT:-18488}:8088"
     volumes:
       - superset_home:/app/superset_home
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
@@ -249,6 +251,38 @@ services:
       - trust_stack
     # Production hardening
     read_only: true
+    security_opt:
+      - no-new-privileges:true
+
+  onyx_runtime:
+    image: nginx:1.27-alpine
+    ports:
+      - "127.0.0.1:${CONTROL_PLANE_ONYX_PORT:-3010}:80"
+    volumes:
+      - ./runtime/onyx/index.html:/usr/share/nginx/html/index.html:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - trust_stack
+    security_opt:
+      - no-new-privileges:true
+
+  dify_runtime:
+    image: nginx:1.27-alpine
+    ports:
+      - "127.0.0.1:${CONTROL_PLANE_DIFY_PORT:-8088}:80"
+    volumes:
+      - ./runtime/dify/index.html:/usr/share/nginx/html/index.html:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - trust_stack
     security_opt:
       - no-new-privileges:true
 
