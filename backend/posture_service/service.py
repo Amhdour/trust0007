@@ -427,6 +427,19 @@ def _control_state(*, passed: bool, evidence_mode: str, freshness_bucket: str, r
     return "PASS"
 
 
+def _control_penalty(status: str, *, base: int) -> int:
+    normalized = str(status).strip().upper()
+    multiplier = {
+        "PASS": 0.0,
+        "FAIL": 1.0,
+        "MISSING_PROOF": 1.0,
+        "STALE": 0.8,
+        "DEMO_ONLY": 0.85,
+        "NEEDS_ATTENTION": 0.6,
+    }.get(normalized, 0.7)
+    return round(base * multiplier)
+
+
 def _panel_provenance(*, source_kind: str, evidence_mode: str = "", live_expected: bool = False) -> tuple[str, str]:
     normalized = str(source_kind).strip().lower()
     if normalized in {"sample", "demo", "demo_fallback", "seedretrievalbackend"}:
@@ -2876,6 +2889,43 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             )
         )
     onyx_handoffs = onyx_handoffs[:5]
+    dify_handoffs = [
+        _record(
+            title="Latest Dify runtime proof",
+            meta="Autonomous-agent lane",
+            detail="Latest post-handoff Dify runtime proof keeps agent-lane posture visible without masking Onyx readiness gaps.",
+            status=dify_portfolio_status,
+            href=_raw("overlays/myStarterKit/artifacts/dify-runtime-proof.json"),
+        ),
+    ]
+    for item in governed_request_feed:
+        if str(item.get("runtime_target", "")).lower() != "dify":
+            continue
+        dify_handoffs.append(
+            _record(
+                title="Recent Dify governed request",
+                meta=" | ".join(
+                    value
+                    for value in (
+                        str(item.get("tenant_id", "")),
+                        str(item.get("requested_path", "")),
+                        str(item.get("trace_id", "")),
+                    )
+                    if value
+                ),
+                detail=(
+                    f"Handoff {_allow_deny_label(bool(item.get('handoff_allowed')))}; "
+                    f"mode {str(item.get('evidence_mode', '')).upper() or 'UNKNOWN'}."
+                ),
+                status="healthy" if bool(item.get("handoff_allowed")) else "critical",
+                href=(
+                    _raw(str(item.get("artifact_refs", {}).get("governed_flow_summary", "")))
+                    if isinstance(item.get("artifact_refs"), dict) and item.get("artifact_refs", {}).get("governed_flow_summary")
+                    else ""
+                ),
+            )
+        )
+    dify_handoffs = dify_handoffs[:4]
 
     sections = [
         {
@@ -3677,6 +3727,34 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 },
             ],
         },
+        {
+            **_section_contract_meta(section_contracts, "dify-agent-access"),
+            "blocks": [
+                {
+                    "type": "cards",
+                    "title": "Dify agent lane summary",
+                    "items": [
+                        _card("Runtime lane", "Dify (Autonomous Agents)", "healthy", "This lane emphasizes governed tool/MCP execution behind runtime handoff policy.", _raw("docs/dify-integration.md"), display_label="Agent runtime", display_detail="Autonomous-agent lane behind governed access."),
+                        _card("Lane posture", "Healthy" if dify_portfolio_status == "healthy" else "Needs attention", dify_portfolio_status, "Dify remains visible as a separate lane so Onyx failures cannot be hidden by aggregate status.", _raw("overlays/myStarterKit/artifacts/dify-runtime-proof.json"), display_label="Current Dify lane posture", display_detail="Healthy Dify does not override Onyx-critical gaps."),
+                    ],
+                },
+                {
+                    "type": "records",
+                    "title": "Recent Dify activity",
+                    "items": dify_handoffs,
+                },
+                {
+                    "type": "links",
+                    "title": "Dify access links",
+                    "items": [
+                        _link("Open Dify Apps", _launch_handoff_url("/apps", runtime="dify"), "Launch governed Dify runtime handoff.", "healthy", display_label="Open Dify apps", display_description="Open governed Dify entry point."),
+                        _link("Open Dify Workspace", _launch_handoff_url("/apps", runtime="dify", mode="live", view="embedded"), "Open dashboard-owned governed Dify workspace.", "healthy", display_label="Open Dify workspace", display_description="Open checked Dify live workspace."),
+                        _link("Latest Dify runtime proof", _raw("overlays/myStarterKit/artifacts/dify-runtime-proof.json"), "Post-handoff Dify runtime reachability and continuity summary.", dify_portfolio_status, display_label="Open Dify runtime proof", display_description="Open latest Dify runtime proof."),
+                        _link("Dify integration note", _raw("docs/dify-integration.md"), "Architecture note for Dify as governed autonomous-agent lane.", "neutral", display_label="How Dify access works", display_description="Open Dify governed-runtime note."),
+                    ],
+                },
+            ],
+        },
     ]
     section_order = {str(section.get("id", "")): index for index, section in enumerate(contract.get("sections", []))}
     allowed_section_ids = set(section_order)
@@ -3719,12 +3797,26 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     )
     onyx_reachable = runtime_readiness_status == "healthy"
     onyx_continuous = runtime_continuity_status == "healthy"
-    onyx_continuity_status = "PASS" if onyx_reachable and onyx_continuous else "FAIL"
+    onyx_continuity_status = "PASS" if onyx_reachable and onyx_continuous else "MISSING_PROOF"
+    onyx_recent_activity_status = (
+        "PASS"
+        if runtime_continuity.get("status") in {"path_activity_observed", "governed_handoff_observed"}
+        else "MISSING_PROOF"
+    )
+    launch_gate_status = (
+        "PASS"
+        if (latest_handoff_allowed and latest_governed_verdict == "go" and live_evidence_mode)
+        else ("DEMO_ONLY" if not live_evidence_mode else "MISSING_PROOF")
+    )
 
     trust_controls = [
         {
             "control": "Identity",
-            "status": _control_state(passed=bool(identity_authenticated), evidence_mode="live" if live_evidence_mode else "demo", freshness_bucket=identity_freshness_bucket),
+            "status": _control_state(
+                passed=bool(identity_authenticated and (identity_live_step or not live_evidence_mode)),
+                evidence_mode="live" if live_evidence_mode else "demo",
+                freshness_bucket=identity_freshness_bucket,
+            ),
             "last_checked": identity_timestamp,
             "reason": (
                 ""
@@ -3739,7 +3831,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "control": "Policy",
-            "status": _control_state(passed=bool(policy_allowed), evidence_mode="live" if live_evidence_mode else "demo", freshness_bucket=policy_freshness_bucket),
+            "status": _control_state(
+                passed=bool(policy_allowed and (policy_engine_step.lower() == "opa" or not live_evidence_mode)),
+                evidence_mode="live" if live_evidence_mode else "demo",
+                freshness_bucket=policy_freshness_bucket,
+            ),
             "last_checked": policy_timestamp,
             "reason": (
                 ""
@@ -3754,7 +3850,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "control": "Retrieval",
-            "status": _control_state(passed=bool(retrieval_allowed), evidence_mode="live" if live_evidence_mode else "demo", freshness_bucket=retrieval_freshness_bucket),
+            "status": _control_state(
+                passed=bool(retrieval_allowed and (retrieval_live_step or not live_evidence_mode)),
+                evidence_mode="live" if live_evidence_mode else "demo",
+                freshness_bucket=retrieval_freshness_bucket,
+            ),
             "last_checked": retrieval_timestamp,
             "reason": (
                 ""
@@ -3766,6 +3866,17 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 )
             ),
             "proof_href": "#retrieval-boundaries",
+        },
+        {
+            "control": "Launch Gate",
+            "status": launch_gate_status,
+            "last_checked": handoff_timestamp,
+            "reason": (
+                ""
+                if launch_gate_status == "PASS"
+                else "Latest governed launch-gate result is not a current live GO with allowed handoff."
+            ),
+            "proof_href": "#launch-gate",
         },
         {
             "control": "Tool Governance",
@@ -3816,6 +3927,13 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             "reason": "" if onyx_continuity_status == "PASS" else "Governed approval is not enough; the Onyx target must also be reachable and active.",
             "proof_href": "#entry-points",
         },
+        {
+            "control": "Onyx recent activity",
+            "status": onyx_recent_activity_status,
+            "last_checked": handoff_timestamp,
+            "reason": "" if onyx_recent_activity_status == "PASS" else "No recent trace-linked Onyx runtime interaction has been captured.",
+            "proof_href": "#entry-points",
+        },
     ]
     control_by_name = {item["control"]: item for item in trust_controls}
 
@@ -3833,51 +3951,65 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         condition=control_by_name["Identity"]["status"] != "PASS",
         label="Identity proof is not fully proven",
         detail=control_by_name["Identity"]["reason"] or "Identity did not satisfy live proof requirements.",
-        weight=20,
+        weight=_control_penalty(control_by_name["Identity"]["status"], base=24),
         href="#identity-session",
     )
     add_blocker(
         condition=control_by_name["Policy"]["status"] != "PASS",
         label="Policy proof is not fully proven",
         detail=control_by_name["Policy"]["reason"] or "Policy enforcement proof is incomplete.",
-        weight=18,
+        weight=_control_penalty(control_by_name["Policy"]["status"], base=22),
         href="#policy-enforcement",
     )
     add_blocker(
         condition=control_by_name["Retrieval"]["status"] != "PASS",
         label="Onyx retrieval proof is incomplete",
         detail=control_by_name["Retrieval"]["reason"] or "Retrieval boundary proof is incomplete.",
-        weight=16,
+        weight=_control_penalty(control_by_name["Retrieval"]["status"], base=20),
         href="#retrieval-boundaries",
+    )
+    add_blocker(
+        condition=control_by_name["Launch Gate"]["status"] != "PASS",
+        label="Launch gate is not live-go",
+        detail=control_by_name["Launch Gate"]["reason"] or "Launch gate did not pass with current live proof.",
+        weight=_control_penalty(control_by_name["Launch Gate"]["status"], base=22),
+        href="#launch-gate",
     )
     add_blocker(
         condition=evidence_provenance_status != "PASS",
         label="Live evidence provenance is not established",
         detail="Demo/local artifacts are still in use or current live artifacts are incomplete.",
-        weight=18,
+        weight=_control_penalty(evidence_provenance_status, base=20),
         href="#evidence-integrity",
     )
     add_blocker(
         condition=onyx_continuity_status != "PASS",
         label="Onyx runtime is not reachable and continuous",
         detail="Governance may approve access, but readiness requires a reachable active runtime target.",
-        weight=20,
+        weight=_control_penalty(control_by_name["Onyx continuity"]["status"], base=22),
+        href="#entry-points",
+    )
+    add_blocker(
+        condition=control_by_name["Onyx recent activity"]["status"] != "PASS",
+        label="Onyx recent activity is missing",
+        detail=control_by_name["Onyx recent activity"]["reason"] or "No recent Onyx activity linked to governed interaction.",
+        weight=_control_penalty(control_by_name["Onyx recent activity"]["status"], base=14),
         href="#entry-points",
     )
     add_blocker(
         condition=evidence_freshness_status != "PASS",
         label="Evidence freshness SLA is breached",
         detail=f"{artifact_counts['stale']} stale, {artifact_counts['expired']} expired, {artifact_counts['missing']} missing proof items.",
-        weight=8,
+        weight=_control_penalty(evidence_freshness_status, base=12),
         href="#evidence-integrity",
     )
-    blocker_candidates.sort(key=lambda item: item["weight"], reverse=True)
+    blocker_candidates.sort(key=lambda item: (item["weight"], item["label"]), reverse=True)
     top_blockers = blocker_candidates[:5]
     hardened_score = max(0, int(launch_summary.get("readiness_score", 0)) - readiness_penalties)
 
     critical_unresolved = any(
         control_by_name[name]["status"] != "PASS"
-        for name in ("Identity", "Policy", "Retrieval", "Evidence provenance", "Onyx continuity")
+        for name in ("Identity", "Policy", "Retrieval", "Launch Gate", "Evidence provenance", "Onyx continuity", "Onyx recent activity")
     )
     if critical_unresolved:
         readiness_decision = "NO_GO"

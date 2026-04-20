@@ -81,7 +81,10 @@ class RuntimeTarget:
     tool_name: str
     secret_path_suffix: str
     port_env_var: str
+    host_env_var: str
+    base_url_env_var: str
     default_port: int
+    default_host: str
 
 
 RUNTIME_REGISTRY: dict[str, RuntimeTarget] = {
@@ -93,7 +96,10 @@ RUNTIME_REGISTRY: dict[str, RuntimeTarget] = {
         tool_name="onyx",
         secret_path_suffix="onyx",
         port_env_var="CONTROL_PLANE_ONYX_PORT",
+        host_env_var="CONTROL_PLANE_ONYX_HOST",
+        base_url_env_var="CONTROL_PLANE_ONYX_BASE_URL",
         default_port=3010,
+        default_host="127.0.0.1",
     ),
     "dify": RuntimeTarget(
         key="dify",
@@ -103,7 +109,10 @@ RUNTIME_REGISTRY: dict[str, RuntimeTarget] = {
         tool_name="dify",
         secret_path_suffix="dify",
         port_env_var="CONTROL_PLANE_DIFY_PORT",
+        host_env_var="CONTROL_PLANE_DIFY_HOST",
+        base_url_env_var="CONTROL_PLANE_DIFY_BASE_URL",
         default_port=8088,
+        default_host="127.0.0.1",
     ),
 }
 
@@ -136,6 +145,14 @@ def _runtime_port(target: RuntimeTarget) -> int:
         return int(os.environ.get(target.port_env_var, str(target.default_port)))
     except ValueError:
         return target.default_port
+
+
+def _runtime_local_base_url(target: RuntimeTarget) -> str:
+    explicit = os.environ.get(target.base_url_env_var, "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    host = os.environ.get(target.host_env_var, target.default_host).strip() or target.default_host
+    return f"http://{host}:{_runtime_port(target)}"
 
 
 def _governance_mode(explicit: str = "") -> str:
@@ -734,6 +751,17 @@ def _record_runtime_proof(
     return proof
 
 
+def _runtime_reachability_targets(local_base_url: str, requested_path: str) -> list[str]:
+    safe_path = requested_path if requested_path.startswith("/") else f"/{requested_path.lstrip('/')}"
+    base_path = safe_path.split("?", 1)[0]
+    return [
+        f"{local_base_url}{safe_path}",
+        f"{local_base_url}{base_path}",
+        f"{local_base_url}/health",
+        f"{local_base_url}/api/health",
+    ]
+
+
 def _runtime_proof_markup(runtime_proof: dict) -> str:
     continuity = dict(runtime_proof.get("continuity", {}))
     reachability = dict(runtime_proof.get("reachability", {}))
@@ -1191,7 +1219,8 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         # Determine if handoff is allowed
         governance_allowed = flow_result.decision if flow_result else False
         runtime_port = _runtime_port(target)
-        local_url = f"http://127.0.0.1:{runtime_port}{safe_path}"
+        local_base_url = _runtime_local_base_url(target)
+        local_url = f"{local_base_url}{safe_path}"
         public_url = _public_service_url(runtime_port, safe_path)
 
         if not governance_allowed:
@@ -1312,7 +1341,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             return
 
         # Governance allowed the handoff, proceed with link
-        local_ready = self._url_is_reachable(local_url)
+        local_ready = any(self._url_is_reachable(candidate) for candidate in _runtime_reachability_targets(local_base_url, safe_path))
         codespaces_visible = self._url_is_reachable(_public_service_url(runtime_port))
         runtime_proof = _record_runtime_proof(
             target=target,
@@ -2049,6 +2078,8 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         try:
             with urlopen(url, timeout=2) as response:
                 return int(getattr(response, "status", 0)) < 400
+        except HTTPError as exc:
+            return 200 <= int(getattr(exc, "code", 0)) < 500
         except (OSError, URLError):
             return False
 
