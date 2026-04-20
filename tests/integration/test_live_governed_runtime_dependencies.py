@@ -221,6 +221,13 @@ def test_live_handoff_denies_without_keycloak_identity():
 
     assert result.decision is False
     assert summary["identity"]["authenticated"] is False
+    assert summary["policy"]["engine"] == "opa"
+    assert summary["policy"]["engine_reachable"] is True
+    assert summary["retrieval"]["live_backend"] is True
+    assert summary["retrieval"]["backend_verified"] is True
+    assert summary["secret"]["required"] is True
+    assert summary["secret"]["fetched"] is False
+    assert summary["secret"]["reason"] == "secret.skipped_due_to_identity"
     assert summary["launch_gate"]["decision"] == "no_go"
 
 
@@ -254,6 +261,7 @@ def test_live_handoff_trace_breakage_causes_launch_gate_no_go():
     assert result.decision is False
     assert summary["trace"]["complete"] is False
     assert summary["trace"]["session_linkage"]["reason"]
+    assert "session.linkage_unavailable" in summary["trace"]["reason_codes"]
     assert summary["launch_gate"]["decision"] == "no_go"
 
 
