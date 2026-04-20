@@ -2,18 +2,20 @@
 
 This page gives reviewers a fast visual layer for the strict live governed path.
 
+For command-by-command validation, use [reviewer-runbook.md](reviewer-runbook.md).
+
 ## Visual Previews
 
 - passing strict live flow:
-  - [dashboard-live-pass.svg](docs/images/dashboard-live-pass.svg)
+  - [dashboard-live-pass.svg](images/dashboard-live-pass.svg)
 - denied strict live flow:
-  - [dashboard-live-deny.svg](docs/images/dashboard-live-deny.svg)
+  - [dashboard-live-deny.svg](images/dashboard-live-deny.svg)
 
 These are lightweight proof previews, not literal runtime screenshots. They highlight the exact dashboard cues a reviewer should look for.
 
 ## What To Look For In A Passing Live Flow
 
-Open [dashboard-live-pass.svg](docs/images/dashboard-live-pass.svg) and look for:
+Open [dashboard-live-pass.svg](images/dashboard-live-pass.svg) and look for:
 
 - mode banner: `LIVE GOVERNED MODE`
 - short “How to read this dashboard” help block with expandable detail
@@ -28,11 +30,11 @@ Open [dashboard-live-pass.svg](docs/images/dashboard-live-pass.svg) and look for
 - `Readiness status`: `GO`
 - `Latest handoff`: `ALLOW`
 
-These indicators correspond to the strict live pass artifact in [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json).
+These indicators correspond to the strict live pass artifact in [allowed-flow.json](../evidence/reviewer/inspectable-live-runtime/allowed-flow.json).
 
 ## What To Look For In A Denied Live Flow
 
-Open [dashboard-live-deny.svg](docs/images/dashboard-live-deny.svg) and look for:
+Open [dashboard-live-deny.svg](images/dashboard-live-deny.svg) and look for:
 
 - mode banner: `LIVE GOVERNED MODE`
 - top command summary showing `DENY` or `NO-GO`
@@ -43,22 +45,22 @@ Open [dashboard-live-deny.svg](docs/images/dashboard-live-deny.svg) and look for
 - `Latest handoff`: `DENY`
 - `Readiness status`: `NO-GO`
 
-These cues correspond to the denial and no-go artifacts under [evidence/reviewer/inspectable-live-runtime](evidence/reviewer/inspectable-live-runtime).
+These cues correspond to the denial and no-go artifacts under [../evidence/reviewer/inspectable-live-runtime](../evidence/reviewer/inspectable-live-runtime).
 
 ## Which Artifacts Match The Visuals
 
 - passing live flow:
-  - [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
+  - [allowed-flow.json](../evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
 - denied identity:
-  - [denied-identity-flow.json](evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
+  - [denied-identity-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
 - denied OPA:
-  - [denied-opa-flow.json](evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
+  - [denied-opa-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
 - denied retrieval:
-  - [denied-retrieval-flow.json](evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
+  - [denied-retrieval-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
 - denied secret:
-  - [denied-secret-flow.json](evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
+  - [denied-secret-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
 - launch-gate no-go:
-  - [live-launch-gate-downgrade.json](evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
+  - [live-launch-gate-downgrade.json](../evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
 
 ## Important Accuracy Note
 

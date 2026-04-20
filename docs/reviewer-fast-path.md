@@ -1,185 +1,39 @@
 # Reviewer Fast Path
 
-This page is the fastest way to inspect what the repo proves without reading the whole codebase.
+This page is the fastest audit route. For full operator flow, use [reviewer-runbook.md](reviewer-runbook.md).
 
-## 30-Second Path
+## 30-second path
 
-1. Read the proof contract:
-   - [strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md)
-2. Open the main integrated proof test:
-   - [test_strict_live_http_end_to_end.py](tests/integration/test_strict_live_http_end_to_end.py)
-3. Inspect one passing live artifact:
-   - [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
-4. Inspect one denied live artifact:
-   - [denied-identity-flow.json](evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
-5. Inspect one launch-gate no-go artifact:
-   - [live-launch-gate-downgrade.json](evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
+1. Proof contract: [strict-live-proof-matrix.md](strict-live-proof-matrix.md)
+2. Runtime-lane strict-live tests:
+   - [../tests/integration/test_strict_live_onyx_end_to_end.py](../tests/integration/test_strict_live_onyx_end_to_end.py)
+   - [../tests/integration/test_strict_live_dify_end_to_end.py](../tests/integration/test_strict_live_dify_end_to_end.py)
+3. Passing artifact: [../evidence/reviewer/inspectable-live-runtime/allowed-flow.json](../evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
+4. Denied artifact example: [../evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json](../evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
+5. Launch-gate no-go artifact: [../evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json](../evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
 
-On the homepage itself, start with:
+## What to confirm quickly
 
-- the mode banner
-- the short “How to read this dashboard” guide if you need help interpreting the page
-- the command summary
-- the newest governed request spotlight
-- the flagship denied `/launch/onyx` proof spotlight
-- the reviewer-view tab group
+- Dashboard shows **live governed** evidence mode when validating live claims.
+- Onyx and Dify runtime lanes both appear in reviewer-visible sections.
+- Passing and denied evidence can be traced from dashboard signals to JSON artifacts.
+- Dify MCP governance deny reason (`policy.mcp_server_not_allowed:*`) is present in denied path.
 
 ## See A Pass
 
-Use this path when you want the strongest positive proof:
 
-- test:
-  - [test_strict_live_http_end_to_end.py](tests/integration/test_strict_live_http_end_to_end.py)
-  - `test_strict_live_handoff_passes_through_http_dependency_chain`
-- reviewer artifact:
-  - [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
-- raw artifacts:
-  - [governed-flow-summary.json](overlays/myStarterKit/artifacts/governed-flow-summary.json)
-  - [identity-evidence.json](overlays/myStarterKit/artifacts/identity-evidence.json)
-  - [policy-evidence.json](overlays/myStarterKit/artifacts/policy-evidence.json)
-  - [retrieval-evidence.json](overlays/myStarterKit/artifacts/retrieval-evidence.json)
-  - [secret-evidence.json](overlays/myStarterKit/artifacts/secret-evidence.json)
-  - [trace-correlation.json](overlays/myStarterKit/artifacts/trace-correlation.json)
-  - [launch-gate-result.json](overlays/myStarterKit/artifacts/launch-gate-result.json)
-- visual guide:
-  - [dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
-
-What this proves:
-
-- live Keycloak-compatible identity participated
-- live OPA participated
-- live Qdrant participated
-- live Vault participated when required
-- trace correlation completed
-- launch-gate used live evidence and passed
-- governed runtime handoff was approved (Onyx sample lane in this strict-live matrix)
-- the dashboard can show a sanitized governed request preview linked back to the same trace and artifact set
-
-What this does not prove:
-
-- Envoy is mandatory in the current request path
-- Grafana or Langfuse are fail-closed dependencies
-- the stack is production complete
+- Onyx pass test: `test_strict_live_onyx_handoff_passes_through_real_stack`
+- Dify pass test: `test_strict_live_dify_handoff_passes_with_runtime_specific_governance`
+- Visual cues guide: [dashboard-visual-proof.md](dashboard-visual-proof.md)
 
 ## See A Deny
 
-Use these for dependency-specific fail-closed proof:
 
-- identity deny:
-  - [denied-identity-flow.json](evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
-- OPA deny:
-  - [denied-opa-flow.json](evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
-- retrieval deny:
-  - [denied-retrieval-flow.json](evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
-- secret deny:
-  - [denied-secret-flow.json](evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
+- Onyx fail-closed checks (identity/OPA/retrieval/secret): `test_strict_live_onyx_end_to_end.py`
+- Dify MCP deny check: `test_strict_live_dify_handoff_denies_unapproved_mcp_server`
+- Artifact set: [../evidence/reviewer/inspectable-live-runtime/](../evidence/reviewer/inspectable-live-runtime/)
 
-What each proves:
+## Claim boundary
 
-- the dependency participated in the strict live path
-- failure was observable
-- failure blocked the handoff
-- the artifacts and dashboard explain why
-
-## See Launch-Gate No-Go
-
-Use this when you want to inspect live evidence failure rather than a direct dependency outage:
-
-- reviewer artifact:
-  - [live-launch-gate-downgrade.json](evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
-- proof matrix row:
-  - [strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md)
-- dashboard visual guide:
-  - [dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
-
-This proves that missing live evidence or incomplete trace continuity can still block the governed handoff.
-
-## Request Visibility
-
-Use this when you want reviewer-safe visibility into what entered the governed path without dumping raw prompts:
-
-- dashboard section:
-  - `Recent Requests`
-- feed artifact:
-  - [governed-request-feed.json](overlays/myStarterKit/artifacts/governed-request-feed.json)
-- latest summary:
-  - [governed-flow-summary.json](overlays/myStarterKit/artifacts/governed-flow-summary.json)
-
-What this shows:
-
-- sanitized question preview
-- allow or deny status
-- live versus demo evidence mode
-- reason codes
-- trace-linked artifact references
-
-Where to look on the dashboard:
-
-- top command summary for the newest request, latest handoff, and flagship proof actions
-- `Recent Requests` for the latest request slice
-- `What The System Stopped` for the deny timeline
-
-What this does not show:
-
-- full conversation history
-- raw prompt dumps in the main dashboard view
-
-## Mandatory Vs Supporting
-
-- Proven mandatory path elements:
-  - Keycloak-compatible identity
-  - OPA policy decision
-  - Qdrant retrieval
-  - Vault secret access when required
-  - trace correlation
-  - live-evidence launch gate
-  - governed runtime handoff (Onyx sample lane)
-- Active supporting elements:
-  - Envoy
-  - Grafana
-  - Langfuse
-- Optional future:
-  - Superset
-  - gVisor
-- Reference-only:
-  - Keycloak Quickstarts
-  - OPA Envoy Plugin
-  - Langfuse Python SDK
-
-## Homepage Reading Order
-
-Use this order when you want the fastest high-confidence review:
-
-1. Mode banner:
-   - decide whether the page is claiming strict live proof or demo/fallback proof
-2. Command summary:
-   - read combined readiness-and-score, latest handoff, top failing control, and evidence freshness
-3. Newest governed request spotlight:
-   - confirm a sanitized preview, result, trace, tenant, evidence mode, and timestamp are visible
-4. Flagship denied handoff spotlight:
-   - confirm denied governed-runtime proof is easy to find without scrolling through inventories
-5. Plain-language review sections:
-   - use `Big Picture`, `What The System Stopped`, `Safety Check Before Use`, `How Reliable The Proof Is`, and `Connected Parts Of The System`
-
-Only move into `Technical Details` after the plain-language story is already clear.
-
-## Plain-Language First Layer
-
-The homepage is now designed so a non-technical reviewer can understand the first layer quickly:
-
-- green means the current proof supports the claim
-- yellow means something important needs attention
-- red means a serious issue or blocker is visible
-- the top layer explains first
-- the lower sections and raw links prove the explanation technically
-
-## Portfolio Framing
-
-This repo is strongest as proof of:
-
-- Layer Retrofit:
-  - repo-owned governance added over runtime and platform components without pretending they are all equally integrated
-- Secure Starter Kits:
-  - additive local control-plane logic over vendored and overlay assets
-- Launch Gates:
-  - evidence-backed readiness with fail-closed live dependency participation
+- Proven now: governed live handoff path for Onyx + Dify with evidence-backed launch-gate behavior.
+- Not implied: always-on public production hosting; that remains environment-specific.

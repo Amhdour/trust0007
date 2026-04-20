@@ -1,66 +1,58 @@
 # Strict Live Proof Matrix
 
-This document defines when the repo is allowed to claim that the strict live governed path is proven.
+This document defines when the repo can claim that the strict live governed path is proven.
 
-Fast supporting links:
+Supporting links:
 
+- reviewer runbook: [reviewer-runbook.md](reviewer-runbook.md)
 - reviewer landing page: [reviewer-fast-path.md](reviewer-fast-path.md)
 - visual proof guide: [dashboard-visual-proof.md](dashboard-visual-proof.md)
-- reviewer evidence bundle: [reviewer_evidence_bundle.json](../evidence/reviewer_evidence_bundle.json)
+- reviewer evidence bundle: [../evidence/reviewer_evidence_bundle.json](../evidence/reviewer_evidence_bundle.json)
 
 ## Acceptance criteria
 
-A live-mode governed handoff is considered proven only if:
+A live governed handoff is proven only when all of the following are true on the same flow:
 
-1. identity is resolved from live Keycloak-compatible HTTP interaction
-2. policy is decided through live OPA HTTP interaction
-3. retrieval is executed through live Qdrant HTTP interaction
-4. secret access is executed through Vault HTTP interaction when required
+1. identity resolves from live Keycloak-compatible HTTP interaction
+2. policy decision resolves through live OPA interaction
+3. retrieval or tool/MCP governance checks run for the selected runtime lane
+4. required secret access succeeds when needed
 5. trace correlation is complete
-6. launch-gate uses live evidence
-7. the final allow or deny is reflected in artifacts and the dashboard
+6. launch-gate evaluates live evidence
+7. final allow/deny is reflected in artifacts and dashboard sections
 
-The strict HTTP dependency matrix below uses the Onyx lane as the deepest tested sample path. Dify uses the same launch-gate and fail-closed control-plane model with runtime-specific tool/MCP controls.
+## Runtime-specific strict-live tests
+
+- Onyx lane: `tests/integration/test_strict_live_onyx_end_to_end.py`
+- Dify lane: `tests/integration/test_strict_live_dify_end_to_end.py`
+- Mocked dependency fail-closed checks: `tests/integration/test_live_governed_runtime_dependencies.py`
 
 ## Proof matrix
 
-| Scenario | Endpoint exercised | Expected result | Primary proof test | Reviewer artifact | Dashboard signal |
+| Runtime lane | Scenario | Endpoint exercised | Expected result | Primary test | Key artifact |
 | --- | --- | --- | --- | --- | --- |
-| Live pass | `/launch/onyx?path=/app&mode=live` | allow | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_passes_through_http_dependency_chain` | `evidence/reviewer/inspectable-live-runtime/allowed-flow.json` | `Latest handoff=ALLOW`, `Evidence mode=LIVE`, `Readiness=GO` |
-| Dify live pass | `/launch/dify?path=/apps&mode=live&mcp=mcp_server.dashboard_control_plane` | allow | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_dify_handoff_passes_with_runtime_specific_governance` | `overlays/myStarterKit/artifacts/dify-runtime-proof.json` | `Dify runtime proof updated`, `Latest handoff=ALLOW` |
-| Dify MCP deny | `/launch/dify?path=/apps&mode=live&mcp=mcp_server.unapproved` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_dify_handoff_denies_unapproved_mcp_server` | `overlays/myStarterKit/artifacts/governed-flow-summary.json` | `Reason=policy.mcp_server_not_allowed` |
-| Missing bearer token | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[identity missing token]` | `evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json` | `Identity result=DENY` |
-| Invalid bearer token | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[identity invalid token]` | `evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json` | `Identity result=DENY` |
-| Missing tenant claim | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[identity tenant missing]` | `evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json` | `Identity result=DENY` |
-| Keycloak unreachable | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[identity keycloak unreachable]` | `evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json` | `Identity result=DENY` |
-| OPA unreachable | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[opa unreachable]` | `evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json` | `Latest policy result=DENY` |
-| OPA explicit deny | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[opa deny]` | `evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json` | `Latest policy result=DENY` |
-| Qdrant unavailable | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[qdrant unavailable]` | `evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json` | `Latest retrieval result=DENY` |
-| Qdrant empty result | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[qdrant empty result]` | `evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json` | `Latest retrieval result=DENY` |
-| Cross-tenant retrieval filtered | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[cross-tenant retrieval]` | `evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json` | `Latest retrieval result=DENY` |
-| Vault unavailable | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[vault unavailable]` | `evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json` | `Secret fetched=no` |
-| Secret key missing | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[secret key missing]` | `evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json` | `Secret fetched=no` |
-| Invalid secret reference | `/launch/onyx?path=/app&mode=live` | deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[invalid secret reference]` | `evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json` | `Secret fetched=no` |
-| Trace incomplete / missing live evidence | `/launch/onyx?path=/app&mode=live` | no-go / deny | `tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks[trace incomplete]` | `evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json` | `Trace complete=no`, `Missing evidence>0`, `Latest handoff=DENY` |
+| Onyx | Live pass | `/launch/onyx?path=/app&mode=live` | allow | `test_strict_live_onyx_handoff_passes_through_real_stack` | `allowed-flow.json` + `onyx-runtime-proof.json` |
+| Onyx | Identity deny (missing/invalid token) | `/launch/onyx?path=/app&mode=live` | deny | `test_strict_live_onyx_handoff_denies_without_token`, `test_strict_live_onyx_handoff_denies_with_invalid_token` | `identity-evidence.json` |
+| Onyx | OPA unreachable | `/launch/onyx?path=/app&mode=live` | deny | `test_strict_live_onyx_handoff_fails_closed_when_opa_is_unavailable` | `policy-evidence.json` |
+| Onyx | Retrieval backend unavailable | `/launch/onyx?path=/app&mode=live` | deny | `test_strict_live_onyx_handoff_fails_closed_when_qdrant_is_unavailable` | `retrieval-evidence.json` |
+| Onyx | Vault unavailable | `/launch/onyx?path=/app&mode=live` | deny | `test_strict_live_onyx_handoff_fails_closed_when_vault_is_unavailable` | `secret-evidence.json` |
+| Dify | Live pass with governed MCP | `/launch/dify?path=/apps&mode=live&mcp=mcp_server.dashboard_control_plane` | allow | `test_strict_live_dify_handoff_passes_with_runtime_specific_governance` | `dify-runtime-proof.json` + `tool-evidence.json` |
+| Dify | MCP deny (unapproved server) | `/launch/dify?path=/apps&mode=live&mcp=mcp_server.unapproved` | deny | `test_strict_live_dify_handoff_denies_unapproved_mcp_server` | `governed-flow-summary.json` reason codes |
 
 ## What is proven now
 
-- The strict live governed path is exercised through the real control-plane HTTP boundary.
-- Keycloak, OPA, Qdrant, and Vault participate as HTTP-level dependencies in the tested live path.
-- Each major dependency can fail closed and block governed runtime handoff.
-- The dashboard exposes live mode, latest dependency posture, launch-gate status, and latest handoff result.
-- Reviewer artifacts include one passing live flow and dependency-specific failure examples.
-- Unauthenticated requests or bearer tokens without the required `openid` scope still fail closed at the identity boundary.
+- Strict live governance is exercised through the real control-plane HTTP boundary.
+- Onyx and Dify runtime lanes have explicit dedicated strict-live tests.
+- Dify lane includes explicit tool/MCP governed allow and deny coverage.
+- Dependency failures are fail-closed and visible in both artifacts and dashboard state.
 
 ## What is not yet fully proven
 
-- “The governed live path is proven” is the right claim. It is stronger and more precise than saying the entire project or every supporting service is fully live-ready.
-- In containerized local setups where Onyx runs outside the compose network, runtime-local health proof can remain partial even when the governed live chain is passing. That is why `onyx-runtime-proof.json` can still show runtime-visibility caveats while the live launch gate is passing.
-- The local Keycloak tenant mapper used by the bootstrap flow is intentionally development-only. It is a local single-tenant proof aid, not a production tenant-claim strategy.
+- “Governed live path is proven” is the accurate claim; it is narrower than claiming every supporting component is production complete.
+- Local containerized setups can pass governance while still having runtime-local visibility caveats.
+- Externally reachable always-on production hosting is environment-specific and not bundled by default.
 
 ## What remains supporting or future
 
-- Envoy is still supporting rather than mandatory in the proved request path.
-- Grafana is a supporting drill-down surface, not a fail-closed dependency.
-- Langfuse is active as an observability destination, but the strict live path does not fail closed on Langfuse reachability.
-- gVisor and Superset remain future or optional depth.
+- Envoy, Grafana, and Langfuse are supporting depth in the current proof story.
+- Superset and gVisor remain optional/future depth.

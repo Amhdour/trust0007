@@ -10,13 +10,48 @@
   ],
   "repo_description_suggestion": "Decision-first dashboard for governed Onyx (RAG) and Dify (Autonomous Agents) runtime readiness, trust proof, and security posture.",
   "tabs": [
-    { "id": "launch-gate", "label": "Runtime Portfolio", "group": "reviewer", "group_label": "Homepage Decision" },
-    { "id": "entry-points", "label": "Onyx RAG Access", "group": "reviewer", "group_label": "Homepage Decision" },
-    { "id": "dify-agent-access", "label": "Dify Agent Access", "group": "reviewer", "group_label": "Homepage Decision" },
-    { "id": "policy-enforcement", "label": "Policy", "group": "operator", "group_label": "Evidence Drill-Down" },
-    { "id": "retrieval-boundaries", "label": "Retrieval", "group": "operator", "group_label": "Evidence Drill-Down" },
-    { "id": "tool-mcp-governance", "label": "Tools / MCP", "group": "operator", "group_label": "Evidence Drill-Down" },
-    { "id": "audit-replay", "label": "Audit Replay", "group": "operator", "group_label": "Evidence Drill-Down" }
+    {
+      "id": "launch-gate",
+      "label": "Runtime Portfolio",
+      "group": "reviewer",
+      "group_label": "Homepage Decision"
+    },
+    {
+      "id": "entry-points",
+      "label": "Onyx RAG Access",
+      "group": "reviewer",
+      "group_label": "Homepage Decision"
+    },
+    {
+      "id": "dify-agent-access",
+      "label": "Dify Agent Access",
+      "group": "reviewer",
+      "group_label": "Homepage Decision"
+    },
+    {
+      "id": "policy-enforcement",
+      "label": "Policy",
+      "group": "operator",
+      "group_label": "Evidence Drill-Down"
+    },
+    {
+      "id": "retrieval-boundaries",
+      "label": "Retrieval",
+      "group": "operator",
+      "group_label": "Evidence Drill-Down"
+    },
+    {
+      "id": "tool-mcp-governance",
+      "label": "Tools / MCP",
+      "group": "operator",
+      "group_label": "Evidence Drill-Down"
+    },
+    {
+      "id": "audit-replay",
+      "label": "Audit Replay",
+      "group": "operator",
+      "group_label": "Evidence Drill-Down"
+    }
   ],
   "sections": [
     {

@@ -12,7 +12,7 @@
   ],
   "proof_sources": [
     "tests/integration/test_live_governed_runtime_dependencies.py::test_live_handoff_denies_when_opa_unavailable",
-    "tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks",
+    "tests/integration/test_strict_live_onyx_end_to_end.py::test_strict_live_onyx_handoff_fails_closed_when_opa_is_unavailable",
     "adapters/policy/opa.py",
     "backend/governance_flow_evaluator.py"
   ],
@@ -25,13 +25,20 @@
       "mandatory": true,
       "engine": "opa",
       "allow": false,
-      "reason_codes": ["policy.opa_unavailable"],
+      "reason_codes": [
+        "policy.opa_unavailable"
+      ],
       "handoff_allowed": false
     },
     "launch_gate_result": {
       "decision": "no_go",
-      "missing_evidence": ["policy.live_opa"],
-      "blockers": ["kill_switch_enabled", "mandatory_control_missing:live_policy"],
+      "missing_evidence": [
+        "policy.live_opa"
+      ],
+      "blockers": [
+        "kill_switch_enabled",
+        "mandatory_control_missing:live_policy"
+      ],
       "handoff_allowed": false
     },
     "governed_flow_summary": {
@@ -39,10 +46,21 @@
       "evidence_mode": "live",
       "decision": false,
       "handoff_allowed": false,
-      "reasons": ["policy.opa_unavailable", "launch_gate.no_go"],
+      "reasons": [
+        "policy.opa_unavailable",
+        "launch_gate.no_go"
+      ],
       "dependency_status": {
-        "identity": {"mandatory": true, "live": true, "authenticated": true},
-        "policy": {"mandatory": true, "engine": "opa", "allow": false}
+        "identity": {
+          "mandatory": true,
+          "live": true,
+          "authenticated": true
+        },
+        "policy": {
+          "mandatory": true,
+          "engine": "opa",
+          "allow": false
+        }
       }
     }
   }

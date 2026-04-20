@@ -22,15 +22,18 @@ Suggested short repository description:
 If you only have a minute, start here:
 
 1. Proof matrix: [docs/strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md)
-2. Main strict-live integration proof: [tests/integration/test_strict_live_http_end_to_end.py](tests/integration/test_strict_live_http_end_to_end.py)
-3. Reviewer landing page: [docs/reviewer-fast-path.md](docs/reviewer-fast-path.md)
-4. Passing live flow artifact: [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
-5. Denied identity artifact: [denied-identity-flow.json](evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
-6. Denied OPA artifact: [denied-opa-flow.json](evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
-7. Denied retrieval artifact: [denied-retrieval-flow.json](evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
-8. Denied secret artifact: [denied-secret-flow.json](evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
-9. Launch-gate no-go artifact: [live-launch-gate-downgrade.json](evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
-10. Visual dashboard proof guide: [docs/dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
+2. Main strict-live integration proofs:
+   - [tests/integration/test_strict_live_onyx_end_to_end.py](tests/integration/test_strict_live_onyx_end_to_end.py)
+   - [tests/integration/test_strict_live_dify_end_to_end.py](tests/integration/test_strict_live_dify_end_to_end.py)
+3. Reviewer runbook: [docs/reviewer-runbook.md](docs/reviewer-runbook.md)
+4. Reviewer landing page: [docs/reviewer-fast-path.md](docs/reviewer-fast-path.md)
+5. Passing live flow artifact: [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
+6. Denied identity artifact: [denied-identity-flow.json](evidence/reviewer/inspectable-live-runtime/denied-identity-flow.json)
+7. Denied OPA artifact: [denied-opa-flow.json](evidence/reviewer/inspectable-live-runtime/denied-opa-flow.json)
+8. Denied retrieval artifact: [denied-retrieval-flow.json](evidence/reviewer/inspectable-live-runtime/denied-retrieval-flow.json)
+9. Denied secret artifact: [denied-secret-flow.json](evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
+10. Launch-gate no-go artifact: [live-launch-gate-downgrade.json](evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
+11. Visual dashboard proof guide: [docs/dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
 
 ## Client Overview
 
@@ -75,8 +78,10 @@ The intended client-facing outputs are a technical review dashboard, a lighter c
 
 The strongest “see a pass” path is:
 
-- test: [tests/integration/test_strict_live_http_end_to_end.py](tests/integration/test_strict_live_http_end_to_end.py)
-  - `test_strict_live_handoff_passes_through_http_dependency_chain`
+- Onyx strict live test: [tests/integration/test_strict_live_onyx_end_to_end.py](tests/integration/test_strict_live_onyx_end_to_end.py)
+  - `test_strict_live_onyx_handoff_passes_through_real_stack`
+- Dify strict live test: [tests/integration/test_strict_live_dify_end_to_end.py](tests/integration/test_strict_live_dify_end_to_end.py)
+  - `test_strict_live_dify_handoff_passes_with_runtime_specific_governance`
 - proof summary: [docs/strict-live-proof-matrix.md](docs/strict-live-proof-matrix.md)
 - reviewer artifact: [allowed-flow.json](evidence/reviewer/inspectable-live-runtime/allowed-flow.json)
 - dashboard visual callout: [docs/dashboard-visual-proof.md](docs/dashboard-visual-proof.md)
@@ -127,6 +132,17 @@ The precise claim after `make smoke-live` passes is: a staging-style governed li
 
 For the full runbook, see [docs/staging-governed-stack.md](docs/staging-governed-stack.md).
 
+
+## Deployment Maturity and Modes
+
+- **Local/dev mode (`make up-dev`)**: development and demo workflows; useful for UI and wiring checks, not sufficient alone for governed-live proof.
+- **Live/staging validation mode (`make up-live` + bootstrap + smoke/tests)**: governed proof generation path with explicit live environment validation and dependency checks.
+- **Public/production deployment**: this repo provides compose definitions, bootstrap scripts, and tests for self-hosted deployments. It does **not** include an always-on hosted production environment. Ingress, external DNS/TLS, secrets lifecycle, and operational ownership remain environment-specific.
+
+Current maturity: **self-hosted runnable**, **live/staging verifiable**, **public deployment optional and environment-specific**.
+
+For the one-pass reviewer/operator flow, see [docs/reviewer-runbook.md](docs/reviewer-runbook.md).
+
 ## Failing Strict Live Flow Examples
 
 The strongest “see a deny” and “see a no-go” paths are:
@@ -138,7 +154,7 @@ The strongest “see a deny” and “see a no-go” paths are:
 - secret denial: [denied-secret-flow.json](evidence/reviewer/inspectable-live-runtime/denied-secret-flow.json)
 - launch-gate no-go from missing live evidence: [live-launch-gate-downgrade.json](evidence/reviewer/inspectable-live-runtime/live-launch-gate-downgrade.json)
 
-The main fail-closed test coverage is in [tests/integration/test_strict_live_http_end_to_end.py](tests/integration/test_strict_live_http_end_to_end.py) and [tests/integration/test_live_governed_runtime_dependencies.py](tests/integration/test_live_governed_runtime_dependencies.py).
+The main fail-closed test coverage is in [tests/integration/test_strict_live_onyx_end_to_end.py](tests/integration/test_strict_live_onyx_end_to_end.py), [tests/integration/test_strict_live_dify_end_to_end.py](tests/integration/test_strict_live_dify_end_to_end.py), and [tests/integration/test_live_governed_runtime_dependencies.py](tests/integration/test_live_governed_runtime_dependencies.py).
 
 ## Evidence Artifacts To Inspect
 

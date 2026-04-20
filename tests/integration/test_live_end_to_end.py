@@ -9,7 +9,7 @@ This test:
 6. Verifies deny path blocks handoff
 
 This file primarily covers the repo-local control-plane path. The strict live
-HTTP dependency chain is proven separately in `test_strict_live_http_end_to_end.py`.
+HTTP dependency chain is proven separately in `test_strict_live_onyx_end_to_end.py` and `test_strict_live_dify_end_to_end.py`.
 """
 
 from __future__ import annotations
@@ -289,9 +289,10 @@ def test_live_dashboard_consumes_artifacts():
         assert "readiness_panel" in dashboard_data
         dashboard_text = json.dumps(dashboard_data)
         assert trace_id in dashboard_text
-        assert "What The System Stopped" in dashboard_text
-        assert "Connected Parts Of The System" in dashboard_text
-        assert "AI System Access" in dashboard_text
+        assert "Audit and Replay" in dashboard_text
+        assert "Runtime Portfolio" in dashboard_text
+        assert "Onyx RAG Access" in dashboard_text
+        assert "Dify Agent Access" in dashboard_text
 
         upstream_response = http_get(server.url("/api/control-plane/upstream-usage"), timeout=10)
         assert upstream_response.status_code == 200
