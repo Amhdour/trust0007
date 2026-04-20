@@ -63,6 +63,8 @@ PROD_SIM_EVENTS = "evidence/prod-sim/events.jsonl"
 PROD_SIM_GOVERNED_FLOW = "evidence/prod-sim/governed-flow-response.json"
 PROD_SIM_LAUNCH_GATE = "evidence/prod-sim/launch-gate-result.json"
 SAMPLE_EVENTS = "telemetry/exports/sample_events.jsonl"
+DEFAULT_FRESH_HOURS = int(os.environ.get("CONTROL_PLANE_EVIDENCE_FRESH_HOURS", "6"))
+DEFAULT_STALE_HOURS = int(os.environ.get("CONTROL_PLANE_EVIDENCE_STALE_HOURS", "24"))
 
 
 def _iso_now() -> str:
@@ -391,24 +393,38 @@ def _format_age_bucket(timestamp: str) -> tuple[str, str]:
         return "warning", "timestamp unavailable"
 
     age = datetime.now(timezone.utc) - parsed
-    if age.total_seconds() <= 48 * 3600:
+    if age.total_seconds() <= DEFAULT_FRESH_HOURS * 3600:
         return "healthy", "fresh"
-    if age.total_seconds() <= 7 * 24 * 3600:
-        return "warning", "aging"
-    return "critical", "stale"
+    if age.total_seconds() <= DEFAULT_STALE_HOURS * 3600:
+        return "warning", "stale"
+    return "critical", "expired"
 
 
 def _freshness_label(*, timestamp: str, evidence_mode: str = "", provenance: str = "") -> str:
     _, age_bucket = _format_age_bucket(timestamp)
     if provenance == "sample/demo":
         return "sample/demo evidence"
+    if age_bucket == "expired":
+        return "expired evidence"
     if age_bucket == "stale":
         return "stale evidence"
     if str(evidence_mode).lower() == "live" and age_bucket == "fresh":
         return "live current evidence"
-    if age_bucket in {"fresh", "aging"}:
+    if age_bucket in {"fresh", "stale"}:
         return "recent generated evidence"
     return "timestamp unavailable"
+
+
+def _control_state(*, passed: bool, evidence_mode: str, freshness_bucket: str, required: bool = True) -> str:
+    if not passed:
+        return "MISSING_PROOF" if required else "NEEDS_ATTENTION"
+    if str(evidence_mode).lower() != "live":
+        return "DEMO_ONLY"
+    if freshness_bucket == "expired":
+        return "STALE"
+    if freshness_bucket == "timestamp unavailable":
+        return "NEEDS_ATTENTION"
+    return "PASS"
 
 
 def _panel_provenance(*, source_kind: str, evidence_mode: str = "", live_expected: bool = False) -> tuple[str, str]:
@@ -1114,10 +1130,10 @@ def _build_artifact_inventory(root: Path) -> tuple[list[dict[str, str]], Counter
             counts["missing"] += 1
         elif freshness == "fresh":
             counts["fresh"] += 1
-        elif freshness == "aging":
-            counts["aging"] += 1
         elif freshness == "stale":
             counts["stale"] += 1
+        elif freshness == "expired":
+            counts["expired"] += 1
         if integrity_status == "healthy":
             counts["verified"] += 1
 
@@ -1841,10 +1857,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     }
     mode_banner["consequences"] = [item for item in mode_banner["consequences"] if item]
     evidence_freshness_value = f"{artifact_counts['fresh']} fresh"
-    if artifact_counts["aging"]:
-        evidence_freshness_value += f" / {artifact_counts['aging']} aging"
-    if artifact_counts["stale"] or artifact_counts["missing"]:
-        evidence_freshness_value += f" / {artifact_counts['stale']} stale / {artifact_counts['missing']} missing"
+    if artifact_counts["stale"] or artifact_counts["expired"] or artifact_counts["missing"]:
+        evidence_freshness_value += (
+            f" / {artifact_counts['stale']} stale / {artifact_counts['expired']} expired / {artifact_counts['missing']} missing"
+        )
     latest_request_status = "healthy" if latest_request and bool(latest_request.get("handoff_allowed")) else ("critical" if latest_request else "warning")
     latest_request_fields = [
         {"label": "Result", "value": _allow_deny_label(bool(latest_request.get("handoff_allowed", False))) if latest_request else "No request"},
@@ -2108,7 +2124,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             ],
             "change": next_action_change,
         }
-    elif artifact_counts["stale"] or artifact_counts["missing"]:
+    elif artifact_counts["stale"] or artifact_counts["expired"] or artifact_counts["missing"]:
         next_action_change = proof_gap_trend
         next_action = {
             "eyebrow": "Recommended next action",
@@ -2280,11 +2296,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     onyx_launch_route = _launch_handoff_path("/app", mode="live", view="embedded")
     dify_launch_route = _launch_handoff_path("/apps", runtime="dify", mode="live", view="embedded")
     onyx_portfolio_status = runtime_proof_status if onyx_available else "warning"
-    dify_portfolio_status = (
-        "critical"
-        if not latest_handoff_allowed
-        else ("warning" if denied_tool_attempts or confirmation_events else "healthy")
-    )
+    dify_portfolio_status = "warning" if denied_tool_attempts or confirmation_events else "healthy"
     runtime_portfolio = {
         "summary": "Two governed runtime lanes are active in this control plane: Onyx for RAG and Dify for autonomous agents.",
         "runtimes": [
@@ -2396,13 +2408,13 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             _card(
                 "Evidence freshness",
                 evidence_freshness_value,
-                "healthy" if artifact_counts["stale"] == 0 and artifact_counts["missing"] == 0 else "warning",
-                f"Stale: {artifact_counts['stale']}. Missing: {artifact_counts['missing']}.",
+                "healthy" if artifact_counts["stale"] == 0 and artifact_counts["expired"] == 0 and artifact_counts["missing"] == 0 else "warning",
+                f"Stale: {artifact_counts['stale']}. Expired: {artifact_counts['expired']}. Missing: {artifact_counts['missing']}.",
                 "#evidence-integrity",
                 id="evidence_freshness",
                 display_label="How up to date the proof is",
                 display_value=evidence_freshness_value,
-                display_detail=f"{artifact_counts['stale']} stale and {artifact_counts['missing']} missing proof item(s).",
+                display_detail=f"{artifact_counts['stale']} stale, {artifact_counts['expired']} expired, and {artifact_counts['missing']} missing proof item(s).",
                 meta_badges=_timestamp_badges(
                     timestamp=evidence_summary_timestamp,
                     evidence_mode="live" if live_evidence_mode else "demo",
@@ -2480,7 +2492,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 _card(
                     "Stale / missing proof",
                     f"{artifact_counts['stale']} / {artifact_counts['missing']}",
-                    "warning" if artifact_counts["stale"] or artifact_counts["missing"] else "healthy",
+                    "warning" if artifact_counts["stale"] or artifact_counts["expired"] or artifact_counts["missing"] else "healthy",
                     "Current stale and missing counts across the reviewer-visible proof set.",
                     "#evidence-integrity",
                     trend=proof_gap_trend,
@@ -2553,7 +2565,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 {
                     "label": "Proof freshness",
                     "value": evidence_freshness_value,
-                    "status": "healthy" if artifact_counts["stale"] == 0 and artifact_counts["missing"] == 0 else "warning",
+                    "status": "healthy" if artifact_counts["stale"] == 0 and artifact_counts["expired"] == 0 and artifact_counts["missing"] == 0 else "warning",
                 },
                 {"label": "Latest trace", "value": latest_trace_id or "Missing", "status": "healthy" if latest_trace_id else "critical"},
                 {"label": "Mode", "value": "Live evidence" if live_evidence_mode else "Demo or local evidence", "status": "healthy" if live_evidence_mode else "warning"},
@@ -2666,7 +2678,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "intro": "Start with the summary cards and the two spotlight panels. Open the lower sections only when you need the technical proof.",
         "statuses": [
             {"status": "healthy", "label": "Good", "detail": "The available proof supports the current claim."},
-            {"status": "warning", "label": "Needs attention", "detail": "Something important is incomplete, aging, or limited."},
+            {"status": "warning", "label": "Needs attention", "detail": "Something important is incomplete, stale, or limited."},
             {"status": "critical", "label": "Serious issue", "detail": "A blocker or important failure is visible."},
         ],
         "questions": [
@@ -2692,7 +2704,13 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         _card("Denied tool attempts", str(denied_tool_attempts), "critical" if denied_tool_attempts else "healthy", "Tool invocations blocked by tool policy.", "#blocked-actions"),
         _card("Audit coverage", f"{audit_coverage}%", "healthy" if audit_coverage >= 60 else "warning", "Observed traces that map to explicit audit records.", "#audit-replay"),
         _card("Trace coverage", f"{trace_coverage}%", "healthy" if trace_coverage >= 80 else "warning", "Requests with visible end-state telemetry.", "#audit-replay"),
-        _card("Evidence freshness", f"{artifact_counts['fresh']} fresh / {artifact_counts['aging']} aging", "healthy" if artifact_counts["stale"] == 0 else "warning", "Artifact recency across reviewer bundles, launch reports, and telemetry exports.", "#evidence-integrity"),
+        _card(
+            "Evidence freshness",
+            f"{artifact_counts['fresh']} fresh / {artifact_counts['stale']} stale / {artifact_counts['expired']} expired",
+            "healthy" if artifact_counts["stale"] == 0 and artifact_counts["expired"] == 0 else "warning",
+            "Artifact recency across reviewer bundles, launch reports, and telemetry exports.",
+            "#evidence-integrity",
+        ),
         _card("Launch-gate status", launch_summary["status"].upper(), _status_from_launch(launch_summary["status"]), f"Readiness score {launch_summary['readiness_score']} with {launch_summary['control_coverage']} control coverage.", "#launch-gate"),
         _card("Failing controls / residual risks", f"{len(failing_controls)} / {len(residual_risks)}", "critical" if failing_controls else "healthy", "Non-pass controls and remaining risks still visible to launch reviewers.", "#launch-gate"),
     ]
@@ -3681,19 +3699,206 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         _link("Dashboard ingestion feed", ingestion_href, "Dashboard export sample used for evidence drill-through and replay references.", "neutral", id="dashboard_ingestion_feed"),
     ]
 
-    readiness_decision = str(launch_summary.get("status", "")).upper().replace("-", "_")
-    readiness_decision = {
+    base_readiness_decision = str(launch_summary.get("status", "")).upper().replace("-", "_")
+    base_readiness_decision = {
         "GO": "GO",
         "CONDITIONAL": "CONDITIONAL_GO",
         "NO_GO": "NO_GO",
-    }.get(readiness_decision, readiness_decision or "NO_GO")
+    }.get(base_readiness_decision, base_readiness_decision or "NO_GO")
+
+    identity_freshness_bucket = _format_age_bucket(identity_timestamp)[1]
+    policy_freshness_bucket = _format_age_bucket(policy_timestamp)[1]
+    retrieval_freshness_bucket = _format_age_bucket(retrieval_timestamp)[1]
+    audit_freshness_bucket = _format_age_bucket(trace_timestamp)[1]
+    trace_freshness_bucket = _format_age_bucket(handoff_timestamp)[1]
+    evidence_provenance_status = "PASS" if live_evidence_mode and bool(governed_flow_summary) else ("DEMO_ONLY" if not live_evidence_mode else "MISSING_PROOF")
+    evidence_freshness_status = (
+        "PASS"
+        if current_core_proof_gap_count == 0
+        else ("STALE" if artifact_counts["expired"] > 0 or artifact_counts["stale"] > 0 else "MISSING_PROOF")
+    )
+    onyx_reachable = runtime_readiness_status == "healthy"
+    onyx_continuous = runtime_continuity_status == "healthy"
+    onyx_continuity_status = "PASS" if onyx_reachable and onyx_continuous else "FAIL"
+
+    trust_controls = [
+        {
+            "control": "Identity",
+            "status": _control_state(passed=bool(identity_authenticated), evidence_mode="live" if live_evidence_mode else "demo", freshness_bucket=identity_freshness_bucket),
+            "last_checked": identity_timestamp,
+            "reason": (
+                ""
+                if identity_authenticated and identity_live_step
+                else (
+                    "Identity checks passed on demo/local evidence only."
+                    if identity_authenticated and not live_evidence_mode
+                    else "Identity proof is missing or incomplete."
+                )
+            ),
+            "proof_href": "#identity-session",
+        },
+        {
+            "control": "Policy",
+            "status": _control_state(passed=bool(policy_allowed), evidence_mode="live" if live_evidence_mode else "demo", freshness_bucket=policy_freshness_bucket),
+            "last_checked": policy_timestamp,
+            "reason": (
+                ""
+                if policy_allowed and policy_engine_step.lower() == "opa"
+                else (
+                    "Policy checks passed on demo/local evidence only."
+                    if policy_allowed and not live_evidence_mode
+                    else "Policy enforcement proof is missing or incomplete."
+                )
+            ),
+            "proof_href": "#policy-enforcement",
+        },
+        {
+            "control": "Retrieval",
+            "status": _control_state(passed=bool(retrieval_allowed), evidence_mode="live" if live_evidence_mode else "demo", freshness_bucket=retrieval_freshness_bucket),
+            "last_checked": retrieval_timestamp,
+            "reason": (
+                ""
+                if retrieval_allowed and retrieval_live_step
+                else (
+                    "Retrieval checks passed on demo/local evidence only."
+                    if retrieval_allowed and not live_evidence_mode
+                    else "Retrieval boundary proof is missing or incomplete."
+                )
+            ),
+            "proof_href": "#retrieval-boundaries",
+        },
+        {
+            "control": "Tool Governance",
+            "status": _control_state(
+                passed=bool(len(tool_attempts) == 0 or len(tool_decisions) > 0),
+                evidence_mode="live" if live_evidence_mode else "demo",
+                freshness_bucket=trace_freshness_bucket,
+                required=False,
+            ),
+            "last_checked": handoff_timestamp,
+            "reason": "" if (len(tool_attempts) == 0 or len(tool_decisions) > 0) else "Tool/MCP governance checks need review.",
+            "proof_href": "#tool-mcp-governance",
+        },
+        {
+            "control": "Audit",
+            "status": _control_state(
+                passed=bool(audit_linkage.get("complete") or audit_linkage.get("record_count")),
+                evidence_mode="live" if live_evidence_mode else "demo",
+                freshness_bucket=audit_freshness_bucket,
+                required=False,
+            ),
+            "last_checked": trace_timestamp,
+            "reason": "" if (audit_linkage.get("complete") or audit_linkage.get("record_count")) else "Audit linkage or records are incomplete.",
+            "proof_href": "#audit-replay",
+        },
+        {
+            "control": "Evidence provenance",
+            "status": evidence_provenance_status,
+            "last_checked": evidence_summary_timestamp,
+            "reason": "" if evidence_provenance_status == "PASS" else "Live evidence provenance is not currently proven.",
+            "proof_href": "#evidence-integrity",
+        },
+        {
+            "control": "Evidence freshness",
+            "status": evidence_freshness_status,
+            "last_checked": evidence_summary_timestamp,
+            "reason": (
+                ""
+                if evidence_freshness_status == "PASS"
+                else f"Evidence SLA breached: {artifact_counts['stale']} stale, {artifact_counts['expired']} expired, {artifact_counts['missing']} missing."
+            ),
+            "proof_href": "#evidence-integrity",
+        },
+        {
+            "control": "Onyx continuity",
+            "status": onyx_continuity_status,
+            "last_checked": handoff_timestamp,
+            "reason": "" if onyx_continuity_status == "PASS" else "Governed approval is not enough; the Onyx target must also be reachable and active.",
+            "proof_href": "#entry-points",
+        },
+    ]
+    control_by_name = {item["control"]: item for item in trust_controls}
+
+    readiness_penalties = 0
+    blocker_candidates: list[dict[str, Any]] = []
+
+    def add_blocker(*, condition: bool, label: str, detail: str, weight: int, href: str) -> None:
+        nonlocal readiness_penalties
+        if not condition:
+            return
+        readiness_penalties += weight
+        blocker_candidates.append({"label": label, "detail": detail, "weight": weight, "href": href})
+
+    add_blocker(
+        condition=control_by_name["Identity"]["status"] != "PASS",
+        label="Identity proof is not fully proven",
+        detail=control_by_name["Identity"]["reason"] or "Identity did not satisfy live proof requirements.",
+        weight=20,
+        href="#identity-session",
+    )
+    add_blocker(
+        condition=control_by_name["Policy"]["status"] != "PASS",
+        label="Policy proof is not fully proven",
+        detail=control_by_name["Policy"]["reason"] or "Policy enforcement proof is incomplete.",
+        weight=18,
+        href="#policy-enforcement",
+    )
+    add_blocker(
+        condition=control_by_name["Retrieval"]["status"] != "PASS",
+        label="Onyx retrieval proof is incomplete",
+        detail=control_by_name["Retrieval"]["reason"] or "Retrieval boundary proof is incomplete.",
+        weight=16,
+        href="#retrieval-boundaries",
+    )
+    add_blocker(
+        condition=evidence_provenance_status != "PASS",
+        label="Live evidence provenance is not established",
+        detail="Demo/local artifacts are still in use or current live artifacts are incomplete.",
+        weight=18,
+        href="#evidence-integrity",
+    )
+    add_blocker(
+        condition=onyx_continuity_status != "PASS",
+        label="Onyx runtime is not reachable and continuous",
+        detail="Governance may approve access, but readiness requires a reachable active runtime target.",
+        weight=20,
+        href="#entry-points",
+    )
+    add_blocker(
+        condition=evidence_freshness_status != "PASS",
+        label="Evidence freshness SLA is breached",
+        detail=f"{artifact_counts['stale']} stale, {artifact_counts['expired']} expired, {artifact_counts['missing']} missing proof items.",
+        weight=8,
+        href="#evidence-integrity",
+    )
+    blocker_candidates.sort(key=lambda item: item["weight"], reverse=True)
+    top_blockers = blocker_candidates[:5]
+    hardened_score = max(0, int(launch_summary.get("readiness_score", 0)) - readiness_penalties)
+
+    critical_unresolved = any(
+        control_by_name[name]["status"] != "PASS"
+        for name in ("Identity", "Policy", "Retrieval", "Evidence provenance", "Onyx continuity")
+    )
+    if critical_unresolved:
+        readiness_decision = "NO_GO"
+    elif base_readiness_decision == "GO" and hardened_score >= 85:
+        readiness_decision = "GO"
+    elif hardened_score >= 60:
+        readiness_decision = "CONDITIONAL_GO"
+    else:
+        readiness_decision = "NO_GO"
 
     # Mapping note: these three compact blocks are derived from the previous
     # command_center/readiness_panel/kpi style payload to keep homepage scope focused.
     readiness = {
         "decision": readiness_decision,
-        "readiness_score": int(launch_summary.get("readiness_score", 0)),
-        "top_blocker": str(top_failing_control.get("summary", "No active blocker listed.")),
+        "readiness_score": hardened_score,
+        "score_basis": {
+            "launch_gate_score": int(launch_summary.get("readiness_score", 0)),
+            "penalties": readiness_penalties,
+        },
+        "top_blocker": top_blockers[0]["detail"] if top_blockers else str(top_failing_control.get("summary", "No active blocker listed.")),
+        "top_blockers": top_blockers,
         "last_updated": launch_report_timestamp or dashboard_generated_at,
         "evidence_mode": "live" if (live_evidence_mode or live_mode_bootstrap_missing) else "demo",
         "latest_handoff_decision": _allow_deny_label(latest_handoff_allowed),
@@ -3706,6 +3911,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "tool_governance_proven": bool(len(tool_attempts) == 0 or len(tool_decisions) > 0),
         "audit_proven": bool(audit_linkage.get("complete") or audit_linkage.get("record_count")),
         "evidence_freshness": evidence_freshness_value,
+        "controls": trust_controls,
+        "freshness_sla": {
+            "fresh_hours": DEFAULT_FRESH_HOURS,
+            "stale_after_hours": DEFAULT_FRESH_HOURS,
+            "expired_after_hours": DEFAULT_STALE_HOURS,
+        },
         "launch_report_available": bool(launch_report_href),
         "governed_flow_summary_available": bool(governed_flow_summary),
         "reviewer_bundle_available": bool(reviewer),
