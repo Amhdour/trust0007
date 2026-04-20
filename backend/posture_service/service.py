@@ -135,6 +135,17 @@ def _dashboard_url(path: str = "") -> str:
     return _public_service_url(3000, path)
 
 
+def _live_front_door_enabled() -> bool:
+    return os.environ.get("CONTROL_PLANE_LIVE_FRONT_DOOR_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _live_front_door_login_path(next_target: str) -> str:
+    target = str(next_target or "").strip()
+    if not target.startswith("/") or target.startswith("//"):
+        target = "/"
+    return f"/auth/live/login?next={quote(target, safe='')}"
+
+
 def _launch_handoff_path(path: str, *, runtime: str = "onyx", mode: str = "", view: str = "") -> str:
     runtime_name = runtime.strip().lower() or "onyx"
     href = f"/launch/{runtime_name}?path={quote(path, safe='/?=&')}"
@@ -142,6 +153,8 @@ def _launch_handoff_path(path: str, *, runtime: str = "onyx", mode: str = "", vi
         href = f"{href}&mode={quote(mode, safe='')}"
     if view:
         href = f"{href}&view={quote(view, safe='')}"
+    if mode.strip().lower() == "live" and _live_front_door_enabled():
+        return _live_front_door_login_path(href)
     return href
 
 

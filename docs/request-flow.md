@@ -32,6 +32,7 @@ In live mode, governed handoff to `/launch/{runtime}` requires this order:
 
 1. Keycloak-backed bearer token or OIDC front-door forwarded access token is resolved into normalized identity.
    Supported live inputs include `Authorization: Bearer <token>`, `X-Forwarded-Access-Token`, `X-Auth-Request-Access-Token`, and access-token cookies such as `kc_access_token`.
+   Optional local helper route: `/auth/live/login?next=<governed-launch-url>` (enabled via `CONTROL_PLANE_LIVE_FRONT_DOOR_ENABLED=true`) can set the `kc_access_token` cookie before redirecting to `/launch/{runtime}`.
    The local strict-live smoke path requests `openid email profile` scope so Keycloak `userinfo` can participate. Without `openid`, identity should fail closed.
 2. OPA receives the live policy input and returns an auditable decision.
 3. Runtime-specific control checks execute:

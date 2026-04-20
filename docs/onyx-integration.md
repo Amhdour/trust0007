@@ -51,6 +51,7 @@ Any failed check results in deny with aggregated reasons.
 - `/api/control-plane/onyx-activity` classifies recent activity into direct Onyx path matches, correlated trace/session observability, and other nearby runtime activity for the current workspace.
 - `/launch/onyx?path=/app&mode=live&view=embedded` is the dashboard-owned live workspace view for that same governed entry point.
 - The live workspace path now requires a deployment-provided OIDC browser session or an explicit Keycloak-backed bearer token. The dashboard does not mint dev cookies anymore.
+- For local/Codespaces previews, set `CONTROL_PLANE_LIVE_FRONT_DOOR_ENABLED=true` to expose `/auth/live/login?next=...`, which mints a Keycloak token using the configured live smoke principal and sets `kc_access_token` before redirecting to the governed launch route.
 - A successful or denied handoff now writes `overlays/myStarterKit/artifacts/onyx-runtime-proof.json`.
 - That artifact summarizes:
   - the requested Onyx path,

@@ -10,8 +10,8 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, quote, unquote, urlparse
-from urllib.request import urlopen
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
+from urllib.request import Request, urlopen
 
 from adapters.identity.keycloak import KeycloakIdentityProvider
 from backend.activity_service.service import build_onyx_runtime_proof, build_onyx_workspace_activity
@@ -229,6 +229,123 @@ def _keycloak_userinfo_url() -> str:
     base_url = os.environ.get("CONTROL_PLANE_KEYCLOAK_BASE_URL", "http://keycloak:8080").strip().rstrip("/")
     realm = os.environ.get("CONTROL_PLANE_KEYCLOAK_REALM", "umbrella-dev").strip()
     return f"{base_url}/realms/{realm}/protocol/openid-connect/userinfo"
+
+
+def _truthy_env(name: str, default: str = "false") -> bool:
+    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _live_front_door_enabled() -> bool:
+    return _truthy_env("CONTROL_PLANE_LIVE_FRONT_DOOR_ENABLED", "false")
+
+
+def _live_front_door_client_id() -> str:
+    return os.environ.get("CONTROL_PLANE_LIVE_FRONT_DOOR_CLIENT_ID", os.environ.get("SMOKE_CLIENT_ID", "governed-smoke-client")).strip()
+
+
+def _live_front_door_username() -> str:
+    return os.environ.get("CONTROL_PLANE_LIVE_FRONT_DOOR_USERNAME", os.environ.get("LIVE_USERNAME", "")).strip()
+
+
+def _live_front_door_password() -> str:
+    return os.environ.get("CONTROL_PLANE_LIVE_FRONT_DOOR_PASSWORD", os.environ.get("LIVE_PASSWORD", "")).strip()
+
+
+def _live_front_door_scope() -> str:
+    return os.environ.get("CONTROL_PLANE_LIVE_FRONT_DOOR_SCOPE", os.environ.get("KEYCLOAK_SCOPE", "openid email profile")).strip()
+
+
+def _keycloak_token_url() -> str:
+    base_url = os.environ.get("CONTROL_PLANE_KEYCLOAK_BASE_URL", "http://keycloak:8080").strip().rstrip("/")
+    realm = os.environ.get("CONTROL_PLANE_KEYCLOAK_REALM", "umbrella-dev").strip()
+    return f"{base_url}/realms/{realm}/protocol/openid-connect/token"
+
+
+def _safe_next_target(candidate: str, default: str = "/") -> str:
+    target = str(candidate or "").strip()
+    if not target.startswith("/") or target.startswith("//") or "\r" in target or "\n" in target:
+        return default
+    return target
+
+
+def _live_front_door_login_href(next_target: str) -> str:
+    safe_next = _safe_next_target(next_target, default="/")
+    return f"/auth/live/login?next={quote(safe_next, safe='')}"
+
+
+def _request_is_https(headers: dict[str, str]) -> bool:
+    forwarded_proto = str(headers.get("X-Forwarded-Proto", "")).split(",")[0].strip().lower()
+    if forwarded_proto == "https":
+        return True
+    forwarded = str(headers.get("Forwarded", "")).lower()
+    return "proto=https" in forwarded
+
+
+def _access_token_cookie(token: str, max_age_seconds: int, *, secure: bool) -> str:
+    bits = [
+        f"kc_access_token={token}",
+        "Path=/",
+        "HttpOnly",
+        "SameSite=Lax",
+        f"Max-Age={max(60, max_age_seconds)}",
+    ]
+    if secure:
+        bits.append("Secure")
+    return "; ".join(bits)
+
+
+def _clear_cookie(name: str, *, secure: bool) -> str:
+    bits = [
+        f"{name}=",
+        "Path=/",
+        "HttpOnly",
+        "SameSite=Lax",
+        "Max-Age=0",
+    ]
+    if secure:
+        bits.append("Secure")
+    return "; ".join(bits)
+
+
+def _mint_live_front_door_token() -> tuple[str, int]:
+    client_id = _live_front_door_client_id()
+    username = _live_front_door_username()
+    password = _live_front_door_password()
+    scope = _live_front_door_scope()
+    missing = [
+        env_name
+        for env_name, value in (
+            ("CONTROL_PLANE_LIVE_FRONT_DOOR_CLIENT_ID", client_id),
+            ("CONTROL_PLANE_LIVE_FRONT_DOOR_USERNAME", username),
+            ("CONTROL_PLANE_LIVE_FRONT_DOOR_PASSWORD", password),
+        )
+        if not value
+    ]
+    if missing:
+        raise ValueError(f"front-door credentials are not configured: {', '.join(missing)}")
+
+    body = urlencode(
+        {
+            "client_id": client_id,
+            "grant_type": "password",
+            "username": username,
+            "password": password,
+            "scope": scope,
+        }
+    ).encode("utf-8")
+    request = Request(_keycloak_token_url(), data=body, method="POST")
+    request.add_header("Content-Type", "application/x-www-form-urlencoded")
+    request.add_header("Accept", "application/json")
+    with urlopen(request, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    token = str(payload.get("access_token", "")).strip()
+    if not token:
+        raise ValueError("token endpoint did not return an access_token")
+    try:
+        expires_in = int(payload.get("expires_in", 600))
+    except (TypeError, ValueError):
+        expires_in = 600
+    return token, max(60, expires_in)
 
 
 def _default_tenant_id() -> str:
@@ -1009,6 +1126,14 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             self._serve_repo_file(path.removeprefix("/raw/"))
             return
 
+        if path == "/auth/live/login":
+            self._serve_live_front_door_login()
+            return
+
+        if path == "/auth/live/logout":
+            self._serve_live_front_door_logout()
+            return
+
         if path.startswith("/launch/"):
             runtime_key = path.removeprefix("/launch/").strip().lower()
             if runtime_key in RUNTIME_REGISTRY:
@@ -1062,6 +1187,61 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
     def _request_cookies(self) -> dict[str, str]:
         return _cookie_map(self.headers.get("Cookie", ""))
+
+    def _serve_live_front_door_login(self) -> None:
+        if not _live_front_door_enabled():
+            self._send_html(
+                "<!doctype html><html><body><main><h1>Live front door disabled</h1><p>Set CONTROL_PLANE_LIVE_FRONT_DOOR_ENABLED=true to enable this helper.</p></main></body></html>",
+                status=HTTPStatus.NOT_FOUND,
+            )
+            return
+        parsed = urlparse(getattr(self, "path", "/auth/live/login"))
+        query = parse_qs(parsed.query)
+        next_target = _safe_next_target(self._query_value(query, "next", "/"), default="/")
+        secure_cookie = _request_is_https(dict(self.headers.items()))
+        try:
+            token, expires_in = _mint_live_front_door_token()
+        except HTTPError as exc:
+            detail = f"identity.keycloak_http_error:{exc.code}"
+            body = f"""<!doctype html>
+<html lang="en"><body><main>
+  <h1>Live sign-in failed</h1>
+  <p>Keycloak denied the live front-door token request.</p>
+  <p><code>{escape(detail)}</code></p>
+  <p><a href="/">Return to dashboard</a></p>
+</main></body></html>"""
+            self._send_html(body, status=HTTPStatus.BAD_GATEWAY)
+            return
+        except (URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
+            body = f"""<!doctype html>
+<html lang="en"><body><main>
+  <h1>Live sign-in unavailable</h1>
+  <p>The live front-door helper could not mint a Keycloak token.</p>
+  <p><code>{escape(type(exc).__name__)}: {escape(str(exc))}</code></p>
+  <p><a href="/">Return to dashboard</a></p>
+</main></body></html>"""
+            self._send_html(body, status=HTTPStatus.SERVICE_UNAVAILABLE)
+            return
+        self._redirect(
+            next_target,
+            cookies=[_access_token_cookie(token, expires_in, secure=secure_cookie)],
+            status=HTTPStatus.SEE_OTHER,
+        )
+
+    def _serve_live_front_door_logout(self) -> None:
+        parsed = urlparse(getattr(self, "path", "/auth/live/logout"))
+        query = parse_qs(parsed.query)
+        next_target = _safe_next_target(self._query_value(query, "next", "/"), default="/")
+        secure_cookie = _request_is_https(dict(self.headers.items()))
+        self._redirect(
+            next_target,
+            cookies=[
+                _clear_cookie("kc_access_token", secure=secure_cookie),
+                _clear_cookie("oauth2_proxy_access_token", secure=secure_cookie),
+                _clear_cookie("access_token", secure=secure_cookie),
+            ],
+            status=HTTPStatus.SEE_OTHER,
+        )
 
     def _handle_governed_flow(self) -> None:
         """Execute a governed flow with runtime policy enforcement and emit artifacts."""
@@ -1258,6 +1438,10 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             artifact_markup = _artifact_list_markup(flow_result.artifacts if flow_result else {})
             dependency_markup = _dependency_summary_markup(flow_result)
             runtime_proof_section = _runtime_proof_markup(runtime_proof)
+            live_login_markup = ""
+            if live_mode and _live_front_door_enabled():
+                login_href = _live_front_door_login_href(getattr(self, "path", f"/launch/{runtime_name}?path={quote(safe_path, safe='/?=&')}&mode=live"))
+                live_login_markup = f'<p><a href="{escape(login_href, quote=True)}">Sign in through the live OIDC front door helper and retry</a></p>'
             # Governance denied the handoff
             body = f"""<!doctype html>
 <html lang="en">
@@ -1321,6 +1505,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
       <h1>⛔ Access Denied</h1>
       <p>The governance layer has blocked your access to <code>{safe_path_html}</code>.</p>
       <p>Present a valid Keycloak-backed bearer token or enter through the deployment's OIDC front door before retrying the live workspace.</p>
+      {live_login_markup}
       <p><a href="/">Return to dashboard</a></p>
       <div class="status">
         <strong>Handoff to {runtime_title} was denied by control-plane policy.</strong>
