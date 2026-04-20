@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -73,6 +74,10 @@ def _request_text(url: str, *, headers: dict[str, str] | None = None) -> tuple[i
         return int(getattr(resp, "status", 200)), resp.read().decode("utf-8")
 
 
+def _artifact(control_plane_base_url: str, filename: str) -> dict:
+    return _request_json(f"{control_plane_base_url.rstrip('/')}/raw/overlays/myStarterKit/artifacts/{quote(filename)}")
+
+
 def _mint_token(base_url: str, realm: str, client_id: str, username: str, password: str, scope: str) -> str:
     payload = _request_json(
         f"{base_url.rstrip('/')}/realms/{realm}/protocol/openid-connect/token",
@@ -116,9 +121,8 @@ def main() -> int:
     _launch(args.control_plane_base_url, "dify", "/apps", token, mcp_server=args.mcp_server)
     # Keep Onyx as the final governed run so retrieval/runtime proof in the
     # top-level summary reflects the RAG lane truthfully.
-    _launch(args.control_plane_base_url, "onyx", "/app?chatMode=search", token)
+    _launch(args.control_plane_base_url, "onyx", "/app", token)
 
-    artifacts_root = Path("overlays/myStarterKit/artifacts")
     required = [
         "identity-evidence.json",
         "policy-evidence.json",
@@ -131,13 +135,30 @@ def main() -> int:
         "onyx-runtime-proof.json",
         "dify-runtime-proof.json",
     ]
-    missing = [name for name in required if not (artifacts_root / name).exists()]
+    missing: list[str] = []
+    for name in required:
+        try:
+            _artifact(args.control_plane_base_url, name)
+        except Exception:
+            missing.append(name)
     if missing:
         raise RuntimeError(f"missing expected artifacts after bootstrap: {', '.join(missing)}")
 
     # Refresh dashboard ingestion exports after live bootstrap so stale summary
     # feeds do not continue to surface older demo posture fragments.
-    subprocess.run(["python", "scripts/export_mystarterkit_dashboard_feed.py"], check=True)
+    # In some containerized startup flows, artifact directories are volume-owned
+    # and may not be writable from the workspace user. Treat export as best-effort.
+    try:
+        subprocess.run(
+            ["python", "scripts/export_mystarterkit_dashboard_feed.py"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or "").strip().splitlines()
+        suffix = f" ({detail[-1]})" if detail else ""
+        print(f"warning: dashboard feed export skipped{suffix}", file=sys.stderr)
     print("runtime evidence bootstrap passed for Onyx and Dify")
     return 0
 

@@ -28,12 +28,22 @@
     }
   },
   "forwardPorts": [
-    3000
+    3000,
+    3010,
+    8088
   ],
   "portsAttributes": {
     "3000": {
       "label": "Control Plane Dashboard",
       "onAutoForward": "openBrowserOnce"
+    },
+    "3010": {
+      "label": "Onyx Runtime",
+      "onAutoForward": "silent"
+    },
+    "8088": {
+      "label": "Dify Runtime",
+      "onAutoForward": "silent"
     }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
