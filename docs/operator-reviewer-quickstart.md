@@ -25,13 +25,13 @@ Configure the live-mode variables in `compose/.env` before expecting live enforc
 
 Check these sections on the homepage:
 
-- `Who Is Trying To Use It`
-- `Rules Being Applied`
-- `What Information It Can Access`
-- `Protected Keys And Passwords`
-- `Did We Follow The Full Process?`
-- `Safety Check Before Use`
-- `Connected Parts Of The System`
+- `Runtime Portfolio`
+- `Onyx RAG Access`
+- `Dify Agent Access`
+- `Policy Enforcement`
+- `Retrieval Boundaries`
+- `Tool and MCP Governance`
+- `Audit and Replay`
 
 The page should make `live` vs `demo` mode obvious.
 
@@ -51,7 +51,8 @@ Inspect:
 
 ```bash
 pytest -q tests/integration/test_live_governed_runtime_dependencies.py
-pytest -q tests/integration/test_strict_live_http_end_to_end.py
+pytest -q tests/integration/test_strict_live_onyx_end_to_end.py
+pytest -q tests/integration/test_strict_live_dify_end_to_end.py
 ```
 
 That suite covers:
@@ -65,4 +66,7 @@ That suite covers:
 
 ## 6. Review the evidence bundle
 
-Use `evidence/reviewer_evidence_bundle.json`, `evidence/reviewer/inspectable-live-runtime/`, and `docs/strict-live-proof-matrix.md` for reviewer-facing summaries of allowed, denied, and downgraded live-mode scenarios.
+Use `../evidence/reviewer_evidence_bundle.json`, `../evidence/reviewer/inspectable-live-runtime/`, and `strict-live-proof-matrix.md` for reviewer-facing summaries of allowed, denied, and downgraded live-mode scenarios.
+
+
+For a tighter pass/fail checklist and deployment-mode boundaries, see [reviewer-runbook.md](reviewer-runbook.md).

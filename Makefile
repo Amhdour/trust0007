@@ -58,7 +58,7 @@ smoke-live:
 	python scripts/smoke-live-onyx-handoff.py
 
 test-live-stack:
-	pytest -q tests/integration/test_strict_live_http_end_to_end.py
+	pytest -q tests/integration/test_strict_live_onyx_end_to_end.py tests/integration/test_strict_live_dify_end_to_end.py
 
 health-check:
 	bash scripts/check-project-health.sh

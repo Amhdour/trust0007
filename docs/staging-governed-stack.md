@@ -8,7 +8,8 @@ This is the repo's production-like deployment path for proving the governed live
 - Env template: `compose/.env.production.example`
 - Bootstrap: `scripts/bootstrap-live-governed-path.sh`
 - Smoke test: `scripts/smoke-live-onyx-handoff.py`
-- Real-stack tests: `tests/integration/test_strict_live_http_end_to_end.py`
+- Real-stack Onyx test: `tests/integration/test_strict_live_onyx_end_to_end.py`
+- Real-stack Dify test: `tests/integration/test_strict_live_dify_end_to_end.py`
 
 ## Local staging bootstrap
 

@@ -87,6 +87,7 @@ class RuntimeTarget:
     default_host: str
 
 
+# Central runtime registry used by launch routing, runtime proof generation, and live startup validation.
 RUNTIME_REGISTRY: dict[str, RuntimeTarget] = {
     "onyx": RuntimeTarget(
         key="onyx",

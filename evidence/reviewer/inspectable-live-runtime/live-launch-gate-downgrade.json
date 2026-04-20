@@ -13,7 +13,7 @@
   ],
   "proof_sources": [
     "tests/integration/test_live_governed_runtime_dependencies.py::test_live_handoff_trace_breakage_causes_launch_gate_no_go",
-    "tests/integration/test_strict_live_http_end_to_end.py::test_strict_live_handoff_fails_closed_for_dependency_breaks",
+    "tests/integration/test_strict_live_onyx_end_to_end.py::test_strict_live_onyx_handoff_fails_closed_when_opa_is_unavailable",
     "launch-gate/evaluator.py",
     "backend/launch_gate_service/service.py"
   ],
@@ -30,8 +30,13 @@
     },
     "launch_gate_result": {
       "decision": "no_go",
-      "missing_evidence": ["trace.correlation"],
-      "blockers": ["kill_switch_enabled", "mandatory_control_missing:trace_correlation"],
+      "missing_evidence": [
+        "trace.correlation"
+      ],
+      "blockers": [
+        "kill_switch_enabled",
+        "mandatory_control_missing:trace_correlation"
+      ],
       "handoff_allowed": false
     },
     "governed_flow_summary": {
@@ -39,13 +44,20 @@
       "evidence_mode": "live",
       "decision": false,
       "handoff_allowed": false,
-      "reasons": ["launch_gate.no_go"],
+      "reasons": [
+        "launch_gate.no_go"
+      ],
       "launch_gate": {
         "decision": "no_go",
-        "missing_evidence": ["trace.correlation"]
+        "missing_evidence": [
+          "trace.correlation"
+        ]
       },
       "dependency_status": {
-        "trace": {"mandatory": true, "complete": false}
+        "trace": {
+          "mandatory": true,
+          "complete": false
+        }
       }
     }
   }
