@@ -156,6 +156,13 @@ def _runtime_local_base_url(target: RuntimeTarget) -> str:
     return f"http://{host}:{_runtime_port(target)}"
 
 
+def _runtime_target_path(target: RuntimeTarget, requested_path: str) -> str:
+    normalized = requested_path if requested_path.startswith("/") else f"/{requested_path.lstrip('/')}"
+    if target.key == "onyx" and normalized == "/app":
+        return "/app/"
+    return normalized
+
+
 def _governance_mode(explicit: str = "") -> str:
     return (explicit or os.environ.get("CONTROL_PLANE_GOVERNANCE_MODE", "demo")).strip().lower() or "demo"
 
@@ -1417,8 +1424,9 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         governance_allowed = flow_result.decision if flow_result else False
         runtime_port = _runtime_port(target)
         local_base_url = _runtime_local_base_url(target)
-        local_url = f"{local_base_url}{safe_path}"
-        public_url = _public_service_url(runtime_port, safe_path)
+        runtime_path = _runtime_target_path(target, safe_path)
+        local_url = f"{local_base_url}{runtime_path}"
+        public_url = _public_service_url(runtime_port, runtime_path)
 
         if not governance_allowed:
             runtime_proof = _record_runtime_proof(
