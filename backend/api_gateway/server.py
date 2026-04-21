@@ -723,7 +723,10 @@ def _artifact_relative_path(path: Path) -> str:
 def _load_json_array(path: Path) -> list[dict]:
     if not path.exists():
         return []
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
     return payload if isinstance(payload, list) else []
 
 

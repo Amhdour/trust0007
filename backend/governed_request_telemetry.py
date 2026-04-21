@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import os
 from pathlib import Path
 from typing import Any
 
@@ -99,7 +100,10 @@ def sanitize_question(prompt: str, *, preview_limit: int = QUESTION_PREVIEW_LIMI
 def append_governed_request_feed(path: Path, record: dict[str, Any], *, limit: int = GOVERNED_REQUEST_FEED_LIMIT) -> list[dict[str, Any]]:
     existing: list[dict[str, Any]] = []
     if path.exists():
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            payload = []
         if isinstance(payload, list):
             existing = [item for item in payload if isinstance(item, dict)]
 
@@ -112,7 +116,9 @@ def append_governed_request_feed(path: Path, record: dict[str, Any], *, limit: i
     updated.sort(key=lambda item: str(item.get("timestamp", "")), reverse=True)
     trimmed = updated[:limit]
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(trimmed, indent=2, sort_keys=True), encoding="utf-8")
+    temp_path = path.with_suffix(f"{path.suffix}.tmp")
+    temp_path.write_text(json.dumps(trimmed, indent=2, sort_keys=True), encoding="utf-8")
+    os.replace(temp_path, path)
     return trimmed
 
 
