@@ -1,0 +1,122 @@
+{
+  "policy_metadata": {
+    "policy_id": "trust-readiness-control-plane",
+    "version": "v1",
+    "generated_at": "2026-04-21T00:00:00Z",
+    "source": "repo-default"
+  },
+  "retrieval": {
+    "approved_purposes": [
+      "runtime_handoff",
+      "launch_readiness_review",
+      "incident_response"
+    ],
+    "tenant_allowed_sources": {
+      "tenant-a": [
+        "qdrant",
+        "knowledge-base",
+        "incident-runbooks"
+      ],
+      "tenant-dashboard": [
+        "qdrant",
+        "knowledge-base"
+      ],
+      "tenant-stage": [
+        "qdrant",
+        "knowledge-base"
+      ],
+      "tenant-api": [
+        "qdrant",
+        "knowledge-base"
+      ]
+    },
+    "classification_order": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted",
+      "secret"
+    ],
+    "source_trust_labels": {
+      "qdrant": [
+        "trusted"
+      ],
+      "knowledge-base": [
+        "trusted",
+        "verified"
+      ],
+      "incident-runbooks": [
+        "verified"
+      ]
+    },
+    "required_provenance_fields": [
+      "uri",
+      "source_owner",
+      "classification"
+    ]
+  },
+  "runtime_controls": {
+    "onyx": {
+      "runtime_class": "rag",
+      "require_retrieval_security": true,
+      "require_data_boundary": true,
+      "auth_modes": [
+        "shared_auth",
+        "per_user_auth"
+      ]
+    },
+    "dify": {
+      "runtime_class": "autonomous_agents",
+      "require_mcp_governance": true,
+      "mcp_allowed_servers": [
+        "mcp_server.dashboard_control_plane"
+      ],
+      "approval_required_actions": [
+        "publish",
+        "external_execute",
+        "external_write",
+        "destructive",
+        "privileged_tooling"
+      ],
+      "approval_required_tools": [
+        "dify_admin",
+        "email.send",
+        "payment.charge"
+      ]
+    }
+  },
+  "tools": {
+    "allowed_tools": [
+      "onyx",
+      "dify",
+      "search",
+      "retrieve",
+      "summarize",
+      "ticket.read"
+    ],
+    "confirmation_required_tools": [
+      "dify_admin",
+      "email.send",
+      "payment.charge",
+      "ticket.create",
+      "export_evidence"
+    ],
+    "forbidden_tools": [
+      "shell.exec",
+      "db.drop",
+      "http.post.untrusted",
+      "admin_shell"
+    ]
+  },
+  "launch_gates": {
+    "deny_by_default": true,
+    "block_if_evidence_stale": true,
+    "block_if_telemetry_unhealthy": true,
+    "block_if_audit_unhealthy": true,
+    "human_approval_required_for_exceptions": true
+  },
+  "secrets": {
+    "require_runtime_secret_health": true,
+    "deny_if_backend_unhealthy": true
+  }
+}

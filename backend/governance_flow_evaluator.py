@@ -225,6 +225,8 @@ class GovernedFlowEvaluator:
     ) -> GovernedFlowResult:
         trace_id = f"flow-{uuid.uuid4().hex[:12]}"
         request_id = f"req-{uuid.uuid4().hex[:12]}"
+        decision_id = f"decision-{uuid.uuid4().hex[:12]}"
+        launch_request_id = request_id
         mode = (evidence_mode or self._flow_mode or "demo").strip().lower()
         live_mode = mode == "live"
         base_metadata = dict(request_metadata or {})
@@ -313,6 +315,8 @@ class GovernedFlowEvaluator:
                     "timestamp": _now_iso(),
                     "trace_id": trace_id,
                     "request_id": request_id,
+                    "decision_id": decision_id,
+                    "launch_request_id": launch_request_id,
                     "session_id": session_value,
                     "actor_id": actor_id,
                     "tenant_id": tenant_value,
@@ -324,6 +328,7 @@ class GovernedFlowEvaluator:
                     "action": action,
                     "outcome": outcome,
                     "component": component,
+                    "tool_id": component if stage in {"tool_execution", "tool_decision"} else "",
                     "policy_source": policy_source,
                     "policy_path": policy_path,
                     "evidence_mode": mode,
@@ -388,6 +393,8 @@ class GovernedFlowEvaluator:
             "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
+            "decision_id": decision_id,
+            "launch_request_id": launch_request_id,
             "session_id": session_id,
             "actor_id": effective_user_id,
             "tenant_id": effective_tenant_id,
@@ -533,6 +540,8 @@ class GovernedFlowEvaluator:
             "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
+            "decision_id": decision_id,
+            "launch_request_id": launch_request_id,
             "session_id": session_id,
             "actor_id": effective_user_id,
             "tenant_id": effective_tenant_id,
@@ -592,6 +601,8 @@ class GovernedFlowEvaluator:
             "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
+            "decision_id": decision_id,
+            "launch_request_id": launch_request_id,
             "session_id": session_id,
             "actor_id": effective_user_id,
             "tenant_id": effective_tenant_id,
@@ -728,6 +739,8 @@ class GovernedFlowEvaluator:
             "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
+            "decision_id": decision_id,
+            "launch_request_id": launch_request_id,
             "session_id": session_id,
             "actor_id": effective_user_id,
             "tenant_id": effective_tenant_id,
@@ -942,8 +955,11 @@ class GovernedFlowEvaluator:
         tool_evidence = {
             "step": "tool_governance",
             "captured_at": _now_iso(),
+            "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
+            "decision_id": decision_id,
+            "launch_request_id": launch_request_id,
             "session_id": session_id,
             "actor_id": effective_user_id,
             "tenant_id": effective_tenant_id,
@@ -1084,7 +1100,7 @@ class GovernedFlowEvaluator:
         emit(
             "handoff.decision",
             {
-                "runtime_target": "onyx",
+                "runtime_target": runtime_target,
                 "runtime_class": runtime_class,
                 "actor_id": effective_user_id,
                 "tenant_id": effective_tenant_id,
@@ -1123,6 +1139,8 @@ class GovernedFlowEvaluator:
             "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
+            "decision_id": decision_id,
+            "launch_request_id": launch_request_id,
             "session_id": session_id,
             "tenant_id": effective_tenant_id,
             "actor_id": effective_user_id,
@@ -1212,6 +1230,8 @@ class GovernedFlowEvaluator:
             "timestamp": _now_iso(),
             "trace_id": trace_id,
             "request_id": request_id,
+            "decision_id": decision_id,
+            "launch_request_id": launch_request_id,
             "session_id": session_id,
             "actor_id": effective_user_id,
             "tenant_id": effective_tenant_id,
@@ -1267,9 +1287,20 @@ class GovernedFlowEvaluator:
             "machine": gate_result.to_machine_readable(),
             "human": gate_result.to_human_readable(),
             "governed_request": governed_request_record,
+            "decision_explanation": {
+                "decision_id": decision_id,
+                "launch_request_id": launch_request_id,
+                "runtime_id": runtime_target,
+                "status": "allow" if final_decision else "deny",
+                "reason_codes": list(final_reasons),
+                "evidence_refs": dict(current_artifact_refs),
+                "generated_at": _now_iso(),
+            },
             "flow_metadata": {
                 "trace_id": trace_id,
                 "request_id": request_id,
+                "decision_id": decision_id,
+                "launch_request_id": launch_request_id,
                 "session_id": session_id,
                 "actor_id": effective_user_id,
                 "tenant_id": effective_tenant_id,

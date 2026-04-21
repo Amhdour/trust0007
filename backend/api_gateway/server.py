@@ -18,6 +18,16 @@ from backend.activity_service.service import build_onyx_runtime_proof, build_ony
 from backend.integration_adapter import load_runtime_policy_bundle
 from backend.integration_adapter.repository import load_upstream_usage_inventory
 from backend.posture_service.service import build_control_plane_dashboard, build_control_plane_live_log
+from backend.trust_readiness.dashboard_api import (
+    build_evidence_audit_page,
+    build_exceptions_waivers_page,
+    build_fleet_overview,
+    build_incidents_page,
+    build_launch_gates_page,
+    build_retrieval_boundary_posture,
+    build_runtime_readiness_page,
+    build_tool_mcp_authorization_posture,
+)
 from backend.governance_flow_evaluator import GovernedFlowEvaluator
 from adapters.onyx_gateway_adapter.interfaces import PolicyChecker, RetrievalChecker, ToolDecisionChecker
 from adapters.onyx_gateway_adapter.schemas import PolicyDecision, RetrievalDecision, ToolDecision, NormalizedRequest
@@ -1098,6 +1108,39 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
         if path in {"/api/control-plane", "/api/control-plane/overview"}:
             self._send_json(build_control_plane_dashboard(REPO_ROOT))
+            return
+
+        if path == "/api/fleet/overview":
+            self._send_json(build_fleet_overview(REPO_ROOT))
+            return
+
+        if path.startswith("/api/runtime/readiness"):
+            runtime_id = path.removeprefix("/api/runtime/readiness").strip("/")
+            self._send_json(build_runtime_readiness_page(REPO_ROOT, runtime_id=runtime_id))
+            return
+
+        if path == "/api/retrieval/boundary-posture":
+            self._send_json(build_retrieval_boundary_posture(REPO_ROOT))
+            return
+
+        if path == "/api/tools/mcp-authorization":
+            self._send_json(build_tool_mcp_authorization_posture(REPO_ROOT))
+            return
+
+        if path == "/api/launch-gates":
+            self._send_json(build_launch_gates_page(REPO_ROOT))
+            return
+
+        if path == "/api/evidence-audit":
+            self._send_json(build_evidence_audit_page(REPO_ROOT))
+            return
+
+        if path == "/api/incidents":
+            self._send_json(build_incidents_page(REPO_ROOT))
+            return
+
+        if path == "/api/exceptions-waivers":
+            self._send_json(build_exceptions_waivers_page(REPO_ROOT))
             return
 
         if path == "/api/control-plane/upstream-usage":

@@ -41,6 +41,7 @@ from backend.integration_adapter.repository import (
     validate_live_governed_flow_artifacts,
 )
 from backend.launch_gate_service.service import build_launch_gate_summary
+from backend.trust_readiness.readiness import compute_fleet_readiness
 
 
 POLICY_BUNDLE_PATH = "overlays/myStarterKit/policies/bundles/default/policy.json"
@@ -1625,6 +1626,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         if not relative:
             return fallback
         loaded = read_json(resolved_root / relative)
+        request_trace_id = str(request.get("trace_id") or "")
+        loaded_trace_id = str(loaded.get("trace_id") or loaded.get("flow_metadata", {}).get("trace_id") or "")
+        if request_trace_id and loaded_trace_id and loaded_trace_id != request_trace_id:
+            return fallback
         return loaded if isinstance(loaded, dict) and loaded else fallback
 
     onyx_governed_summary = _request_artifact(latest_onyx_request, "governed_flow_summary", governed_flow_summary)
@@ -2453,6 +2458,16 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             },
         ],
     }
+    real_time_readiness = {
+        item.runtime_id: item.to_dict()
+        for item in compute_fleet_readiness(resolved_root)
+    }
+    for runtime_item in runtime_portfolio["runtimes"]:
+        readiness_state = real_time_readiness.get(str(runtime_item.get("runtime_key", "")), {})
+        if readiness_state:
+            runtime_item["readiness_state"] = readiness_state.get("state", "")
+            runtime_item["readiness_score"] = readiness_state.get("score", 0)
+            runtime_item["readiness_blockers"] = readiness_state.get("blockers", [])
     command_center = {
         "cards": [
             _card(
@@ -3883,6 +3898,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     evidence_freshness_status = (
         "PASS"
         if current_core_proof_gap_count == 0
+        or (live_evidence_mode and artifact_counts["expired"] == 0 and artifact_counts["stale"] == 0 and artifact_counts["missing"] == 0)
         else ("STALE" if artifact_counts["expired"] > 0 or artifact_counts["stale"] > 0 else "MISSING_PROOF")
     )
     onyx_reachable = runtime_readiness_status == "healthy"
@@ -4199,6 +4215,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "reading_guide": reading_guide,
         "command_center": command_center,
         "runtime_portfolio": runtime_portfolio,
+        "real_time_readiness": real_time_readiness,
         "stack_health": stack_health,
         "audience_paths": audience_paths,
         "operator_briefing": quick_answers,
