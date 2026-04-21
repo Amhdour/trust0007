@@ -28,6 +28,16 @@ from backend.trust_readiness.dashboard_api import (
     build_runtime_readiness_page,
     build_tool_mcp_authorization_posture,
 )
+from backend.runtime_repair.api import (
+    build_repair_center,
+    diagnose_lane,
+    execute_lane,
+    get_repair_plan,
+    get_repair_run,
+    lane_from_value,
+    list_repair_runs,
+    plan_lane,
+)
 from backend.governance_flow_evaluator import GovernedFlowEvaluator
 from adapters.onyx_gateway_adapter.interfaces import PolicyChecker, RetrievalChecker, ToolDecisionChecker
 from adapters.onyx_gateway_adapter.schemas import PolicyDecision, RetrievalDecision, ToolDecision, NormalizedRequest
@@ -1169,6 +1179,33 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             self._send_json(build_exceptions_waivers_page(REPO_ROOT))
             return
 
+        if path == "/api/repair/center":
+            tenant_id = self._query_value(parse_qs(parsed.query), "tenant_id", _default_tenant_id())
+            self._send_json(build_repair_center(REPO_ROOT, tenant_id=tenant_id))
+            return
+
+        if path == "/repair/runs":
+            self._send_json(list_repair_runs(REPO_ROOT))
+            return
+
+        if path.startswith("/repair/runs/"):
+            run_id = path.removeprefix("/repair/runs/").strip("/")
+            payload = get_repair_run(REPO_ROOT, run_id)
+            if payload:
+                self._send_json(payload)
+            else:
+                self._send_json({"error": "repair_run_not_found", "run_id": run_id}, status=HTTPStatus.NOT_FOUND)
+            return
+
+        if path.startswith("/repair/plans/"):
+            plan_id = path.removeprefix("/repair/plans/").strip("/")
+            payload = get_repair_plan(REPO_ROOT, plan_id)
+            if payload:
+                self._send_json(payload)
+            else:
+                self._send_json({"error": "repair_plan_not_found", "plan_id": plan_id}, status=HTTPStatus.NOT_FOUND)
+            return
+
         if path == "/api/control-plane/upstream-usage":
             self._send_json(load_upstream_usage_inventory(REPO_ROOT))
             return
@@ -1219,6 +1256,23 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
         self._serve_static(path)
 
+    def do_POST(self) -> None:  # noqa: N802
+        parsed = urlparse(getattr(self, "path", "/"))
+        path = parsed.path
+        payload = self._read_json_body()
+
+        for prefix, handler in (
+            ("/repair/diagnose/", diagnose_lane),
+            ("/repair/plan/", plan_lane),
+            ("/repair/execute/", execute_lane),
+        ):
+            if path.startswith(prefix):
+                lane = lane_from_value(path.removeprefix(prefix).strip("/"))
+                self._send_json(handler(REPO_ROOT, lane, payload))
+                return
+
+        self._send_json({"error": "not_found", "path": path}, status=HTTPStatus.NOT_FOUND)
+
     def log_message(self, format: str, *args: object) -> None:  # noqa: A003
         return
 
@@ -1260,6 +1314,20 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     def _query_value(self, query: dict[str, list[str]], key: str, default: str = "") -> str:
         values = query.get(key, [])
         return values[-1] if values else default
+
+    def _read_json_body(self) -> dict[str, object]:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if length <= 0:
+            return {}
+        raw = self.rfile.read(length)
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except json.JSONDecodeError:
+            return {}
+        return payload if isinstance(payload, dict) else {}
 
     def _request_cookies(self) -> dict[str, str]:
         return _cookie_map(self.headers.get("Cookie", ""))

@@ -1,6 +1,6 @@
 # Docs
 
-Start with `trust-readiness-platform.md` for the repo-first architecture, product module boundaries, readiness state model, Onyx/Dify launch lanes, dashboard APIs, production hardening, threat model, and roadmap.
+Start with `trust-readiness-platform.md` for the repo-first architecture, product module boundaries, readiness state model, Onyx/Dify launch lanes, dashboard APIs, production hardening, threat model, and roadmap. Use `governed-runtime-repair.md` for the repair center diagnostics, bounded remediation policy, evidence/audit model, and Onyx/Dify repair flows.
 
 See `repo-bootstrap-assessment.md` for the initial repository map, architecture summary,
 phased implementation plan, and first-file bootstrap sequence.
@@ -20,3 +20,4 @@ Additional homepage-focused notes:
 - `evidence-model.md`: what artifacts are emitted, how they correlate, and which ones are mandatory in live mode.
 - `strict-live-proof-matrix.md`: acceptance criteria plus the pass/fail proof matrix for the strict live governed path.
 - `operator-reviewer-quickstart.md`: quickest path to verify the governed flow, dashboard panels, and reviewer evidence bundle.
+- `governed-runtime-repair.md`: repair center architecture for diagnosing runtime lane failures, planning safe remediations, policy-checking execution, and recomputing readiness without forcing GO.

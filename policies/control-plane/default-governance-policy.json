@@ -118,5 +118,45 @@
   "secrets": {
     "require_runtime_secret_health": true,
     "deny_if_backend_unhealthy": true
+  },
+  "repair_actions": {
+    "deny_by_default": true,
+    "demo_evidence_counts_for_live_readiness": false,
+    "allowed_without_approval": [
+      "recheck_health",
+      "reprobe_routes",
+      "retry_governed_handoff",
+      "refresh_runtime_proof",
+      "refresh_evidence_bundle",
+      "re_evaluate_launch_gate",
+      "validate_runtime_config",
+      "validate_dependency_connectivity",
+      "surface_precise_blocker"
+    ],
+    "allowed_with_approval": [
+      "mark_lane_degraded",
+      "quarantine_lane",
+      "restart_local_service",
+      "reload_runtime_config",
+      "rotate_nonhuman_runtime_credential",
+      "reseed_nonprod_test_data",
+      "resync_policy_bundle"
+    ],
+    "production_requires_elevated_role_for": [
+      "restart_local_service",
+      "rotate_nonhuman_runtime_credential",
+      "resync_policy_bundle"
+    ],
+    "blocked_in_production_without_elevated_role": [
+      "resync_policy_bundle"
+    ],
+    "rules": [
+      "allow route reprobe in all environments",
+      "allow evidence refresh in all environments",
+      "allow local service restart only in dev/staging",
+      "require approval for credential rotation",
+      "deny policy bundle resync in production unless actor has elevated role",
+      "never override a failed launch gate without fresh supporting evidence"
+    ]
   }
 }
