@@ -186,6 +186,29 @@ def _is_local_url(url: str) -> bool:
     return any(token in lowered for token in ("localhost", "127.0.0.1", "0.0.0.0"))
 
 
+def _is_codespaces_public_url(url: str) -> bool:
+    host = urlparse(url).netloc.lower()
+    return host.endswith(".app.github.dev")
+
+
+def _response_is_embeddable(response: object, requested_url: str) -> bool:
+    final_url = str(getattr(response, "url", "") or "")
+    final_host = urlparse(final_url).netloc.lower()
+    if final_host and final_host != urlparse(requested_url).netloc.lower():
+        return False
+
+    headers = getattr(response, "headers", {})
+    x_frame_options = str(headers.get("X-Frame-Options", "") if hasattr(headers, "get") else "").strip().lower()
+    if x_frame_options in {"deny", "sameorigin"}:
+        return False
+
+    content_security_policy = str(headers.get("Content-Security-Policy", "") if hasattr(headers, "get") else "").lower()
+    if "frame-ancestors" in content_security_policy and ("'none'" in content_security_policy or "'self'" in content_security_policy):
+        return False
+
+    return True
+
+
 def _validate_startup_configuration() -> None:
     governance_mode = _governance_mode()
     environment_mode = _control_plane_environment_mode()
@@ -2330,9 +2353,14 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     def _url_is_reachable(self, url: str) -> bool:
         try:
             with urlopen(url, timeout=2) as response:
-                return int(getattr(response, "status", 0)) < 400
+                status = int(getattr(response, "status", 0))
+                if status < 200 or status >= 400:
+                    return False
+                if _is_codespaces_public_url(url) and not _response_is_embeddable(response, url):
+                    return False
+                return True
         except HTTPError as exc:
-            return 200 <= int(getattr(exc, "code", 0)) < 500
+            return False
         except (OSError, URLError):
             return False
 
