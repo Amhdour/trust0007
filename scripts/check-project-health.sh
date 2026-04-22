@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/compose/docker-compose.production.yml}"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/compose/.env.production}"
+LIVE_COMPOSE_PROJECT_NAME="${LIVE_COMPOSE_PROJECT_NAME:-trust0007_live}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "error: $ENV_FILE is missing. Copy compose/.env.production.example to compose/.env.production first." >&2
@@ -11,7 +12,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 compose() {
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+  docker compose --env-file "$ENV_FILE" -p "$LIVE_COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
 }
 
 required_services=(
@@ -41,10 +42,10 @@ curl -sSf http://127.0.0.1:3000/api/health
 printf '\n'
 
 printf '\n==> Live smoke\n'
-python "$ROOT_DIR/scripts/smoke-live-onyx-handoff.py" --control-plane-base-url http://127.0.0.1:3000
+ENV_FILE="$ENV_FILE" python "$ROOT_DIR/scripts/smoke-live-onyx-handoff.py" --control-plane-base-url http://127.0.0.1:3000
 
 printf '\n==> Dual-runtime evidence bootstrap\n'
-python "$ROOT_DIR/scripts/bootstrap_runtime_evidence.py" --control-plane-base-url http://127.0.0.1:3000
+ENV_FILE="$ENV_FILE" python "$ROOT_DIR/scripts/bootstrap_runtime_evidence.py" --control-plane-base-url http://127.0.0.1:3000
 
 printf '\n==> Focused pytest bundle\n'
 pytest -q \

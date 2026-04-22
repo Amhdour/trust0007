@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/compose/.env.production}"
 COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/compose/docker-compose.production.yml}"
+LIVE_COMPOSE_PROJECT_NAME="${LIVE_COMPOSE_PROJECT_NAME:-trust0007_live}"
 STATE_DIR="${STATE_DIR:-$ROOT_DIR/.runtime/live-governed}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
@@ -47,7 +48,7 @@ require_value() {
 }
 
 compose() {
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+  docker compose --env-file "$ENV_FILE" -p "$LIVE_COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
 }
 
 wait_for_http() {
@@ -80,6 +81,45 @@ wait_for_json_http() {
   done
   echo "error: ${name} did not return a successful response at ${url}" >&2
   exit 1
+}
+
+wait_for_success_http() {
+  local name="$1"
+  local url="$2"
+  local attempts="${3:-90}"
+  local i
+  for ((i=1; i<=attempts; i+=1)); do
+    if curl -fsS "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "error: ${name} did not return a successful response at ${url}" >&2
+  exit 1
+}
+
+runtime_reachable_on_host() {
+  local port="$1"
+  local path="$2"
+  local code
+  code="$(curl -sS -L -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}${path}" || true)"
+  [[ "$code" != "000" ]]
+}
+
+ensure_runtime_target() {
+  local service_name="$1"
+  local label="$2"
+  local port="$3"
+  local path="$4"
+
+  if runtime_reachable_on_host "$port" "$path"; then
+    echo "Using existing ${label} runtime target on host port ${port}."
+    return 0
+  fi
+
+  echo "Starting ${label} runtime placeholder..."
+  compose up -d "$service_name"
+  wait_for_http "$label runtime" "http://127.0.0.1:${port}${path}"
 }
 
 KEYCLOAK_BOOTSTRAP_DIR="/opt/keycloak/data/bootstrap"
@@ -181,6 +221,37 @@ output_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 PY
 }
 
+write_rendered_tenant_mapper() {
+  local output_file="$1"
+  local tenant_id="$2"
+  python - "$output_file" "$tenant_id" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+output_file = Path(sys.argv[1])
+tenant_id = sys.argv[2]
+
+payload = {
+    "name": "tenant_id",
+    "protocol": "openid-connect",
+    "protocolMapper": "oidc-hardcoded-claim-mapper",
+    "consentRequired": False,
+    "config": {
+        "claim.name": "tenant_id",
+        "claim.value": tenant_id,
+        "jsonType.label": "String",
+        "id.token.claim": "true",
+        "access.token.claim": "true",
+        "userinfo.token.claim": "true",
+        "introspection.token.claim": "true",
+    },
+}
+
+output_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+PY
+}
+
 read_json_value() {
   local file_path="$1"
   local expression="$2"
@@ -221,10 +292,12 @@ apply_tenant_mapper() {
   fi
 
   mappers_json="$(kcadm get "clients/${client_uuid}/protocol-mappers/models" -r "$KEYCLOAK_REALM")"
-  while IFS= read -r mapper_id; do
-    [[ -n "$mapper_id" ]] || continue
-    kcadm delete "clients/${client_uuid}/protocol-mappers/models/${mapper_id}" -r "$KEYCLOAK_REALM" >/dev/null
-  done < <(printf '%s' "$mappers_json" | json_mapper_ids_by_name "tenant_id")
+  for mapper_name in tenant_id tenant_id_hardcoded; do
+    while IFS= read -r mapper_id; do
+      [[ -n "$mapper_id" ]] || continue
+      kcadm delete "clients/${client_uuid}/protocol-mappers/models/${mapper_id}" -r "$KEYCLOAK_REALM" >/dev/null
+    done < <(printf '%s' "$mappers_json" | json_mapper_ids_by_name "$mapper_name")
+  done
   kcadm create "clients/${client_uuid}/protocol-mappers/models" -r "$KEYCLOAK_REALM" -f "$KEYCLOAK_MAPPER_REMOTE_FILE" >/dev/null
 }
 
@@ -257,14 +330,16 @@ require_value "LIVE_PASSWORD" "$LIVE_PASSWORD"
 
 RENDERED_REALM_FILE="$STATE_DIR/realm-governed.rendered.json"
 RENDERED_USER_FILE="$STATE_DIR/keycloak-live-user.rendered.json"
+RENDERED_MAPPER_FILE="$STATE_DIR/keycloak-tenant-id-mapper.rendered.json"
 
 write_rendered_realm "$REALM_TEMPLATE" "$RENDERED_REALM_FILE" "$KEYCLOAK_REALM" "$CONTROL_PLANE_BASE_URL"
 write_rendered_user "$RENDERED_USER_FILE" "$LIVE_USERNAME" "$LIVE_PASSWORD" "$TENANT_ID"
+write_rendered_tenant_mapper "$RENDERED_MAPPER_FILE" "$TENANT_ID"
 
 echo "Starting staging-style governed dependency services..."
 compose up -d keycloak_db db keycloak vault qdrant opa langfuse grafana superset envoy
 
-wait_for_http "Keycloak" "http://127.0.0.1:${KEYCLOAK_HOST_PORT}/health/ready"
+wait_for_success_http "Keycloak" "http://127.0.0.1:${KEYCLOAK_HOST_PORT}/realms/master/.well-known/openid-configuration"
 wait_for_http "Vault" "http://127.0.0.1:8200/v1/sys/health"
 wait_for_json_http "Qdrant" "http://127.0.0.1:6333/collections"
 wait_for_json_http "OPA" "http://127.0.0.1:8181/v1/data"
@@ -303,7 +378,7 @@ vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault kv put secret/runtime/${TENANT_ID}/
 echo "Copying Keycloak bootstrap assets into the container..."
 compose exec -T keycloak sh -lc "mkdir -p ${KEYCLOAK_BOOTSTRAP_DIR}"
 compose cp "$RENDERED_REALM_FILE" "keycloak:${KEYCLOAK_REALM_REMOTE_FILE}" >/dev/null
-compose cp "$MAPPER_FILE" "keycloak:${KEYCLOAK_MAPPER_REMOTE_FILE}" >/dev/null
+compose cp "$RENDERED_MAPPER_FILE" "keycloak:${KEYCLOAK_MAPPER_REMOTE_FILE}" >/dev/null
 compose cp "$RENDERED_USER_FILE" "keycloak:${KEYCLOAK_USER_REMOTE_FILE}" >/dev/null
 
 echo "Ensuring realm ${KEYCLOAK_REALM} exists..."
@@ -389,11 +464,14 @@ with urlopen(points_req, timeout=10) as response:
     response.read()
 PY
 
+ensure_runtime_target "onyx_runtime" "Onyx" "${CONTROL_PLANE_ONYX_PORT:-3010}" "/app/"
+ensure_runtime_target "dify_runtime" "Dify" "${CONTROL_PLANE_DIFY_PORT:-8088}" "/apps/"
+
 echo "Starting live control-plane container..."
 CONTROL_PLANE_GOVERNANCE_MODE=live \
 CONTROL_PLANE_ENVIRONMENT_MODE=staging \
 CONTROL_PLANE_VAULT_TOKEN="$VAULT_TOKEN" \
-compose up -d --build control_plane
+compose up -d --build --no-deps control_plane
 
 wait_for_json_http "Control plane" "http://127.0.0.1:3000/api/health"
 

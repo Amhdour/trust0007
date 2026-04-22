@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from backend.integration_adapter.repository import DIFY_RUNTIME_PROOF_PATH, ONYX_RUNTIME_PROOF_PATH, read_json
+
 from .evidence import evidence_age_status, latest_timestamp, load_evidence_bundle
 from .incidents import active_incident_controls
 from .runtime_registry import runtime_descriptor, runtime_descriptors
@@ -54,11 +56,32 @@ def _runtime_matches(runtime_id: str, summary: dict[str, Any], tool: dict[str, A
     return not observed or observed == runtime_id
 
 
+def _runtime_specific_proof_current(root: Path, runtime_id: str) -> bool:
+    proof_path = ONYX_RUNTIME_PROOF_PATH if runtime_id == "onyx" else DIFY_RUNTIME_PROOF_PATH
+    proof = read_json(root / proof_path)
+    if not proof:
+        return False
+    observed_runtime = str(proof.get("runtime_key") or proof.get("runtime_target") or runtime_id)
+    if observed_runtime != runtime_id:
+        return False
+    if not bool(proof.get("handoff_allowed", False)):
+        return False
+    if str(proof.get("evidence_mode", "")) == "demo":
+        return False
+    continuity = proof.get("continuity", {}) if isinstance(proof.get("continuity"), dict) else {}
+    if str(continuity.get("status", "")) in {"", "no_runtime_activity", "blocked_before_runtime"}:
+        return False
+    observed_at = latest_timestamp(proof)
+    if observed_at and evidence_age_status(observed_at) == "stale":
+        return False
+    return True
+
+
 def compute_runtime_readiness(root: Path | None = None, *, runtime_id: str = "onyx") -> RuntimeReadiness:
     descriptor = runtime_descriptor(runtime_id)
     bundle = load_evidence_bundle(root)
     refs = bundle.evidence_refs()
-    runtime_current = _runtime_matches(descriptor.runtime_id, bundle.summary, bundle.tool)
+    runtime_current = _runtime_matches(descriptor.runtime_id, bundle.summary, bundle.tool) or _runtime_specific_proof_current(bundle.root, descriptor.runtime_id)
     signals: list[EvidenceSignal] = []
 
     identity_ok = bool(bundle.identity.get("authenticated", False))

@@ -4,6 +4,7 @@ CLIENT_NAME ?= Example Client
 CLIENT_SLUG ?= example-client
 ENGAGEMENT_TRACK ?= secure-starter-kit
 PRIMARY_RUNTIME ?= Onyx
+LIVE_COMPOSE_PROJECT_NAME ?= trust0007_live
 
 demo:
 	bash scripts/run-demo.sh
@@ -55,10 +56,10 @@ bootstrap-live:
 	bash scripts/bootstrap-live-governed-path.sh
 
 smoke-live:
-	python scripts/smoke-live-onyx-handoff.py
+	ENV_FILE=compose/.env.production python scripts/smoke-live-onyx-handoff.py
 
 test-live-stack:
-	pytest -q tests/integration/test_strict_live_onyx_end_to_end.py tests/integration/test_strict_live_dify_end_to_end.py
+	LIVE_STACK_ENV_FILE=compose/.env.production LIVE_COMPOSE_PROJECT_NAME=$(LIVE_COMPOSE_PROJECT_NAME) pytest -q tests/integration/test_strict_live_onyx_end_to_end.py tests/integration/test_strict_live_dify_end_to_end.py
 
 health-check:
 	bash scripts/check-project-health.sh
@@ -73,7 +74,7 @@ verify-live:
 	bash scripts/verify-live-env.sh .env.live
 
 up-live: verify-live
-	docker compose --env-file .env.live -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml up -d
+	docker compose --env-file .env.live -p $(LIVE_COMPOSE_PROJECT_NAME) -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml up -d
 
 down-live:
-	docker compose --env-file .env.live -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml down
+	docker compose --env-file .env.live -p $(LIVE_COMPOSE_PROJECT_NAME) -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml down

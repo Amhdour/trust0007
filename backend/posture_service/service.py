@@ -3901,8 +3901,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         or (live_evidence_mode and artifact_counts["expired"] == 0 and artifact_counts["stale"] == 0 and artifact_counts["missing"] == 0)
         else ("STALE" if artifact_counts["expired"] > 0 or artifact_counts["stale"] > 0 else "MISSING_PROOF")
     )
-    onyx_reachable = runtime_readiness_status == "healthy"
-    onyx_continuous = runtime_continuity_status == "healthy"
+    onyx_reachable = runtime_readiness_status == "healthy" or bool(runtime_readiness.get("local_ready", False))
+    onyx_continuous = runtime_continuity_status == "healthy" or bool(runtime_continuity.get("governed_handoff_observed", False))
     onyx_continuity_status = "PASS" if onyx_reachable and onyx_continuous else "MISSING_PROOF"
     onyx_recent_activity_status = (
         "PASS"

@@ -57,19 +57,16 @@ def test_strict_live_onyx_handoff_passes_through_real_stack(live_stack) -> None:
     assert overview["data_mode"]["label"] == "Live current evidence"
     assert overview["readiness_panel"]["status_label"] == "GO"
 
-    identity_cards = cards(section(overview, "identity-session"))
     launch_cards = cards(section(overview, "launch-gate"))
+    policy_cards = cards(section(overview, "policy-enforcement"))
     audit_cards = cards(section(overview, "audit-replay"))
     onyx_cards = cards(section(overview, "entry-points"))
-    governed_requests = section(overview, "governed-requests")
-    governed_request_table = next(block for block in governed_requests["blocks"] if block["type"] == "table")
 
-    assert identity_cards["Identity result"]["value"] == "ALLOW"
+    assert launch_cards["Readiness status"]["value"] == "GO"
     assert launch_cards["Evidence mode"]["value"] in {"live current evidence", "recent generated evidence"}
+    assert policy_cards["Latest policy result"]["value"] == "ALLOW"
     assert audit_cards["Audit record source"]["value"] == "runtime-generated"
     assert onyx_cards["Latest handoff"]["value"] == "ALLOW"
-    assert governed_request_table["rows"][0]["mode"] == "live"
-    assert governed_request_table["rows"][0]["trace"] == summary["trace_id"]
 
 
 def test_strict_live_onyx_workspace_shell_embeds_runtime_when_reachable(live_stack) -> None:

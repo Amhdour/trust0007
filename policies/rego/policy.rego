@@ -16,6 +16,7 @@ tool_rules := object.get(runtime_policy, "tools", {})
 surface_rules := object.get(object.get(runtime_policy, "surfaces", {}), "path_policies", [])
 identity_rules := object.get(runtime_policy, "identity", {})
 retrieval_rules := object.get(runtime_policy, "retrieval", {})
+runtime_controls := object.get(runtime_policy, "runtime_controls", {})
 
 request_ctx := object.get(input, "request", {})
 identity_ctx := object.get(input, "identity", {})
@@ -27,6 +28,9 @@ requested_query := object.get(request_ctx, "query", object.get(metadata, "surfac
 requested_tools := object.get(input, "requested_tools", [])
 retrieval_needed := object.get(retrieval_ctx, "needed", object.get(input, "retrieval_needed", false))
 retrieval_source := object.get(retrieval_ctx, "source", object.get(input, "retrieval_source", ""))
+runtime_key := object.get(metadata, "runtime_key", object.get(metadata, "runtime_target", ""))
+runtime_control := object.get(runtime_controls, runtime_key, {})
+requested_mcp_server := object.get(metadata, "requested_mcp_server", "")
 prompt := lower(object.get(input, "prompt", ""))
 requested_evidence_mode := lower(object.get(request_ctx, "evidence_mode", object.get(metadata, "evidence_mode", "")))
 identity_source := lower(object.get(identity_ctx, "source", object.get(metadata, "identity_source", "")))
@@ -163,6 +167,20 @@ unallowlisted_tool_used if {
   not tool in forbidden_tools
 }
 
+mcp_governance_required if {
+  runtime_key == "dify"
+  object.get(runtime_control, "require_mcp_governance", false)
+}
+
+mcp_server_allowed if {
+  not mcp_governance_required
+}
+
+mcp_server_allowed if {
+  mcp_governance_required
+  requested_mcp_server in object.get(runtime_control, "mcp_allowed_servers", [])
+}
+
 allow if {
   tenant_present
   live_identity_satisfied
@@ -173,6 +191,7 @@ allow if {
   retrieval_source_allowed
   not forbidden_tool_used
   not unallowlisted_tool_used
+  mcp_server_allowed
 }
 
 reason_code := "tenant.missing" if {
@@ -203,6 +222,12 @@ reason_code := "tenant.missing" if {
   not tool in allowed_tools
   not tool in confirmation_required_tools
   not tool in forbidden_tools
+} else := sprintf("policy.mcp_server_not_allowed:%s", [requested_mcp_server]) if {
+  not mcp_server_allowed
+  requested_mcp_server != ""
+} else := "policy.mcp_server_not_allowed:missing" if {
+  not mcp_server_allowed
+  requested_mcp_server == ""
 } else := "policy.default_deny"
 
 decision := {

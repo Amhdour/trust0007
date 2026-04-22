@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from http.client import RemoteDisconnected
 import json
 import os
 from pathlib import Path
@@ -33,15 +34,21 @@ def _request_text(
     timeout: float = 20.0,
 ) -> HTTPResponse:
     request = Request(url, data=data, headers=headers or {}, method=method)
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            return HTTPResponse(
-                int(getattr(response, "status", 200)),
-                response.read().decode("utf-8"),
-                getattr(response, "geturl", lambda: url)(),
-            )
-    except HTTPError as exc:
-        return HTTPResponse(exc.code, exc.read().decode("utf-8"), getattr(exc, "geturl", lambda: url)())
+    for attempt in range(5):
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                return HTTPResponse(
+                    int(getattr(response, "status", 200)),
+                    response.read().decode("utf-8"),
+                    getattr(response, "geturl", lambda: url)(),
+                )
+        except HTTPError as exc:
+            return HTTPResponse(exc.code, exc.read().decode("utf-8"), getattr(exc, "geturl", lambda: url)())
+        except (OSError, RemoteDisconnected, URLError):
+            if attempt == 4:
+                raise
+            time.sleep(2)
+    raise RuntimeError(f"request failed after retries: {url}")
 
 
 def _request_json(
@@ -61,25 +68,40 @@ def _request_json(
 class LiveStackHarness:
     def __init__(self, repo_root: Path) -> None:
         self.repo_root = repo_root
-        self.control_plane_base_url = os.environ.get("CONTROL_PLANE_BASE_URL", "http://127.0.0.1:3000").rstrip("/")
-        self.keycloak_base_url = os.environ.get("KEYCLOAK_BASE_URL", "http://127.0.0.1:18080").rstrip("/")
-        self.realm = os.environ.get("KEYCLOAK_REALM", "umbrella")
-        self.client_id = os.environ.get("SMOKE_CLIENT_ID", "governed-smoke-client")
-        self.username = os.environ.get("LIVE_USERNAME", "governed-live-admin")
-        self.password = os.environ.get("LIVE_PASSWORD", "change-me")
-        self.scope = os.environ.get("KEYCLOAK_SCOPE", "openid email profile")
         self.compose_file = Path(
             os.environ.get("LIVE_STACK_COMPOSE_FILE", str(repo_root / "compose" / "docker-compose.production.yml"))
         )
         self.env_file = Path(os.environ.get("LIVE_STACK_ENV_FILE", str(repo_root / "compose" / ".env.production")))
+        self.compose_project_name = os.environ.get("LIVE_COMPOSE_PROJECT_NAME", "trust0007_live")
+        self.control_plane_base_url = self._setting("CONTROL_PLANE_BASE_URL", "http://127.0.0.1:3000").rstrip("/")
+        self.keycloak_base_url = self._setting("KEYCLOAK_BASE_URL", "http://127.0.0.1:18080").rstrip("/")
+        self.realm = self._setting("KEYCLOAK_REALM", "umbrella")
+        self.client_id = self._setting("SMOKE_CLIENT_ID", "governed-smoke-client")
+        self.username = self._setting("LIVE_USERNAME", "governed-live-admin")
+        self.password = self._setting("LIVE_PASSWORD", "change-me")
+        self.scope = self._setting("KEYCLOAK_SCOPE", "openid email profile")
         self.vault_init_file = Path(
             os.environ.get("VAULT_INIT_FILE", str(repo_root / ".runtime" / "live-governed" / "vault-init.json"))
         )
 
+    def _setting(self, key: str, default: str) -> str:
+        explicit = os.environ.get(key, "").strip()
+        if explicit:
+            return explicit
+        if self.env_file.exists():
+            for raw_line in self.env_file.read_text(encoding="utf-8").splitlines():
+                stripped = raw_line.strip()
+                if not stripped or stripped.startswith("#") or "=" not in raw_line:
+                    continue
+                found_key, value = raw_line.split("=", 1)
+                if found_key.strip() == key:
+                    return value.strip()
+        return default
+
     def require_ready(self) -> None:
         if self._status_code(f"{self.control_plane_base_url}/api/health") != 200:
             pytest.skip("live governed stack is not running at the configured control-plane URL")
-        if self._status_code(f"{self.keycloak_base_url}/health/ready") != 200:
+        if self._status_code(f"{self.keycloak_base_url}/realms/{self.realm}/.well-known/openid-configuration") != 200:
             pytest.skip("Keycloak is not ready for the live governed stack tests")
 
     @property
@@ -164,6 +186,8 @@ class LiveStackHarness:
             "compose",
             "--env-file",
             str(self.env_file),
+            "-p",
+            self.compose_project_name,
             "-f",
             str(self.compose_file),
             *args,
@@ -186,12 +210,12 @@ class LiveStackHarness:
                 return int(getattr(response, "status", 200))
         except HTTPError as exc:
             return exc.code
-        except URLError:
+        except (OSError, RemoteDisconnected, URLError):
             return None
 
     def _wait_until_unreachable(self, service_name: str) -> None:
         check_url = {
-            "keycloak": f"{self.keycloak_base_url}/health/ready",
+            "keycloak": f"{self.keycloak_base_url}/realms/{self.realm}/.well-known/openid-configuration",
             "opa": "http://127.0.0.1:8181/v1/data",
             "qdrant": "http://127.0.0.1:6333/collections",
             "vault": "http://127.0.0.1:8200/v1/sys/health",
@@ -207,7 +231,7 @@ class LiveStackHarness:
 
     def _wait_until_ready(self, service_name: str) -> None:
         if service_name == "keycloak":
-            url = f"{self.keycloak_base_url}/health/ready"
+            url = f"{self.keycloak_base_url}/realms/{self.realm}/.well-known/openid-configuration"
             expected = {200}
         elif service_name == "opa":
             url = "http://127.0.0.1:8181/v1/data"
@@ -237,7 +261,38 @@ class LiveStackHarness:
         if not unseal_keys:
             raise RuntimeError("vault init state file does not contain an unseal key")
 
-        status_output = self._compose("exec", "-T", "vault", "sh", "-lc", "VAULT_ADDR=http://127.0.0.1:8200 vault status -format=json")
+        status_output = ""
+        for attempt in range(30):
+            command = [
+                "docker",
+                "compose",
+                "--env-file",
+                str(self.env_file),
+                "-p",
+                self.compose_project_name,
+                "-f",
+                str(self.compose_file),
+                "exec",
+                "-T",
+                "vault",
+                "sh",
+                "-lc",
+                "VAULT_ADDR=http://127.0.0.1:8200 vault status -format=json",
+            ]
+            completed = subprocess.run(
+                command,
+                cwd=self.repo_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if completed.stdout.strip():
+                status_output = completed.stdout
+                break
+            if attempt == 29:
+                detail = (completed.stderr or completed.stdout).strip()
+                raise RuntimeError(detail or "vault status did not return JSON")
+            time.sleep(2)
         status_payload = json.loads(status_output)
         if not status_payload.get("sealed", False):
             return

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from html import escape
 import json
 import mimetypes
@@ -180,6 +181,8 @@ def _runtime_target_path(target: RuntimeTarget, requested_path: str) -> str:
     normalized = requested_path if requested_path.startswith("/") else f"/{requested_path.lstrip('/')}"
     if target.key == "onyx" and normalized == "/app":
         return "/app/"
+    if target.key == "dify" and normalized == "/apps":
+        return "/apps/"
     return normalized
 
 
@@ -859,6 +862,7 @@ def _record_runtime_proof(
         )
     else:
         proof = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "requested_path": requested_path,
             "trace_id": trace_id,
             "session_id": session_id,
@@ -1247,6 +1251,10 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             self._serve_live_front_door_logout()
             return
 
+        if path.startswith("/runtime-proxy/"):
+            self._serve_runtime_proxy(parsed)
+            return
+
         if path.startswith("/launch/"):
             runtime_key = path.removeprefix("/launch/").strip().lower()
             if runtime_key in RUNTIME_REGISTRY:
@@ -1455,6 +1463,89 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     def _serve_dify_handoff(self, requested_path: str) -> None:
         """Backward-compatible wrapper retained for legacy tests/callers."""
         ControlPlaneRequestHandler._serve_runtime_handoff(self, requested_path, runtime="dify")
+
+    def _serve_runtime_proxy(self, parsed) -> None:
+        """Proxy runtime UI assets through the dashboard origin after launch approval."""
+        remainder = parsed.path.removeprefix("/runtime-proxy/").lstrip("/")
+        runtime_key, _, proxied_path = remainder.partition("/")
+        target = RUNTIME_REGISTRY.get(runtime_key.strip().lower())
+        if not target:
+            self._send_json({"error": "unknown_runtime_proxy"}, status=HTTPStatus.NOT_FOUND)
+            return
+
+        upstream_path = f"/{proxied_path}" if proxied_path else "/"
+        upstream_url = f"{_runtime_local_base_url(target)}{upstream_path}"
+        if parsed.query:
+            upstream_url = f"{upstream_url}?{parsed.query}"
+
+        try:
+            request = Request(
+                upstream_url,
+                headers={
+                    "User-Agent": self.headers.get("User-Agent", "trust-control-plane-runtime-proxy"),
+                    "Accept": self.headers.get("Accept", "*/*"),
+                },
+            )
+            with urlopen(request, timeout=15) as response:
+                status = getattr(response, "status", HTTPStatus.OK.value)
+                body = response.read()
+                headers = dict(response.headers.items())
+        except HTTPError as exc:
+            status = exc.code
+            body = exc.read()
+            headers = dict(exc.headers.items())
+        except (TimeoutError, URLError, OSError) as exc:
+            self._send_json(
+                {"error": "runtime_proxy_unreachable", "runtime": target.key, "detail": str(exc)},
+                status=HTTPStatus.BAD_GATEWAY,
+            )
+            return
+
+        content_type = headers.get("Content-Type", "")
+        prefix = f"/runtime-proxy/{target.key}"
+        if any(marker in content_type for marker in ("text/html", "text/css", "javascript", "application/json")):
+            try:
+                text = body.decode("utf-8")
+                for needle, replacement in (
+                    ('href="/', f'href="{prefix}/'),
+                    ('src="/', f'src="{prefix}/'),
+                    ('action="/', f'action="{prefix}/'),
+                    ('url(/', f'url({prefix}/'),
+                    ('"/_next/', f'"{prefix}/_next/'),
+                    ("'/_next/", f"'{prefix}/_next/"),
+                    ('"/console/', f'"{prefix}/console/'),
+                    ('"/api/', f'"{prefix}/api/'),
+                    ('"/files/', f'"{prefix}/files/'),
+                    ('"/auth/', f'"{prefix}/auth/'),
+                ):
+                    text = text.replace(needle, replacement)
+                body = text.encode("utf-8")
+            except UnicodeDecodeError:
+                pass
+
+        self.send_response(status)
+        hop_by_hop = {
+            "connection",
+            "content-length",
+            "transfer-encoding",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailers",
+            "upgrade",
+            "x-frame-options",
+        }
+        for header, value in headers.items():
+            lower = header.lower()
+            if lower in hop_by_hop:
+                continue
+            if lower == "location" and value.startswith("/"):
+                value = f"{prefix}{value}"
+            self.send_header(header, value)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _serve_runtime_handoff(self, requested_path: str, *, runtime: str = "onyx") -> None:
         """Serve runtime handoff with governance enforcement.
@@ -1784,17 +1875,19 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 f'<a class="surface-link{" is-active" if href == launch_view_href(safe_path, mode="live", view="embedded") else ""}" href="{href}">{label}</a>'
                 for label, href in workspace_nav
             )
+            dashboard_frame_url = f"/runtime-proxy/{runtime_name}{runtime_path}"
+            runtime_open_href = dashboard_frame_url if local_ready else public_url
             workspace_main_markup = ""
             frame_callout_markup = ""
-            if codespaces_visible:
+            if local_ready:
                 frame_callout_markup = (
-                    f'<p class="frame-status">The live runtime target responded to the public dashboard handoff, so you can use {runtime_title} here without leaving the control-plane shell.</p>'
+                    f'<p class="frame-status">The live runtime target responded through the dashboard-owned proxy, so you can use {runtime_title} here without leaving the control-plane shell.</p>'
                 )
                 workspace_main_markup = f"""
       <section class="workspace-runtime" aria-label="Live {runtime_title} runtime">
         <iframe
           class="runtime-frame"
-          src="{public_url}"
+          src="{dashboard_frame_url}"
           title="Live {runtime_title} runtime for {safe_path_html}"
           loading="eager"
           referrerpolicy="no-referrer"
@@ -1803,12 +1896,12 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 """
             else:
                 frame_callout_markup = f"""
-        <div class="status-note">The live handoff passed, but the browser still cannot reach the public {runtime_title} port yet. Use the checklist below to bring the runtime online and then re-check governance.</div>
+        <div class="status-note">The live handoff passed, but the dashboard cannot reach the local {runtime_title} service yet. Use the checklist below to bring the runtime online and then re-check governance.</div>
 """
                 workspace_main_markup = f"""
       <div class="runtime-placeholder">
         <h2>Runtime frame is not reachable yet</h2>
-        <p>The dashboard approved this live handoff, but the public {runtime_title} port is not reachable from the browser yet for <code>{safe_path_html}</code>.</p>
+        <p>The dashboard approved this live handoff, but the local {runtime_title} service is not reachable through the control-plane proxy yet for <code>{safe_path_html}</code>.</p>
         <ol class="runtime-fallback-list">
           <li>Start or repair the local {runtime_title} service.</li>
           <li>Expose port <code>{runtime_port}</code> in the Codespaces <strong>Ports</strong> tab if the public URL is still hidden behind the tunnel.</li>
@@ -1823,7 +1916,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             runtime_health_note_markup = ""
             if codespaces_visible and not local_ready:
                 runtime_health_note_markup = (
-                    '<div class="status-note">Local runtime health is still degraded. The dashboard is showing the live surface only because the public target responded.</div>'
+                    '<div class="status-note">Public runtime health is visible, but local proxy health is still degraded. The dashboard will wait for local proxy reachability before embedding the runtime.</div>'
                 )
 
             body = f"""<!doctype html>
@@ -2179,7 +2272,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
           Governance approved the live handoff for <code>{safe_path_html}</code>. This page keeps the control-plane context, traceability, and runtime access together in one dashboard-owned workspace.
         </p>
         <div class="toolbar">
-          <a class="primary" href="{public_url}" target="_blank" rel="noreferrer">Open in new tab</a>
+          <a class="primary" href="{runtime_open_href}" target="_blank" rel="noreferrer">Open in new tab</a>
           <a href="/">Return to dashboard</a>
           <a href="{launch_view_href(safe_path, mode='live', view='embedded')}">Re-check governance</a>
         </div>

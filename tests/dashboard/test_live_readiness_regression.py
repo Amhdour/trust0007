@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import backend.posture_service.service as posture_service_module
 from backend.posture_service.service import build_control_plane_dashboard
 
 
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 def _healthy_live_summary() -> dict:
+    timestamp = _now()
     return {
-        "generated_at": "2026-04-20T10:00:00+00:00",
+        "generated_at": timestamp,
         "trace_id": "trace-live-1",
         "request_id": "req-live-1",
         "session_id": "sess-live-1",
@@ -49,7 +56,7 @@ def test_dashboard_reaches_go_for_healthy_live_configuration(monkeypatch) -> Non
     )
     monkeypatch.setattr(posture_service_module, "load_latest_governed_flow_summary", lambda root: _healthy_live_summary())
     monkeypatch.setattr(posture_service_module, "load_latest_governed_request_feed", lambda root: [{
-        "timestamp": "2026-04-20T10:00:00+00:00",
+        "timestamp": _now(),
         "trace_id": "trace-live-1",
         "session_id": "sess-live-1",
         "tenant_id": "tenant-a",
@@ -62,10 +69,10 @@ def test_dashboard_reaches_go_for_healthy_live_configuration(monkeypatch) -> Non
         "reason_codes": ["policy.allow"],
         "artifact_refs": {"governed_flow_summary": "overlays/myStarterKit/artifacts/governed-flow-summary.json"},
     }])
-    monkeypatch.setattr(posture_service_module, "load_latest_identity_evidence", lambda root: {"live": True, "authenticated": True, "captured_at": "2026-04-20T10:00:00+00:00"})
-    monkeypatch.setattr(posture_service_module, "load_latest_policy_evidence", lambda root: {"allow": True, "engine": "opa", "engine_reachable": True, "captured_at": "2026-04-20T10:00:00+00:00"})
-    monkeypatch.setattr(posture_service_module, "load_latest_retrieval_evidence", lambda root: {"allow": True, "live_backend": True, "backend_verified": True, "captured_at": "2026-04-20T10:00:00+00:00"})
-    monkeypatch.setattr(posture_service_module, "load_latest_secret_evidence", lambda root: {"required": True, "fetched": True, "captured_at": "2026-04-20T10:00:00+00:00"})
+    monkeypatch.setattr(posture_service_module, "load_latest_identity_evidence", lambda root: {"live": True, "authenticated": True, "captured_at": _now()})
+    monkeypatch.setattr(posture_service_module, "load_latest_policy_evidence", lambda root: {"allow": True, "engine": "opa", "engine_reachable": True, "captured_at": _now()})
+    monkeypatch.setattr(posture_service_module, "load_latest_retrieval_evidence", lambda root: {"allow": True, "live_backend": True, "backend_verified": True, "captured_at": _now()})
+    monkeypatch.setattr(posture_service_module, "load_latest_secret_evidence", lambda root: {"required": True, "fetched": True, "captured_at": _now()})
     monkeypatch.setattr(posture_service_module, "load_latest_trace_correlation", lambda root: {"complete": True, "trace_id": "trace-live-1", "session_id": "sess-live-1"})
     monkeypatch.setattr(posture_service_module, "load_latest_audit_records", lambda root: [{"stage": "handoff", "trace_id": "trace-live-1"}])
     monkeypatch.setattr(posture_service_module, "build_launch_gate_summary", lambda root: {
@@ -74,13 +81,13 @@ def test_dashboard_reaches_go_for_healthy_live_configuration(monkeypatch) -> Non
         "control_coverage": "6/6",
         "findings": [],
         "residual_risks": [],
-        "generated_at": "2026-04-20T10:00:00+00:00",
+        "generated_at": _now(),
     })
     monkeypatch.setattr(posture_service_module, "build_activity_snapshot", lambda root, limit=12: {
-        "generated_at": "2026-04-20T10:00:00+00:00",
+            "generated_at": _now(),
         "entries": [
             {
-                "timestamp": "2026-04-20T10:00:00+00:00",
+                    "timestamp": _now(),
                 "source": "onyx",
                 "source_label": "Onyx Web",
                 "event_type": "Onyx web request",
@@ -139,7 +146,7 @@ def test_dashboard_remains_fail_closed_when_critical_proof_missing(monkeypatch) 
         "control_coverage": "4/6",
         "findings": [{"control": "live_retrieval", "status": "fail", "summary": "Retrieval proof missing"}],
         "residual_risks": ["missing:retrieval.live_backend"],
-        "generated_at": "2026-04-20T10:00:00+00:00",
+        "generated_at": _now(),
     })
     monkeypatch.setattr(posture_service_module, "load_latest_retrieval_evidence", lambda root: {"allow": False, "live_backend": False})
 
@@ -158,7 +165,7 @@ def test_dify_health_does_not_mask_critical_onyx_runtime_failure(monkeypatch) ->
         "control_coverage": "6/6",
         "findings": [],
         "residual_risks": [],
-        "generated_at": "2026-04-20T10:00:00+00:00",
+        "generated_at": _now(),
     })
     monkeypatch.setattr(posture_service_module, "load_latest_onyx_runtime_proof", lambda root: {
         "continuity": {"status": "no_runtime_activity", "label": "No recent activity", "detail": "No activity."},
