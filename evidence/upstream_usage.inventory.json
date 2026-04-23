@@ -424,34 +424,6 @@
       "missing_integration_depth": "The current repo-owned Langfuse bridge does not import this SDK or depend on its snapshot.",
       "removal_impact": "Would only remove local SDK reference material for future direct Langfuse instrumentation work.",
       "status_notes": "Do not imply the vendored SDK is part of the current evidence path."
-    },
-    {
-      "component_name": "Onyx Agent",
-      "upstream_path": "upstream/onyx",
-      "classification": "reference_only",
-      "runtime_path_status": "reference",
-      "recommended_action": "keep as reference",
-      "runtime_role": "Reference runtime candidate for comparative architecture exploration.",
-      "runtime_location": "Vendored snapshot placeholder under upstream/ with no active compose wiring or dashboard dependency.",
-      "necessity_rationale": "Maintains a documented upstream slot for Onyx Agent while current governed runtime proofs continue to target Onyx.",
-      "integration_points": [
-        "evidence/upstream.lock.json",
-        "evidence/upstream_usage.inventory.json",
-        "docs/submodules.md"
-      ],
-      "governance_signals": [
-        "No runtime governance signals are currently emitted for Onyx Agent."
-      ],
-      "evidence_artifacts": [
-        "upstream/onyx/README.md"
-      ],
-      "dashboard_visible": false,
-      "enabled_in_dev": false,
-      "enabled_in_prod_sim": false,
-      "source_snapshot_required": false,
-      "missing_integration_depth": "No compose service, governed handoff adapter, policy evidence, or dashboard lane depends on Onyx Agent today.",
-      "removal_impact": "Removing the snapshot would remove only a reference slot; no current runtime or reviewer workflow would break.",
-      "status_notes": "Keep Onyx Agent as an opt-in reference upstream until a dedicated integration plan exists."
     }
   ]
 }

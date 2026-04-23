@@ -1120,8 +1120,19 @@ def _dependency_summary_markup(flow_result: GovernedFlowEvaluator | object | Non
 class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     server_version = "control-plane/0.1"
 
+    @staticmethod
+    def _normalize_launch_request_target(raw_path: str) -> str:
+        """Normalize malformed launch URLs into canonical query-string form.
+
+        Example: /launch/onyx/agent&mcp=foo -> /launch/onyx/agent?mcp=foo
+        """
+        if "?" not in raw_path and raw_path.startswith("/launch/") and "&" in raw_path:
+            return raw_path.replace("&", "?", 1)
+        return raw_path
+
     def do_GET(self) -> None:  # noqa: N802
-        parsed = urlparse(getattr(self, "path", "/"))
+        raw_path = self._normalize_launch_request_target(getattr(self, "path", "/"))
+        parsed = urlparse(raw_path)
         path = parsed.path
 
         if path in {"/api/health", "/healthz"}:
@@ -1248,10 +1259,17 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         capability_lane_paths = {
             "/launch/onyx/chat": "/app",
             "/launch/onyx/search": "/app?chatMode=search",
-            "/launch/onyx/agent": "/app/agents",
-            "/launch/onyx/mcp": "/app/agents?chatMode=mcp",
+            "/launch/onyx/agent": "/apps",
+            "/launch/onyx/mcp": "/apps?chatMode=mcp",
             "/launch/onyx/admin": "/admin",
         }
+        if path.startswith("/launch/onyx/agent/"):
+            lane_suffix = path.removeprefix("/launch/onyx/agent")
+            requested_path = f"/app{lane_suffix}"
+            if parsed.query:
+                requested_path = f"{requested_path}{'&' if '?' in requested_path else '?'}{parsed.query}"
+            self._serve_runtime_handoff(requested_path, runtime="onyx")
+            return
         if path in capability_lane_paths:
             requested_path = capability_lane_paths[path]
             if parsed.query:
@@ -1620,7 +1638,15 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         target = _runtime_target(runtime or "onyx")
         runtime_name = target.key
         runtime_title = target.label
-        parsed = urlparse(getattr(self, "path", f"/launch/{runtime_name}?path={quote(safe_path, safe='/?=&')}"))
+        if runtime_name == "onyx":
+            if safe_path.startswith("/apps"):
+                runtime_title = "Onyx Agent"
+            elif safe_path.startswith("/app/agents"):
+                runtime_title = "Onyx Agents"
+        raw_request_path = ControlPlaneRequestHandler._normalize_launch_request_target(
+            getattr(self, "path", f"/launch/{runtime_name}?path={quote(safe_path, safe='/?=&')}")
+        )
+        parsed = urlparse(raw_request_path)
         query = parse_qs(parsed.query)
         flow_mode = _governance_mode(query.get("mode", [""])[-1] if query.get("mode") else "")
         view_mode = query.get("view", [""])[-1].strip().lower()

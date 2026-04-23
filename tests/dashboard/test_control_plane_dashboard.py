@@ -59,8 +59,8 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "renderDrilldownTabs" in js
     assert "ACTIVE_DRILLDOWN_SECTION_IDS" in js
     assert "AI Trust & Security Control Plane" in js
-    assert "Trust Proof" in js
-    assert "Security Posture" in js
+    assert "Safety checks" in js
+    assert "Security snapshot" in js
     assert "readiness.decision" in js
     assert "trustProof.identity_proven" in js
     assert "security.blocked_actions_count" in js
@@ -233,8 +233,8 @@ def test_frontend_runtime_portfolio_has_dual_runtime_fallback_and_link_binding_l
     assert 'launch_href: "/launch/onyx/agent?mode=live&view=embedded"' in js
     assert "runtimeByKey.get(\"onyx\")?.launch_href" in js
     assert "runtimeByKey.get(\"onyx\")?.launch_href" in js
-    assert "liveRuntimeLink.setAttribute(\"href\", onyxLaunchHref)" in js
-    assert "liveOnyx AgentLink.setAttribute(\"href\", onyxLaunchHref)" in js
+    assert "liveRuntimeLink.setAttribute(\"href\", onyxChatLaunchHref)" in js
+    assert "liveOnyxAgentLink.setAttribute(\"href\", onyxAgentLaunchHref)" in js
 
 
 def test_fallback_mode_banner_uses_review_only_copy(monkeypatch) -> None:

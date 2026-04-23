@@ -28,7 +28,7 @@ const trustScorecardRoot = document.getElementById("trust-scorecard-root");
 const secondaryContextRoot = document.getElementById("secondary-context-root");
 const runtimePortfolioRoot = document.getElementById("runtime-portfolio-root");
 const liveRuntimeLink = document.getElementById("live-runtime-link");
-const liveOnyx AgentLink = document.getElementById("live-onyx-link");
+const liveOnyxAgentLink = document.getElementById("live-onyx-link");
 const viewEvidenceLink = document.getElementById("view-evidence-link");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
 
@@ -2440,13 +2440,13 @@ function renderTrustScorecard(payload) {
 
 function renderDecisionHero(payload) {
   if (heroEyebrow) {
-    heroEyebrow.textContent = "Runtime Decision Surface";
+    heroEyebrow.textContent = "Start here";
   }
   if (heroTitle) {
     heroTitle.textContent = payload.title || "AI Trust & Security Control Plane";
   }
   if (heroCopy) {
-    heroCopy.textContent = payload.subtitle || "Trust, Security, and Launch Posture for Governed Runtime Lanes.";
+    heroCopy.textContent = payload.subtitle || "See if launch is safe, what is blocked, and what to do next.";
   }
 
   const readiness = payload.readiness || {};
@@ -2461,8 +2461,8 @@ function renderDecisionHero(payload) {
     heroMeta.innerHTML = `
       <span class="${statusClass(payload.data_mode?.status || "neutral")}">${escapeHtml(decision)}</span>
       <span class="chip">Score ${escapeHtml(String(score))}</span>
-      <span class="chip">Top blocker: ${escapeHtml(topBlocker)}</span>
-      <span class="chip">Evidence mode: ${escapeHtml(String(evidenceMode).toUpperCase())}</span>
+      <span class="chip">Main issue: ${escapeHtml(topBlocker)}</span>
+      <span class="chip">Proof source: ${escapeHtml(String(evidenceMode).toUpperCase())}</span>
       ${
         Number.isFinite(Number(freshnessSla.fresh_hours))
           ? `<span class="chip">Freshness SLA: fresh ≤${escapeHtml(String(freshnessSla.fresh_hours))}h · stale >${escapeHtml(
@@ -2473,7 +2473,7 @@ function renderDecisionHero(payload) {
       ${
         topBlockers.length
           ? `<div class="hero-blocker-panel">
-              <strong>Why not GO?</strong>
+              <strong>What's blocking launch?</strong>
               <ul>
                 ${topBlockers
                   .slice(0, 5)
@@ -2491,20 +2491,20 @@ function renderDecisionHero(payload) {
 
   const runtimeItems = Array.isArray(payload.runtime_portfolio?.runtimes) ? payload.runtime_portfolio.runtimes : [];
   const runtimeByKey = new Map(runtimeItems.map((item) => [String(item?.runtime_key || item?.id || "").toLowerCase(), item]));
-  const onyxLaunchHref = String(
+  const onyxChatLaunchHref = String(
     runtimeByKey.get("onyx")?.launch_href || runtimeByKey.get("onyx")?.launch_route || "/launch/onyx?path=/app&mode=live&view=embedded",
   );
-  const onyxLaunchHref = String(
-    runtimeByKey.get("onyx")?.launch_href || runtimeByKey.get("onyx")?.launch_route || "/launch/onyx/agent?mode=live&view=embedded",
+  const onyxAgentLaunchHref = String(
+    runtimeByKey.get("onyx")?.agent_launch_href || "/launch/onyx/agent?mode=live&view=embedded",
   );
 
   if (liveRuntimeLink) {
     liveRuntimeLink.textContent = "Open Onyx";
-    liveRuntimeLink.setAttribute("href", onyxLaunchHref);
+    liveRuntimeLink.setAttribute("href", onyxChatLaunchHref);
   }
-  if (liveOnyx AgentLink) {
-    liveOnyx AgentLink.textContent = "Open Onyx Agent";
-    liveOnyx AgentLink.setAttribute("href", onyxLaunchHref);
+  if (liveOnyxAgentLink) {
+    liveOnyxAgentLink.textContent = "Open Onyx Agent";
+    liveOnyxAgentLink.setAttribute("href", onyxAgentLaunchHref);
   }
   if (viewEvidenceLink) {
     viewEvidenceLink.setAttribute("href", "#dashboard-root");
@@ -2520,7 +2520,7 @@ function renderDecisionHero(payload) {
       .join("");
     const onyxRuntime = runtimeByKey.get("onyx");
     if (onyxRuntime) {
-      runtimeLanesMeta.innerHTML += `<span class="chip">Onyx continuity critical: ${escapeHtml(String(onyxRuntime.status || "unknown").toUpperCase())}</span>`;
+      runtimeLanesMeta.innerHTML += `<span class="chip">Onyx service health: ${escapeHtml(String(onyxRuntime.status || "unknown").toUpperCase())}</span>`;
     }
   }
 }
@@ -2547,19 +2547,19 @@ function renderHomepagePanels(payload) {
   panelRoot.innerHTML = `
     <article class="decision-panel">
       <p class="eyebrow">Panel A</p>
-      <h3>Runtime Readiness</h3>
+      <h3>Can we launch now?</h3>
       <ul class="decision-list">
         <li><span>Decision</span><strong>${escapeHtml(readiness.decision || "UNKNOWN")}</strong></li>
         <li><span>Readiness score</span><strong>${escapeHtml(String(readiness.readiness_score ?? "n/a"))}</strong></li>
         <li><span>Latest handoff</span><strong>${escapeHtml(readiness.latest_handoff_decision || "UNKNOWN")}</strong></li>
-        <li><span>Evidence mode</span><strong>${escapeHtml(String(readiness.evidence_mode || "unavailable").toUpperCase())}</strong></li>
-        <li><span>Top blocker</span><strong>${escapeHtml(readiness.top_blocker || "No blocker listed.")}</strong></li>
+        <li><span>Proof source</span><strong>${escapeHtml(String(readiness.evidence_mode || "unavailable").toUpperCase())}</strong></li>
+        <li><span>Main issue</span><strong>${escapeHtml(readiness.top_blocker || "No blocker listed.")}</strong></li>
         <li><span>Onyx continuity</span><strong>${escapeHtml(String(onyxRuntime.status || "unknown").toUpperCase())}</strong></li>
         <li><span>Last updated</span><strong>${escapeHtml(formatTimestamp(readiness.last_updated))}</strong></li>
       </ul>
       ${
         Array.isArray(readiness.top_blockers) && readiness.top_blockers.length
-          ? `<div class="decision-failing-controls"><p class="metric-label">Why not GO?</p><ul>${readiness.top_blockers
+          ? `<div class="decision-failing-controls"><p class="metric-label">What's blocking launch?</p><ul>${readiness.top_blockers
               .slice(0, 5)
               .map((item) => `<li><strong>${escapeHtml(item.label || "Blocker")}</strong>: ${escapeHtml(item.detail || "")}</li>`)
               .join("")}</ul></div>`
@@ -2568,7 +2568,7 @@ function renderHomepagePanels(payload) {
     </article>
     <article class="decision-panel">
       <p class="eyebrow">Panel B</p>
-      <h3>Trust Proof</h3>
+      <h3>Safety checks</h3>
       <ul class="decision-list">
         ${trustRow("Identity", trust.identity_proven ? "Proven" : "Missing")}
         ${trustRow("Policy", trust.policy_proven ? "Proven" : "Missing")}
@@ -2585,7 +2585,7 @@ function renderHomepagePanels(payload) {
     </article>
     <article class="decision-panel">
       <p class="eyebrow">Panel C</p>
-      <h3>Security Posture</h3>
+      <h3>Security snapshot</h3>
       <ul class="decision-list">
         <li><span>Blocked actions</span><strong>${escapeHtml(String(security.blocked_actions_count ?? 0))}</strong></li>
         <li><span>Denied events</span><strong>${escapeHtml(String(security.denied_events_count ?? 0))}</strong></li>

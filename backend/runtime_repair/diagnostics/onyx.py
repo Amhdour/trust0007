@@ -85,6 +85,20 @@ class OnyxDiagnosticAdapter(RuntimeDiagnosticAdapter):
                     details={"observed_at": retrieval_timestamp},
                 )
             )
+        denied_tools = [str(tool).strip() for tool in bundle.tool.get("denied_tools", []) if str(tool).strip()]
+        if denied_tools:
+            findings.append(
+                self._finding(
+                    context,
+                    Severity.HIGH,
+                    FailureCategory.TOOLS_MCP,
+                    "Tool/MCP governance denied runtime actions",
+                    "Onyx tool governance shows denied tool or MCP actions that block runtime workflows.",
+                    evidence_used=[bundle.evidence_refs().get("tool", "")],
+                    reason_codes=[f"tools_mcp.denied:{tool}" for tool in denied_tools],
+                    details={"denied_tools": denied_tools, "tool_evidence": bundle.tool},
+                )
+            )
         proof_path = str(runtime_proof.get("requested_path", ""))
         if proof_path and proof_path not in {"/app", "/app/"}:
             findings.append(
