@@ -5,6 +5,7 @@ from enum import Enum
 
 class RuntimeLane(str, Enum):
     ONYX = "onyx"
+    DIFY = "dify"
 
 
 class FailureCategory(str, Enum):

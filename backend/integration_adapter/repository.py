@@ -27,6 +27,7 @@ RETRIEVAL_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/retrieval-evidence.js
 SECRET_EVIDENCE_PATH = "overlays/myStarterKit/artifacts/secret-evidence.json"
 TRACE_CORRELATION_PATH = "overlays/myStarterKit/artifacts/trace-correlation.json"
 ONYX_RUNTIME_PROOF_PATH = "overlays/myStarterKit/artifacts/onyx-runtime-proof.json"
+DIFY_RUNTIME_PROOF_PATH = "overlays/myStarterKit/artifacts/dify-runtime-proof.json"
 RUNTIME_PROOF_PATH = "overlays/myStarterKit/artifacts/runtime-proof.json"
 AUDIT_RECORDS_PATH = "overlays/myStarterKit/artifacts/audit-records.jsonl"
 UPSTREAM_INVENTORY_CLASSIFICATIONS = {

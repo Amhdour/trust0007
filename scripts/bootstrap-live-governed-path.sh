@@ -4,37 +4,59 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/compose/.env.production}"
 COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/compose/docker-compose.production.yml}"
+if [[ -n "${ENV_FILES:-}" ]]; then
+  IFS=":" read -r -a ENV_FILE_LIST <<<"$ENV_FILES"
+else
+  ENV_FILE_LIST=("$ENV_FILE")
+fi
+if [[ -n "${COMPOSE_FILES:-}" ]]; then
+  IFS=":" read -r -a COMPOSE_FILE_LIST <<<"$COMPOSE_FILES"
+else
+  IFS=":" read -r -a COMPOSE_FILE_LIST <<<"$COMPOSE_FILE"
+fi
 LIVE_COMPOSE_PROJECT_NAME="${LIVE_COMPOSE_PROJECT_NAME:-trust0007_live}"
 STATE_DIR="${STATE_DIR:-$ROOT_DIR/.runtime/live-governed}"
 
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "error: $ENV_FILE is missing. Copy compose/.env.production.example to compose/.env.production and replace the placeholder secrets first." >&2
-  exit 1
-fi
+for env_file in "${ENV_FILE_LIST[@]}"; do
+  if [[ ! -f "$env_file" ]]; then
+    echo "error: $env_file is missing. Copy compose/.env.production.example to compose/.env.production and replace the placeholder secrets first." >&2
+    exit 1
+  fi
+done
+
+for compose_file in "${COMPOSE_FILE_LIST[@]}"; do
+  if [[ ! -f "$compose_file" ]]; then
+    echo "error: compose file not found: $compose_file" >&2
+    exit 1
+  fi
+done
 
 mkdir -p "$STATE_DIR"
 
 read_env_value() {
   local key="$1"
-  python - "$ENV_FILE" "$key" <<'PY'
+  python - "$key" "${ENV_FILE_LIST[@]}" <<'PY'
 from pathlib import Path
 import sys
 
-env_path = Path(sys.argv[1])
-target = sys.argv[2]
+target = sys.argv[1]
+env_paths = [Path(path) for path in sys.argv[2:]]
+found = ""
 
-if not env_path.exists():
-    raise SystemExit(0)
+for env_path in env_paths:
+    if not env_path.exists():
+        continue
 
-for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-    stripped = raw_line.strip()
-    if not stripped or stripped.startswith("#") or "=" not in raw_line:
-        continue
-    key, value = raw_line.split("=", 1)
-    if key.strip() != target:
-        continue
-    print(value.strip())
-    raise SystemExit(0)
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in raw_line:
+            continue
+        key, value = raw_line.split("=", 1)
+        if key.strip() != target:
+            continue
+        found = value.strip()
+
+print(found)
 PY
 }
 
@@ -48,7 +70,16 @@ require_value() {
 }
 
 compose() {
-  docker compose --env-file "$ENV_FILE" -p "$LIVE_COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
+  local args=()
+  local env_file compose_file
+  for env_file in "${ENV_FILE_LIST[@]}"; do
+    args+=(--env-file "$env_file")
+  done
+  args+=(-p "$LIVE_COMPOSE_PROJECT_NAME")
+  for compose_file in "${COMPOSE_FILE_LIST[@]}"; do
+    args+=(-f "$compose_file")
+  done
+  docker compose "${args[@]}" "$@"
 }
 
 wait_for_http() {
@@ -118,7 +149,7 @@ ensure_runtime_target() {
   fi
 
   echo "Starting ${label} runtime placeholder..."
-  compose up -d "$service_name"
+  compose up -d --force-recreate "$service_name"
   wait_for_http "$label runtime" "http://127.0.0.1:${port}${path}"
 }
 

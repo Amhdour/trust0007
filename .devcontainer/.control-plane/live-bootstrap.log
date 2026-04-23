@@ -1,20 +1,165 @@
-[2026-04-23T06:35:33Z] bootstrap-live-governed-path: start
+[2026-04-23T10:12:58Z] bootstrap-live-governed-path: start
 Starting staging-style governed dependency services...
-time="2026-04-23T06:35:37Z" level=warning msg="a network with name trust_stack_production exists but was not created for project \"trust0007_live\".\nSet `external: true` to use an existing network"
- Container trust0007_live-grafana-1  Running
+time="2026-04-23T10:12:58Z" level=warning msg="a network with name trust_stack_production exists but was not created for project \"trust0007_live\".\nSet `external: true` to use an existing network"
  Container trust0007_live-superset-1  Running
- Container trust0007_live-qdrant-1  Running
- Container trust0007_live-keycloak_db-1  Running
- Container trust0007_live-db-1  Running
+ Container 217d399ce1b7_trust0007_live-keycloak_db-1  Running
+ Container trust0007_live-keycloak-1  Running
  Container trust0007_live-opa-1  Running
- Container trust0007_live-vault-1  Running
+ Container trust0007_live-grafana-1  Running
+ Container trust0007_live-qdrant-1  Running
+ Container trust0007_live-db-1  Running
  Container trust0007_live-langfuse-1  Running
- Container trust0007_live-keycloak_db-1  Waiting
+ Container trust0007_live-vault-1  Running
  Container trust0007_live-db-1  Waiting
  Container trust0007_live-envoy-1  Starting
- Container trust0007_live-keycloak_db-1  Healthy
- Container trust0007_live-keycloak-1  Starting
- Container trust0007_live-db-1  Healthy
+ Container 217d399ce1b7_trust0007_live-keycloak_db-1  Waiting
  Container trust0007_live-envoy-1  Started
- Container trust0007_live-keycloak-1  Started
-error: Keycloak did not return a successful response at http://127.0.0.1:18080/realms/master/.well-known/openid-configuration
+ Container trust0007_live-db-1  Healthy
+ Container 217d399ce1b7_trust0007_live-keycloak_db-1  Healthy
+Initializing or unsealing Vault...
+Copying Keycloak bootstrap assets into the container...
+ trust0007_live-keycloak-1 copy /workspaces/trust0007/.runtime/live-governed/realm-governed.rendered.json to trust0007_live-keycloak-1:/opt/keycloak/data/bootstrap/realm-governed-template.json Copying
+ trust0007_live-keycloak-1 copy /workspaces/trust0007/.runtime/live-governed/realm-governed.rendered.json to trust0007_live-keycloak-1:/opt/keycloak/data/bootstrap/realm-governed-template.json Copied
+ trust0007_live-keycloak-1 copy /workspaces/trust0007/.runtime/live-governed/keycloak-tenant-id-mapper.rendered.json to trust0007_live-keycloak-1:/opt/keycloak/data/bootstrap/keycloak-tenant-id-mapper.json Copying
+ trust0007_live-keycloak-1 copy /workspaces/trust0007/.runtime/live-governed/keycloak-tenant-id-mapper.rendered.json to trust0007_live-keycloak-1:/opt/keycloak/data/bootstrap/keycloak-tenant-id-mapper.json Copied
+ trust0007_live-keycloak-1 copy /workspaces/trust0007/.runtime/live-governed/keycloak-live-user.rendered.json to trust0007_live-keycloak-1:/opt/keycloak/data/bootstrap/keycloak-live-user.json Copying
+ trust0007_live-keycloak-1 copy /workspaces/trust0007/.runtime/live-governed/keycloak-live-user.rendered.json to trust0007_live-keycloak-1:/opt/keycloak/data/bootstrap/keycloak-live-user.json Copied
+Ensuring realm umbrella exists...
+Logging into http://127.0.0.1:8080 as user admin of realm master
+
+Applying tenant claim mappers to the live clients...
+Logging into http://127.0.0.1:8080 as user admin of realm master
+
+Logging into http://127.0.0.1:8080 as user admin of realm master
+
+Logging into http://127.0.0.1:8080 as user admin of realm master
+Logging into http://127.0.0.1:8080 as user admin of realm master
+Created new model with id 'bc4d6cac-c574-4add-b3ab-305f3886868f'
+Logging into http://127.0.0.1:8080 as user admin of realm master
+
+Logging into http://127.0.0.1:8080 as user admin of realm master
+
+Logging into http://127.0.0.1:8080 as user admin of realm master
+Logging into http://127.0.0.1:8080 as user admin of realm master
+Created new model with id '8dbd327a-6efe-46af-be72-e6c5e2d427bc'
+Ensuring governed live user governed-live-admin exists...
+Logging into http://127.0.0.1:8080 as user admin of realm master
+
+Logging into http://127.0.0.1:8080 as user admin of realm master
+Logging into http://127.0.0.1:8080 as user admin of realm master
+Logging into http://127.0.0.1:8080 as user admin of realm master
+Seeding tenant-scoped Qdrant content...
+Using existing Onyx runtime target on host port 3010.
+Using existing Dify runtime target on host port 8088.
+Starting live control-plane container...
+#1 [internal] load local bake definitions
+#1 reading from stdin 550B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile.control-plane
+#2 transferring dockerfile:
+#2 transferring dockerfile: 635B 0.1s done
+#2 DONE 0.1s
+
+#3 [internal] load metadata for docker.io/library/python:3.12-slim
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [ 1/17] FROM docker.io/library/python:3.12-slim@sha256:520153e2deb359602c9cffd84e491e3431d76e7bf95a3255c9ce9433b76ab99a
+#5 resolve docker.io/library/python:3.12-slim@sha256:520153e2deb359602c9cffd84e491e3431d76e7bf95a3255c9ce9433b76ab99a 0.1s done
+#5 DONE 0.1s
+
+#6 [internal] load build context
+#6 transferring context: 157.25kB 0.2s done
+#6 DONE 0.2s
+
+#5 [ 1/17] FROM docker.io/library/python:3.12-slim@sha256:520153e2deb359602c9cffd84e491e3431d76e7bf95a3255c9ce9433b76ab99a
+#5 DONE 0.1s
+
+#7 [ 2/17] WORKDIR /app
+#7 CACHED
+
+#8 [ 3/17] COPY adapters /app/adapters
+#8 CACHED
+
+#9 [ 4/17] COPY apps /app/apps
+#9 CACHED
+
+#10 [ 5/17] COPY backend /app/backend
+#10 DONE 0.2s
+
+#11 [ 6/17] COPY contracts /app/contracts
+#11 DONE 0.2s
+
+#12 [ 7/17] COPY docs /app/docs
+#12 DONE 0.0s
+
+#13 [ 8/17] COPY evidence /app/evidence
+#13 DONE 0.0s
+
+#14 [ 9/17] COPY frontend /app/frontend
+#14 DONE 0.1s
+
+#15 [10/17] COPY infra /app/infra
+#15 DONE 0.0s
+
+#16 [11/17] COPY launch-gate /app/launch-gate
+#16 DONE 0.0s
+
+#17 [12/17] COPY overlays /app/overlays
+#17 DONE 0.1s
+
+#18 [13/17] COPY policies /app/policies
+#18 DONE 0.0s
+
+#19 [14/17] COPY scripts /app/scripts
+#19 DONE 0.0s
+
+#20 [15/17] COPY telemetry /app/telemetry
+#20 DONE 0.0s
+
+#21 [16/17] COPY README.md /app/README.md
+#21 DONE 0.0s
+
+#22 [17/17] COPY README.template.md /app/README.template.md
+#22 DONE 0.0s
+
+#23 exporting to image
+#23 exporting layers
+#23 exporting layers 0.4s done
+#23 exporting manifest sha256:525c8038a2d5cd62aa3a9b905473cccced464d60b995ae890ca439109d46d834 done
+#23 exporting config sha256:3a61e0b3bd6c6ab94f141fab9423e9e472f4c9268f579d056454011f20f61b71 done
+#23 exporting attestation manifest sha256:014ef1ecadda5bba56dbe1947577f2afb12f67ba0e9b7cf1125a611b26257f64 0.0s done
+#23 exporting manifest list sha256:79686024a5a5054cdd7a1fd992a8beeaf85538ecb938e3f6b7eb99ceb3c20108 done
+#23 naming to docker.io/library/beta011-control-plane:local 0.0s done
+#23 unpacking to docker.io/library/beta011-control-plane:local
+#23 unpacking to docker.io/library/beta011-control-plane:local 0.2s done
+#23 DONE 0.8s
+
+#24 resolving provenance for metadata file
+#24 DONE 0.0s
+ beta011-control-plane:local  Built
+time="2026-04-23T10:13:49Z" level=warning msg="a network with name trust_stack_production exists but was not created for project \"trust0007_live\".\nSet `external: true` to use an existing network"
+ Container trust0007_live-control_plane-1  Recreate
+ Container trust0007_live-control_plane-1  Recreated
+ Container trust0007_live-control_plane-1  Starting
+ Container trust0007_live-control_plane-1  Started
+
+Live governed staging bootstrap complete.
+Control plane: http://127.0.0.1:3000
+Keycloak: http://127.0.0.1:18080
+Realm: umbrella
+User: governed-live-admin
+Tenant: tenant-stage
+Vault state: /workspaces/trust0007/.runtime/live-governed/vault-init.json
+
+Next step:
+  python scripts/smoke-live-onyx-handoff.py
+  python scripts/bootstrap_runtime_evidence.py
+[2026-04-23T10:13:53Z] bootstrap_runtime_evidence: start
+warning: dashboard feed export skipped (PermissionError: [Errno 13] Permission denied: '/workspaces/trust0007/overlays/myStarterKit/artifacts/dashboard')
+runtime evidence bootstrap passed for Onyx and Dify
+[2026-04-23T10:13:55Z] live bootstrap completed
