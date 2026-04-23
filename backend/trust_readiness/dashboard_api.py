@@ -112,15 +112,15 @@ def build_tool_mcp_authorization_posture(root: Path | None = None) -> dict[str, 
     policy = load_runtime_policy_bundle(repo_root(root)).document
     bundle = load_evidence_bundle(root)
     tools = policy.get("tools", {})
-    dify_controls = policy.get("runtime_controls", {}).get("dify", {})
+    onyx_controls = policy.get("runtime_controls", {}).get("onyx", {})
     return {
         "page": "Tool/MCP Authorization Posture",
         "generated_at": _now(),
-        "runtime_id": "dify",
-        "mcp_allowed_servers": dify_controls.get("mcp_allowed_servers", []),
+        "runtime_id": "onyx",
+        "mcp_allowed_servers": onyx_controls.get("mcp_allowed_servers", []),
         "allowed_tools": tools.get("allowed_tools", []),
-        "approval_required_tools": sorted(set(tools.get("confirmation_required_tools", [])) | set(dify_controls.get("approval_required_tools", []))),
-        "approval_required_actions": dify_controls.get("approval_required_actions", []),
+        "approval_required_tools": sorted(set(tools.get("confirmation_required_tools", [])) | set(onyx_controls.get("approval_required_tools", []))),
+        "approval_required_actions": onyx_controls.get("approval_required_actions", []),
         "latest_decision": {
             "requested_tools": bundle.tool.get("requested_tools", []),
             "allowed_tools": bundle.tool.get("allowed_tools", []),

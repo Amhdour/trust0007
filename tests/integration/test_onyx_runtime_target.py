@@ -8,7 +8,7 @@ def test_onyx_is_the_primary_runtime_target() -> None:
 
     assert Path("upstream/onyx").exists()
     assert "Onyx" in payload["runtime_module"]
-    assert "Dify" in payload["runtime_module"]
+    assert "Onyx Agent" in payload["runtime_module"]
 
 
 def test_dashboard_exposes_onyx_entry_points() -> None:
@@ -23,9 +23,9 @@ def test_dashboard_exposes_onyx_entry_points() -> None:
     labels = {item["label"] for item in links}
     hrefs = {item["href"] for item in links}
 
-    assert {"Open Onyx Workspace", "Open Chat", "Open Agents", "Search Knowledge", "Open Dify Apps", "Open Dify Workspace"} <= labels
+    assert {"Open Onyx Workspace", "Open Chat", "Open Agents", "Search Knowledge", "Open Onyx Agent Apps", "Open Onyx Agent Workspace"} <= labels
     assert any("/launch/onyx?path=/app&mode=live&view=embedded" in href for href in hrefs)
     assert any("/launch/onyx?path=/app" in href for href in hrefs) or any("/app" in href for href in hrefs) or any("/raw/docs/onyx-integration.md" in href for href in hrefs)
     assert any("/launch/onyx?path=/app/agents" in href for href in hrefs) or any("/app/agents" in href for href in hrefs) or any("/raw/docs/onyx-integration.md" in href for href in hrefs)
     assert any("/launch/onyx?path=/app?chatMode=search" in href for href in hrefs) or any("chatMode=search" in href for href in hrefs) or any("/raw/docs/onyx-integration.md" in href for href in hrefs)
-    assert any("/launch/dify?path=/apps" in href for href in hrefs)
+    assert any("/launch/onyx/agent" in href for href in hrefs) or any("/launch/onyx?path=/app/agents" in href for href in hrefs)

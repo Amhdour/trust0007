@@ -106,7 +106,7 @@ def _launch(control_plane_base_url: str, runtime: str, path: str, token: str, mc
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate fresh live governed evidence for Onyx and Dify handoff lanes.")
+    parser = argparse.ArgumentParser(description="Generate fresh live governed evidence for Onyx and Onyx Agent handoff lanes.")
     parser.add_argument("--control-plane-base-url", default=_default_control_plane_base_url())
     parser.add_argument("--keycloak-base-url", default=_default_keycloak_base_url())
     parser.add_argument("--realm", default=_setting("KEYCLOAK_REALM", "umbrella"))
@@ -118,7 +118,7 @@ def main() -> int:
     args = parser.parse_args()
 
     token = _mint_token(args.keycloak_base_url, args.realm, args.client_id, args.username, args.password, args.scope)
-    _launch(args.control_plane_base_url, "dify", "/apps", token, mcp_server=args.mcp_server)
+    _launch(args.control_plane_base_url, "onyx", "/apps", token, mcp_server=args.mcp_server)
     # Keep Onyx as the final governed run so retrieval/runtime proof in the
     # top-level summary reflects the RAG lane truthfully.
     _launch(args.control_plane_base_url, "onyx", "/app", token)
@@ -133,7 +133,7 @@ def main() -> int:
         "launch-gate-result.json",
         "governed-flow-summary.json",
         "onyx-runtime-proof.json",
-        "dify-runtime-proof.json",
+        "onyx-agent-runtime-proof.json",
     ]
     missing: list[str] = []
     for name in required:
@@ -159,7 +159,7 @@ def main() -> int:
         detail = (exc.stderr or exc.stdout or "").strip().splitlines()
         suffix = f" ({detail[-1]})" if detail else ""
         print(f"warning: dashboard feed export skipped{suffix}", file=sys.stderr)
-    print("runtime evidence bootstrap passed for Onyx and Dify")
+    print("runtime evidence bootstrap passed for Onyx and Onyx Agent")
     return 0
 
 

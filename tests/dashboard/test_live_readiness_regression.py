@@ -124,8 +124,8 @@ def test_dashboard_reaches_go_for_healthy_live_configuration(monkeypatch) -> Non
     runtime_summary_items = {item["label"]: item for item in payload["command_center"]["runtime_summary"]["items"]}
     assert runtime_summary_items["Reachability"]["value"] == "Runtime reachable"
     assert runtime_summary_items["Continuity"]["value"] == "Path activity seen"
-    dify = next(item for item in payload["runtime_portfolio"]["runtimes"] if item["runtime_key"] == "dify")
-    assert dify["status"] == "healthy"
+    onyx = next(item for item in payload["runtime_portfolio"]["runtimes"] if item["runtime_key"] == "onyx")
+    assert onyx["status"] == "healthy"
 
 
 def test_dashboard_remains_fail_closed_when_critical_proof_missing(monkeypatch) -> None:
@@ -156,7 +156,7 @@ def test_dashboard_remains_fail_closed_when_critical_proof_missing(monkeypatch) 
     assert payload["trust_proof"]["retrieval_proven"] is False
 
 
-def test_dify_health_does_not_mask_critical_onyx_runtime_failure(monkeypatch) -> None:
+def test_onyx_health_does_not_mask_critical_onyx_runtime_failure(monkeypatch) -> None:
     monkeypatch.setenv("CONTROL_PLANE_GOVERNANCE_MODE", "live")
     monkeypatch.setattr(posture_service_module, "load_latest_governed_flow_summary", lambda root: _healthy_live_summary())
     monkeypatch.setattr(posture_service_module, "build_launch_gate_summary", lambda root: {

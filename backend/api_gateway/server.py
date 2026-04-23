@@ -123,19 +123,6 @@ RUNTIME_REGISTRY: dict[str, RuntimeTarget] = {
         default_port=3010,
         default_host="127.0.0.1",
     ),
-    "dify": RuntimeTarget(
-        key="dify",
-        label="Dify",
-        runtime_class="autonomous_agents",
-        default_path="/apps",
-        tool_name="dify",
-        secret_path_suffix="dify",
-        port_env_var="CONTROL_PLANE_DIFY_PORT",
-        host_env_var="CONTROL_PLANE_DIFY_HOST",
-        base_url_env_var="CONTROL_PLANE_DIFY_BASE_URL",
-        default_port=8088,
-        default_host="127.0.0.1",
-    ),
 }
 
 
@@ -182,10 +169,7 @@ def _runtime_local_base_url(target: RuntimeTarget) -> str:
 
 
 def _runtime_target_path(target: RuntimeTarget, requested_path: str) -> str:
-    normalized = requested_path if requested_path.startswith("/") else f"/{requested_path.lstrip('/')}"
-    if target.key == "dify" and normalized == "/apps":
-        return "/apps/"
-    return normalized
+    return requested_path if requested_path.startswith("/") else f"/{requested_path.lstrip('/')}"
 
 
 def _governance_mode(explicit: str = "") -> str:
@@ -248,7 +232,6 @@ def _validate_startup_configuration() -> None:
             "CONTROL_PLANE_OPA_URL",
             "CONTROL_PLANE_QDRANT_URL",
             "CONTROL_PLANE_ONYX_SECRET_PATH",
-            "CONTROL_PLANE_DIFY_SECRET_PATH",
         ]
         for env_name in required_env:
             if not os.environ.get(env_name, "").strip():
@@ -523,13 +506,12 @@ class RuntimePolicyChecker(PolicyChecker):
             if not tenant_sources:
                 return PolicyDecision(allow=False, reasons=[f"policy.data_boundary_not_configured:{request.tenant_id}"])
 
-        if runtime_key == "dify" and bool(runtime_controls.get("require_mcp_governance", False)):
+        if bool(runtime_controls.get("require_mcp_governance", False)):
             allowed_mcp_servers = set(runtime_controls.get("mcp_allowed_servers", []))
-            if not allowed_mcp_servers:
-                return PolicyDecision(allow=False, reasons=["policy.mcp_not_configured:dify"])
-            requested_mcp_server = str(request.metadata.get("requested_mcp_server", "")).strip()
-            if requested_mcp_server and requested_mcp_server not in allowed_mcp_servers:
-                return PolicyDecision(allow=False, reasons=[f"policy.mcp_server_not_allowed:{requested_mcp_server}"])
+            if allowed_mcp_servers:
+                requested_mcp_server = str(request.metadata.get("requested_mcp_server", "")).strip()
+                if requested_mcp_server and requested_mcp_server not in allowed_mcp_servers:
+                    return PolicyDecision(allow=False, reasons=[f"policy.mcp_server_not_allowed:{requested_mcp_server}"])
 
         if requested_path:
             surface_info = _resolve_surface(self._policy, requested_path)
@@ -683,8 +665,6 @@ class RuntimeToolExecutor(ToolExecutor):
 def _runtime_tool_policy_config(policy_context: RuntimePolicyContext) -> ToolPolicyConfig:
     tool_policy = policy_context.document.get("tools", {})
     confirmation_required = set(tool_policy.get("confirmation_required_tools", []))
-    dify_controls = _runtime_controls(policy_context.document, "dify")
-    confirmation_required.update(dify_controls.get("approval_required_tools", []))
     argument_policies = tool_policy.get("argument_policies", {})
     return ToolPolicyConfig(
         tool_allowlist=set(tool_policy.get("allowed_tools", [])),
@@ -1265,6 +1245,20 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             self._serve_runtime_proxy(parsed)
             return
 
+        capability_lane_paths = {
+            "/launch/onyx/chat": "/app",
+            "/launch/onyx/search": "/app?chatMode=search",
+            "/launch/onyx/agent": "/app/agents",
+            "/launch/onyx/mcp": "/app/agents?chatMode=mcp",
+            "/launch/onyx/admin": "/admin",
+        }
+        if path in capability_lane_paths:
+            requested_path = capability_lane_paths[path]
+            if parsed.query:
+                requested_path = f"{requested_path}{'&' if '?' in requested_path else '?'}{parsed.query}"
+            self._serve_runtime_handoff(requested_path, runtime="onyx")
+            return
+
         if path.startswith("/launch/"):
             runtime_key = path.removeprefix("/launch/").strip().lower()
             if runtime_key in RUNTIME_REGISTRY:
@@ -1494,10 +1488,6 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         """Backward-compatible wrapper retained for legacy tests/callers."""
         ControlPlaneRequestHandler._serve_runtime_handoff(self, requested_path, runtime="onyx")
 
-    def _serve_dify_handoff(self, requested_path: str) -> None:
-        """Backward-compatible wrapper retained for legacy tests/callers."""
-        ControlPlaneRequestHandler._serve_runtime_handoff(self, requested_path, runtime="dify")
-
     def _serve_runtime_proxy(self, parsed) -> None:
         """Proxy runtime UI assets through the dashboard origin after launch approval."""
         if parsed.path == "/runtime-proxy/onyx/app/":
@@ -1655,14 +1645,13 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             surface_info = _resolve_surface(policy_context.document, safe_path)
             evaluator = _build_governed_flow_evaluator(policy_context, flow_mode=flow_mode)
             retrieval_needed_for_runtime = live_mode and bool(runtime_controls.get("require_retrieval_security", target.runtime_class == "rag"))
-            requested_mcp_server = query.get("mcp", ["mcp_server.dashboard_control_plane"])[-1]
+            requested_mcp_server = query.get("mcp", [""])[-1]
             requested_action = query.get("action", [""])[-1].strip().lower()
             requested_tools = [target.tool_name]
-            if runtime_name == "dify":
-                approval_required_actions = set(runtime_controls.get("approval_required_actions", []))
-                approval_required_tools = list(runtime_controls.get("approval_required_tools", []))
-                if requested_action and requested_action in approval_required_actions:
-                    requested_tools.extend(approval_required_tools)
+            approval_required_actions = set(runtime_controls.get("approval_required_actions", []))
+            approval_required_tools = list(runtime_controls.get("approval_required_tools", []))
+            if requested_action and requested_action in approval_required_actions:
+                requested_tools.extend(approval_required_tools)
 
             flow_result = evaluator.run(
                 user_id=_dashboard_user_id(),
@@ -1676,7 +1665,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                     "requested_path": safe_path,
                     "runtime_key": runtime_name,
                     "runtime_class": target.runtime_class,
-                    "requested_mcp_server": requested_mcp_server if runtime_name == "dify" else "",
+                    "requested_mcp_server": requested_mcp_server,
                     "surface": surface_info.get("surface", ""),
                     "surface_query": surface_info.get("query", {}),
                 },
@@ -1685,8 +1674,8 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                         "surface": surface_info.get("surface", ""),
                         "path": surface_info.get("path", safe_path),
                         "chat_mode": surface_info.get("query", {}).get("chatMode", ""),
-                        **({"mcp_server": requested_mcp_server} if runtime_name == "dify" else {}),
-                        **({"action": requested_action} if runtime_name == "dify" and requested_action else {}),
+                        **({"mcp_server": requested_mcp_server} if requested_mcp_server else {}),
+                        **({"action": requested_action} if requested_action else {}),
                     }
                 }
                 | (

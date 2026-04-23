@@ -279,27 +279,6 @@
       "snapshot_file_count": 443,
       "snapshot_bytes": 4433304,
       "provenance_mode": "content_fingerprint"
-    },
-    {
-      "component_name": "Dify",
-      "upstream_path": "upstream/dify",
-      "source_repo": "https://github.com/langgenius/dify",
-      "source_owner": "langgenius",
-      "classification": "reference_only",
-      "runtime_path_status": "reference",
-      "integration_owner": "runtime",
-      "tracked_as": "vendored_snapshot",
-      "checkout_policy": "opt_in",
-      "integration_decision": "reference_only",
-      "source_ref": "",
-      "source_commit": "",
-      "refresh_policy": "Refresh only when Dify becomes an evaluated runtime option for governed handoff experiments.",
-      "refresh_notes": "",
-      "last_validated": "2026-04-19",
-      "snapshot_fingerprint": "b43ba9eedcf466d17d89b012081da11a6e55d6055c0fe06fd1ee0918d4ac8550",
-      "snapshot_file_count": 1,
-      "snapshot_bytes": 98,
-      "provenance_mode": "content_fingerprint"
     }
   ]
 }

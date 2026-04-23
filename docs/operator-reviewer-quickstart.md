@@ -15,11 +15,11 @@ Configure the live-mode variables in `compose/.env` before expecting live enforc
 
 - Dashboard path:
   - open `/`
-  - use the Onyx or Dify launch entry points
+  - use the Onyx or Onyx Agent launch entry points
 - API path:
   - call `/api/control-plane/governed-flow?mode=live`
   - or `/launch/onyx?path=/app&mode=live`
-  - or `/launch/dify?path=/apps&mode=live`
+  - or `/launch/onyx/agent&mode=live`
 
 ## 3. Verify live evidence on the dashboard
 
@@ -27,7 +27,7 @@ Check these sections on the homepage:
 
 - `Runtime Portfolio`
 - `Onyx RAG Access`
-- `Dify Agent Access`
+- `Onyx Agent Access`
 - `Policy Enforcement`
 - `Retrieval Boundaries`
 - `Tool and MCP Governance`
@@ -52,7 +52,7 @@ Inspect:
 ```bash
 pytest -q tests/integration/test_live_governed_runtime_dependencies.py
 pytest -q tests/integration/test_strict_live_onyx_end_to_end.py
-pytest -q tests/integration/test_strict_live_dify_end_to_end.py
+pytest -q tests/integration/test_live_end_to_end.py
 ```
 
 That suite covers:

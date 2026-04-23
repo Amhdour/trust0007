@@ -21,7 +21,7 @@ The homepage should stay compact and reviewer-friendly:
 - Minimal hero with current readiness signal
 - Runtime portfolio panel for governed lanes:
   - **Onyx (RAG)**
-  - **Dify (Autonomous Agents)**
+  - **Onyx Agentic (MCP/Tools)**
 - Three primary panels:
   - **Runtime Readiness**
   - **Trust Proof**

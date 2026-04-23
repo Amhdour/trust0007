@@ -29,9 +29,9 @@ def test_tool_policy_blocks_unapproved_mcp_tool_and_requires_privileged_approval
 
     decision = engine.evaluate_tool_authorization(
         {
-            "runtime_id": "dify",
+            "runtime_id": "onyx",
             "mcp_server": "mcp_server.unapproved",
-            "tool_id": "dify_admin",
+            "tool_id": "onyx_admin",
             "risk": "high",
             "action_type": "external_write",
             "approved": False,
@@ -40,7 +40,7 @@ def test_tool_policy_blocks_unapproved_mcp_tool_and_requires_privileged_approval
 
     assert decision.allow is False
     assert "policy.mcp_server_not_allowed:mcp_server.unapproved" in decision.reason_codes
-    assert "tool.approval_required:dify_admin" in decision.reason_codes
+    assert "tool.approval_required:onyx_admin" in decision.reason_codes
 
 
 def test_launch_gate_policy_blocks_stale_evidence_and_unhealthy_sinks() -> None:

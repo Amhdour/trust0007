@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from backend.integration_adapter.repository import (
-    DIFY_RUNTIME_PROOF_PATH,
     ONYX_RUNTIME_PROOF_PATH,
     repo_root,
     read_json,
@@ -416,7 +415,7 @@ class RuntimeDiagnosticAdapter:
 
 
 def proof_path_for_lane(lane: RuntimeLane) -> str:
-    return ONYX_RUNTIME_PROOF_PATH if lane == RuntimeLane.ONYX else DIFY_RUNTIME_PROOF_PATH
+    return ONYX_RUNTIME_PROOF_PATH
 
 
 def host_from_url(url: str) -> str:

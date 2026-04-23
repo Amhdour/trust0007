@@ -39,9 +39,9 @@ def _seed_ready_artifacts(root: Path, *, runtime_id: str = "onyx") -> Path:
             "requested_tools": [runtime_id],
             "allowed_tools": [runtime_id],
             "denied_tools": [],
-            "mcp_governance_required": runtime_id == "dify",
-            "mcp_governed": runtime_id != "dify" or True,
-            "mcp_server": "mcp_server.dashboard_control_plane" if runtime_id == "dify" else "",
+            "mcp_governance_required": runtime_id == "onyx",
+            "mcp_governed": runtime_id != "onyx" or True,
+            "mcp_server": "mcp_server.dashboard_control_plane" if runtime_id == "onyx" else "",
         },
     )
     _write(artifacts / "trace-correlation.json", {**common, "complete": True})
@@ -85,10 +85,10 @@ def test_runtime_readiness_computes_ready_with_exceptions_for_optional_eval_gap(
 
 
 def test_active_incident_control_forces_incident_mode(tmp_path: Path) -> None:
-    _seed_ready_artifacts(tmp_path, runtime_id="dify")
+    _seed_ready_artifacts(tmp_path, runtime_id="onyx")
     append_incident_control(
         root=tmp_path,
-        runtime_id="dify",
+        runtime_id="onyx",
         control_type="tool_disable",
         tenant_id="tenant-dashboard",
         actor_id="secops-1",
@@ -96,7 +96,7 @@ def test_active_incident_control_forces_incident_mode(tmp_path: Path) -> None:
         tool_id="email.send",
     )
 
-    readiness = compute_runtime_readiness(tmp_path, runtime_id="dify")
+    readiness = compute_runtime_readiness(tmp_path, runtime_id="onyx")
 
     assert readiness.state.value == "INCIDENT_MODE"
     assert readiness.launch_allowed is False

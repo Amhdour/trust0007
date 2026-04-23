@@ -28,7 +28,7 @@ const trustScorecardRoot = document.getElementById("trust-scorecard-root");
 const secondaryContextRoot = document.getElementById("secondary-context-root");
 const runtimePortfolioRoot = document.getElementById("runtime-portfolio-root");
 const liveRuntimeLink = document.getElementById("live-runtime-link");
-const liveDifyLink = document.getElementById("live-dify-link");
+const liveOnyx AgentLink = document.getElementById("live-onyx-link");
 const viewEvidenceLink = document.getElementById("view-evidence-link");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
 
@@ -48,12 +48,12 @@ const DASHBOARD_VIEW_MODES = { operator: { label: "Operator" } };
 const SECTION_ID_ALIASES = {
   "launch-gate": "runtime-portfolio",
   "entry-points": "rag-runtime-access",
-  "dify-agent-access": "agent-runtime-access",
+  "onyx-agent-access": "agent-runtime-access",
 };
 const LEGACY_SECTION_ID_BY_CANONICAL = {
   "runtime-portfolio": "launch-gate",
   "rag-runtime-access": "entry-points",
-  "agent-runtime-access": "dify-agent-access",
+  "agent-runtime-access": "onyx-agent-access",
 };
 const ACTIVE_DRILLDOWN_SECTION_IDS = new Set([
   "runtime-portfolio",
@@ -61,7 +61,7 @@ const ACTIVE_DRILLDOWN_SECTION_IDS = new Set([
   "agent-runtime-access",
   "launch-gate",
   "entry-points",
-  "dify-agent-access",
+  "onyx-agent-access",
   "policy-enforcement",
   "retrieval-boundaries",
   "tool-mcp-governance",
@@ -724,7 +724,7 @@ function buildAccessRequirementsMeta(payload) {
     payload.data_mode?.label ? { label: "Evidence", value: payload.data_mode.label, status: "neutral" } : null,
     payload.mode_banner?.label ? { label: "Mode", value: payload.mode_banner.label, status: "neutral" } : null,
     { label: "RAG lane", value: "/launch/onyx?path=/app&mode=live", status: "neutral" },
-    { label: "Agent lane", value: "/launch/dify?path=/apps&mode=live", status: "neutral" },
+    { label: "Agent lane", value: "/launch/onyx/agent&mode=live", status: "neutral" },
   ];
 
   return items.filter(Boolean);
@@ -734,7 +734,7 @@ function renderLiveSessionActions() {
   return `
     <div class="live-session-actions">
       <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/onyx-integration.md">Onyx runtime note</a>
-      <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/dify-integration.md">Dify runtime note</a>
+      <a class="hero-action-button hero-action-button-secondary" href="/raw/docs/onyx-integration.md">Onyx Agent runtime note</a>
     </div>
   `;
 }
@@ -2263,12 +2263,12 @@ function defaultRuntimePortfolio() {
       primary_controls: ["Retrieval boundaries", "Tenant/source policy", "Data-path governance"],
     },
     {
-      name: "Dify",
-      runtime_key: "dify",
+      name: "Onyx Agent",
+      runtime_key: "onyx",
       runtime_class: "Autonomous Agents",
       description: "Agent runtime lane with tool, MCP, and authorization governance.",
       status: "neutral",
-      launch_href: "/launch/dify?path=/apps&mode=live&view=embedded",
+      launch_href: "/launch/onyx/agent?mode=live&view=embedded",
       evidence_href: "#tool-mcp-governance",
       primary_controls: ["Tool authorization", "MCP allowlists", "Agent capability controls"],
     },
@@ -2494,17 +2494,17 @@ function renderDecisionHero(payload) {
   const onyxLaunchHref = String(
     runtimeByKey.get("onyx")?.launch_href || runtimeByKey.get("onyx")?.launch_route || "/launch/onyx?path=/app&mode=live&view=embedded",
   );
-  const difyLaunchHref = String(
-    runtimeByKey.get("dify")?.launch_href || runtimeByKey.get("dify")?.launch_route || "/launch/dify?path=/apps&mode=live&view=embedded",
+  const onyxLaunchHref = String(
+    runtimeByKey.get("onyx")?.launch_href || runtimeByKey.get("onyx")?.launch_route || "/launch/onyx/agent?mode=live&view=embedded",
   );
 
   if (liveRuntimeLink) {
     liveRuntimeLink.textContent = "Open Onyx";
     liveRuntimeLink.setAttribute("href", onyxLaunchHref);
   }
-  if (liveDifyLink) {
-    liveDifyLink.textContent = "Open Dify";
-    liveDifyLink.setAttribute("href", difyLaunchHref);
+  if (liveOnyx AgentLink) {
+    liveOnyx AgentLink.textContent = "Open Onyx Agent";
+    liveOnyx AgentLink.setAttribute("href", onyxLaunchHref);
   }
   if (viewEvidenceLink) {
     viewEvidenceLink.setAttribute("href", "#dashboard-root");

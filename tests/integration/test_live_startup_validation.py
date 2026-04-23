@@ -10,7 +10,7 @@ def test_live_startup_validation_fails_for_dev_environment(monkeypatch: pytest.M
     monkeypatch.setenv("CONTROL_PLANE_ENVIRONMENT_MODE", "dev")
     monkeypatch.setenv("CONTROL_PLANE_VAULT_TOKEN", "token")
     monkeypatch.setenv("CONTROL_PLANE_ONYX_SECRET_PATH", "secret/data/runtime/tenant-stage/onyx")
-    monkeypatch.setenv("CONTROL_PLANE_DIFY_SECRET_PATH", "secret/data/runtime/tenant-stage/dify")
+    monkeypatch.setenv("CONTROL_PLANE_ONYX_SECRET_PATH", "secret/data/runtime/tenant-stage/onyx")
     monkeypatch.setenv("CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS", "true")
 
     with pytest.raises(RuntimeError, match="environment_mode_dev_not_allowed"):
@@ -22,10 +22,10 @@ def test_live_startup_validation_fails_without_required_live_secret_path(monkeyp
     monkeypatch.setenv("CONTROL_PLANE_ENVIRONMENT_MODE", "staging")
     monkeypatch.setenv("CONTROL_PLANE_VAULT_TOKEN", "token")
     monkeypatch.setenv("CONTROL_PLANE_ONYX_SECRET_PATH", "secret/data/runtime/tenant-stage/onyx")
-    monkeypatch.delenv("CONTROL_PLANE_DIFY_SECRET_PATH", raising=False)
+    monkeypatch.delenv("CONTROL_PLANE_ONYX_SECRET_PATH", raising=False)
     monkeypatch.setenv("CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS", "true")
 
-    with pytest.raises(RuntimeError, match="missing_required_env:CONTROL_PLANE_DIFY_SECRET_PATH"):
+    with pytest.raises(RuntimeError, match="missing_required_env:CONTROL_PLANE_ONYX_SECRET_PATH"):
         server._validate_startup_configuration()
 
 
@@ -34,7 +34,7 @@ def test_live_startup_validation_passes_with_hardened_configuration(monkeypatch:
     monkeypatch.setenv("CONTROL_PLANE_ENVIRONMENT_MODE", "staging")
     monkeypatch.setenv("CONTROL_PLANE_VAULT_TOKEN", "token")
     monkeypatch.setenv("CONTROL_PLANE_ONYX_SECRET_PATH", "secret/data/runtime/tenant-stage/onyx")
-    monkeypatch.setenv("CONTROL_PLANE_DIFY_SECRET_PATH", "secret/data/runtime/tenant-stage/dify")
+    monkeypatch.setenv("CONTROL_PLANE_ONYX_SECRET_PATH", "secret/data/runtime/tenant-stage/onyx")
     monkeypatch.setenv("CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS", "true")
     monkeypatch.setenv("CONTROL_PLANE_EXTERNAL_REACHABLE", "false")
     monkeypatch.setenv("CONTROL_PLANE_KEYCLOAK_DEV_MODE", "false")
@@ -56,9 +56,9 @@ def test_runtime_base_url_prefers_explicit_override(monkeypatch: pytest.MonkeyPa
 
 
 def test_runtime_base_url_uses_host_and_port_when_override_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    dify_target = server._runtime_target("dify")
-    monkeypatch.delenv("CONTROL_PLANE_DIFY_BASE_URL", raising=False)
-    monkeypatch.setenv("CONTROL_PLANE_DIFY_HOST", "dify")
-    monkeypatch.setenv("CONTROL_PLANE_DIFY_PORT", "8088")
+    onyx_target = server._runtime_target("onyx")
+    monkeypatch.delenv("CONTROL_PLANE_ONYX_BASE_URL", raising=False)
+    monkeypatch.setenv("CONTROL_PLANE_ONYX_HOST", "onyx")
+    monkeypatch.setenv("CONTROL_PLANE_ONYX_PORT", "8088")
 
-    assert server._runtime_local_base_url(dify_target) == "http://dify:8088"
+    assert server._runtime_local_base_url(onyx_target) == "http://onyx:8088"

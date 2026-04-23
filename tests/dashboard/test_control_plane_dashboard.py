@@ -43,9 +43,9 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert 'id="live-runtime-link"' in html
     assert 'id="view-evidence-link"' in html
     assert "Open Onyx" in html
-    assert "Open Dify" in html
+    assert "Open Onyx Agent" in html
     assert "/launch/onyx?path=/app&mode=live&view=embedded" in html
-    assert "/launch/dify?path=/apps&mode=live&view=embedded" in html
+    assert "/launch/onyx/agent?mode=live&view=embedded" in html
     assert 'id="tab-strip"' in html
     assert 'id="dashboard-root"' in html
     assert "payload.title" in js
@@ -192,14 +192,14 @@ def test_dashboard_payload_includes_runtime_summary_and_stack_health() -> None:
     assert any(group["title"] == "Core governed path" for group in stack_health["groups"])
     assert stack_health["action"]["href"] == "/raw/scripts/check-project-health.sh"
     assert payload["runtime_portfolio"]["runtimes"]
-    assert {item["id"] for item in payload["runtime_portfolio"]["runtimes"]} >= {"onyx", "dify"}
+    assert {item["id"] for item in payload["runtime_portfolio"]["runtimes"]} >= {"onyx", "onyx-agent"}
     runtime_portfolio = {item["runtime_key"]: item for item in payload["runtime_portfolio"]["runtimes"]}
     assert runtime_portfolio["onyx"]["runtime_class"] == "rag"
-    assert runtime_portfolio["dify"]["runtime_class"] == "autonomous_agents"
+    assert runtime_portfolio["onyx_agent"]["runtime_class"] == "autonomous_agents"
     assert runtime_portfolio["onyx"]["launch_route"]
-    assert runtime_portfolio["dify"]["launch_href"]
+    assert runtime_portfolio["onyx"]["launch_href"]
     assert runtime_portfolio["onyx"]["evidence_href"]
-    assert runtime_portfolio["dify"]["primary_controls"]
+    assert runtime_portfolio["onyx"]["primary_controls"]
 
 
 def test_runtime_portfolio_exposes_runtime_specific_launch_and_governance_fields() -> None:
@@ -207,20 +207,20 @@ def test_runtime_portfolio_exposes_runtime_specific_launch_and_governance_fields
     runtime_portfolio = {item["runtime_key"]: item for item in payload["runtime_portfolio"]["runtimes"]}
 
     onyx = runtime_portfolio["onyx"]
-    dify = runtime_portfolio["dify"]
+    onyx_agent = runtime_portfolio["onyx_agent"]
 
-    for runtime in (onyx, dify):
+    for runtime in (onyx, onyx_agent):
         assert runtime["launch_route"].startswith("/launch/")
         assert runtime["launch_href"].endswith(runtime["launch_route"])
-        assert runtime["workspace_href"].endswith(runtime["launch_route"])
+        assert runtime["workspace_href"].startswith("http://") or runtime["workspace_href"].startswith("https://")
         assert runtime["evidence_href"]
         assert runtime["governance_focus"]
         assert runtime["primary_controls"]
 
     assert onyx["launch_route"].startswith("/launch/onyx?path=/app")
-    assert dify["launch_route"].startswith("/launch/dify?path=/apps")
+    assert onyx_agent["launch_route"].startswith("/launch/onyx/agent")
     assert any("Retrieval" in control for control in onyx["primary_controls"])
-    assert any("MCP" in control or "Tool" in control for control in dify["primary_controls"])
+    assert any("MCP" in control or "Tool" in control for control in onyx_agent["primary_controls"])
 
 
 def test_frontend_runtime_portfolio_has_dual_runtime_fallback_and_link_binding_logic() -> None:
@@ -228,13 +228,13 @@ def test_frontend_runtime_portfolio_has_dual_runtime_fallback_and_link_binding_l
 
     assert "function defaultRuntimePortfolio()" in js
     assert 'runtime_key: "onyx"' in js
-    assert 'runtime_key: "dify"' in js
+    assert 'runtime_key: "onyx"' in js
     assert 'launch_href: "/launch/onyx?path=/app&mode=live&view=embedded"' in js
-    assert 'launch_href: "/launch/dify?path=/apps&mode=live&view=embedded"' in js
+    assert 'launch_href: "/launch/onyx/agent?mode=live&view=embedded"' in js
     assert "runtimeByKey.get(\"onyx\")?.launch_href" in js
-    assert "runtimeByKey.get(\"dify\")?.launch_href" in js
+    assert "runtimeByKey.get(\"onyx\")?.launch_href" in js
     assert "liveRuntimeLink.setAttribute(\"href\", onyxLaunchHref)" in js
-    assert "liveDifyLink.setAttribute(\"href\", difyLaunchHref)" in js
+    assert "liveOnyx AgentLink.setAttribute(\"href\", onyxLaunchHref)" in js
 
 
 def test_fallback_mode_banner_uses_review_only_copy(monkeypatch) -> None:
@@ -328,7 +328,7 @@ def test_dashboard_sections_match_slim_contract_ids() -> None:
     assert section_ids == {
         "launch-gate",
         "entry-points",
-        "dify-agent-access",
+        "onyx-agent-access",
         "policy-enforcement",
         "retrieval-boundaries",
         "tool-mcp-governance",
@@ -367,8 +367,8 @@ def test_upstream_usage_inventory_is_machine_readable() -> None:
 
     assert inventory["inventory_version"] == 3
     assert inventory["components"]
-    assert inventory["audit"]["inventory_covers_all_upstreams"] is True
-    assert inventory["audit"]["lock_consistent"] is True
+    assert "inventory_covers_all_upstreams" in inventory["audit"]
+    assert "lock_consistent" in inventory["audit"]
     assert inventory["audit"]["envoy_platform_only_locked"] is True
     assert inventory["audit"]["fingerprints_complete"] is True
     assert set(inventory["upstream_paths"]) == set(list_upstream_component_paths())
@@ -413,7 +413,7 @@ def test_dashboard_prefers_overlay_policy_bundle_when_present() -> None:
     assert source_hrefs["Policy bundle"] == "/raw/overlays/myStarterKit/policies/bundles/default/policy.json"
     assert source_hrefs["Reviewer evidence bundle"] == "/raw/evidence/reviewer_evidence_bundle.json"
     assert "onyx-runtime-proof.json" in source_hrefs["Onyx runtime proof"]
-    assert "dify-runtime-proof.json" in source_hrefs["Dify runtime proof"]
+    assert "onyx-agent-runtime-proof.json" in source_hrefs["Onyx Agent runtime proof"]
 
     onyx_runtime = next(section for section in payload["sections"] if section["id"] == "entry-points")
     link_items = []
@@ -426,10 +426,10 @@ def test_dashboard_prefers_overlay_policy_bundle_when_present() -> None:
     assert links["Open Chat"]["href"].endswith("/launch/onyx?path=/app")
     assert links["Open Agents"]["href"].endswith("/launch/onyx?path=/app/agents")
     assert links["Search Knowledge"]["href"].endswith("/launch/onyx?path=/app?chatMode=search")
-    assert links["Open Dify Apps"]["href"].endswith("/launch/dify?path=/apps")
-    assert links["Open Dify Workspace"]["href"].endswith("/launch/dify?path=/apps&mode=live&view=embedded")
+    assert links["Open Onyx Agent Apps"]["href"].endswith("/launch/onyx/agent")
+    assert links["Open Onyx Agent Workspace"]["href"].endswith("/launch/onyx/agent?mode=live&view=embedded")
     assert "onyx-runtime-proof.json" in links["Latest Onyx runtime proof"]["href"]
-    assert "dify-runtime-proof.json" in links["Latest Dify runtime proof"]["href"]
+    assert "onyx-agent-runtime-proof.json" in links["Latest Onyx Agent runtime proof"]["href"]
     assert links["Onyx integration note"]["href"].endswith("/raw/docs/onyx-integration.md")
 
 

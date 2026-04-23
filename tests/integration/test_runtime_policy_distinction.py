@@ -18,13 +18,13 @@ def _request(*, runtime_key: str, path: str, mcp_server: str = "") -> Normalized
     )
 
 
-def test_runtime_policy_distinguishes_onyx_data_boundary_and_dify_mcp_rules() -> None:
+def test_runtime_policy_distinguishes_onyx_data_boundary_and_onyx_mcp_rules() -> None:
     policy = {
         "runtime_controls": {
             "onyx": {
                 "require_data_boundary": True,
             },
-            "dify": {
+            "onyx": {
                 "require_mcp_governance": True,
                 "mcp_allowed_servers": ["mcp_server.dashboard_control_plane"],
             },
@@ -37,7 +37,7 @@ def test_runtime_policy_distinguishes_onyx_data_boundary_and_dify_mcp_rules() ->
         "surfaces": {
             "path_policies": [
                 {"path": "/app", "surface": "onyx.chat", "allowed_roles": ["tenant_user"]},
-                {"path": "/apps", "surface": "dify.apps", "allowed_roles": ["tenant_user"]},
+                {"path": "/apps", "surface": "onyx.apps", "allowed_roles": ["tenant_user"]},
             ]
         },
     }
@@ -46,28 +46,28 @@ def test_runtime_policy_distinguishes_onyx_data_boundary_and_dify_mcp_rules() ->
     )
 
     onyx_decision = checker.check_policy(_request(runtime_key="onyx", path="/app"))
-    dify_decision = checker.check_policy(
-        _request(runtime_key="dify", path="/apps", mcp_server="mcp_server.dashboard_control_plane")
+    onyx_decision = checker.check_policy(
+        _request(runtime_key="onyx", path="/apps", mcp_server="mcp_server.dashboard_control_plane")
     )
 
     assert onyx_decision.allow is False
     assert "policy.data_boundary_not_configured:tenant-a" in onyx_decision.reasons
 
-    assert dify_decision.allow is True
-    assert dify_decision.reasons == ["policy.allow"]
+    assert onyx_decision.allow is True
+    assert onyx_decision.reasons == ["policy.allow"]
 
 
-def test_runtime_policy_denies_dify_when_mcp_server_not_allowlisted() -> None:
+def test_runtime_policy_denies_onyx_when_mcp_server_not_allowlisted() -> None:
     policy = {
         "runtime_controls": {
-            "dify": {
+            "onyx": {
                 "require_mcp_governance": True,
                 "mcp_allowed_servers": ["mcp_server.dashboard_control_plane"],
             }
         },
         "surfaces": {
             "path_policies": [
-                {"path": "/apps", "surface": "dify.apps", "allowed_roles": ["tenant_user"]},
+                {"path": "/apps", "surface": "onyx.apps", "allowed_roles": ["tenant_user"]},
             ]
         },
     }
@@ -75,7 +75,7 @@ def test_runtime_policy_denies_dify_when_mcp_server_not_allowlisted() -> None:
         RuntimePolicyContext(document=policy, source="inline-test", relative_path="tests/runtime-policy.json")
     )
 
-    dify_decision = checker.check_policy(_request(runtime_key="dify", path="/apps", mcp_server="mcp_server.unapproved"))
+    onyx_decision = checker.check_policy(_request(runtime_key="onyx", path="/apps", mcp_server="mcp_server.unapproved"))
 
-    assert dify_decision.allow is False
-    assert dify_decision.reasons == ["policy.mcp_server_not_allowed:mcp_server.unapproved"]
+    assert onyx_decision.allow is False
+    assert onyx_decision.reasons == ["policy.mcp_server_not_allowed:mcp_server.unapproved"]

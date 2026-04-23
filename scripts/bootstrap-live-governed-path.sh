@@ -372,7 +372,7 @@ fi
 
 vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault secrets enable -path=secret kv-v2 >/dev/null 2>&1 || true"
 vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault kv put secret/runtime/${TENANT_ID}/onyx api_token=runtime-secret >/dev/null"
-vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault kv put secret/runtime/${TENANT_ID}/dify api_token=runtime-secret >/dev/null"
+vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault kv put secret/runtime/${TENANT_ID}/onyx api_token=runtime-secret >/dev/null"
 vault_exec "VAULT_TOKEN=${VAULT_TOKEN} vault kv put secret/runtime/${TENANT_ID}/governed-flow api_token=runtime-secret >/dev/null"
 
 echo "Copying Keycloak bootstrap assets into the container..."
@@ -465,7 +465,7 @@ with urlopen(points_req, timeout=10) as response:
 PY
 
 ensure_runtime_target "onyx_runtime" "Onyx" "${CONTROL_PLANE_ONYX_PORT:-3010}" "/app/"
-ensure_runtime_target "dify_runtime" "Dify" "${CONTROL_PLANE_DIFY_PORT:-8088}" "/apps/"
+ensure_runtime_target "onyx_runtime" "Onyx Agent" "${CONTROL_PLANE_ONYX_PORT:-3010}" "/app/agents"
 
 echo "Starting live control-plane container..."
 CONTROL_PLANE_GOVERNANCE_MODE=live \

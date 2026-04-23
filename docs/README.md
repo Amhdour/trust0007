@@ -1,6 +1,6 @@
 # Docs
 
-Start with `trust-readiness-platform.md` for the repo-first architecture, product module boundaries, readiness state model, Onyx/Dify launch lanes, dashboard APIs, production hardening, threat model, and roadmap. Use `governed-runtime-repair.md` for the repair center diagnostics, bounded remediation policy, evidence/audit model, and Onyx/Dify repair flows.
+Start with `trust-readiness-platform.md` for the repo-first architecture, product module boundaries, readiness state model, Onyx/Onyx Agent launch lanes, dashboard APIs, production hardening, threat model, and roadmap. Use `governed-runtime-repair.md` for the repair center diagnostics, bounded remediation policy, evidence/audit model, and Onyx/Onyx Agent repair flows.
 
 See `repo-bootstrap-assessment.md` for the initial repository map, architecture summary,
 phased implementation plan, and first-file bootstrap sequence.
