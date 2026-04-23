@@ -1,137 +1,20 @@
-[2026-04-22T12:35:38Z] bootstrap-live-governed-path: start
+[2026-04-23T06:35:33Z] bootstrap-live-governed-path: start
 Starting staging-style governed dependency services...
- Container compose-qdrant-1  Recreate
- Container compose-keycloak_db-1  Running
- Container compose-keycloak-1  Recreate
- Container compose-opa-1  Recreate
- Container compose-grafana-1  Recreate
- Container compose-vault-1  Recreate
- Container compose-superset-1  Running
- Container 1986a9baf6c4_compose-superset-1  Stopping
- Container 1986a9baf6c4_compose-superset-1  Stopped
- Container 1986a9baf6c4_compose-superset-1  Removing
- Container 1986a9baf6c4_compose-superset-1  Removed
- Container compose-langfuse-1  Stopping
- Container compose-langfuse-1  Stopped
- Container compose-db-1  Recreate
- Container compose-opa-1  Recreated
- Container compose-envoy-1  Recreate
- Container compose-keycloak-1  Recreated
- Container compose-qdrant-1  Recreated
- Container compose-vault-1  Recreated
- Container compose-envoy-1  Recreated
- Container compose-grafana-1  Recreated
- Container compose-db-1  Recreated
- Container compose-langfuse-1  Recreate
- Container compose-langfuse-1  Recreated
- Container compose-qdrant-1  Starting
- Container compose-grafana-1  Starting
- Container compose-opa-1  Starting
- Container compose-vault-1  Starting
- Container compose-keycloak_db-1  Waiting
- Container compose-db-1  Starting
- Container compose-keycloak_db-1  Healthy
- Container compose-keycloak-1  Starting
- Container compose-grafana-1  Started
- Container compose-opa-1  Started
- Container compose-envoy-1  Starting
- Container compose-vault-1  Started
- Container compose-qdrant-1  Started
- Container compose-db-1  Started
- Container compose-db-1  Waiting
- Container compose-keycloak-1  Started
- Container compose-envoy-1  Started
- Container compose-db-1  Healthy
- Container compose-langfuse-1  Starting
- Container compose-langfuse-1  Started
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-curl: (56) Recv failure: Connection reset by peer
-curl: (52) Empty reply from server
-error: Keycloak did not become reachable at http://127.0.0.1:18080/health/ready
+time="2026-04-23T06:35:37Z" level=warning msg="a network with name trust_stack_production exists but was not created for project \"trust0007_live\".\nSet `external: true` to use an existing network"
+ Container trust0007_live-grafana-1  Running
+ Container trust0007_live-superset-1  Running
+ Container trust0007_live-qdrant-1  Running
+ Container trust0007_live-keycloak_db-1  Running
+ Container trust0007_live-db-1  Running
+ Container trust0007_live-opa-1  Running
+ Container trust0007_live-vault-1  Running
+ Container trust0007_live-langfuse-1  Running
+ Container trust0007_live-keycloak_db-1  Waiting
+ Container trust0007_live-db-1  Waiting
+ Container trust0007_live-envoy-1  Starting
+ Container trust0007_live-keycloak_db-1  Healthy
+ Container trust0007_live-keycloak-1  Starting
+ Container trust0007_live-db-1  Healthy
+ Container trust0007_live-envoy-1  Started
+ Container trust0007_live-keycloak-1  Started
+error: Keycloak did not return a successful response at http://127.0.0.1:18080/realms/master/.well-known/openid-configuration

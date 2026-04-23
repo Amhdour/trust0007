@@ -44,6 +44,8 @@ services:
       GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: ${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}
     ports:
       - "${CONTROL_PLANE_HOST_PORT:-3000}:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - control_plane_artifacts:/app/overlays/myStarterKit/artifacts
       - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -1,4 +1,4 @@
-"""Trust readiness product modules for governed Onyx and Dify runtimes."""
+"""Trust readiness product modules for the Onyx governed runtime."""
 
 from .dashboard_api import (
     build_evidence_audit_page,

@@ -20,7 +20,7 @@ class ReadinessState(str, Enum):
 
 
 SignalStatus = Literal["pass", "fail", "missing", "stale", "degraded", "review"]
-RuntimeClass = Literal["rag", "autonomous_agents"]
+RuntimeClass = Literal["onyx_governed_runtime", "rag"]
 DecisionStatus = Literal["allow", "deny", "review"]
 
 

@@ -107,7 +107,7 @@ class PolicyAsCodeEngine:
 
     def evaluate_tool_authorization(self, request: dict[str, Any]) -> PolicyDecisionTrace:
         rules = ["tools.default_deny"]
-        runtime_id = str(request.get("runtime_id", "dify"))
+        runtime_id = str(request.get("runtime_id", "onyx"))
         mcp_server = str(request.get("mcp_server", ""))
         tool_id = str(request.get("tool_id", ""))
         risk = str(request.get("risk", "high"))
@@ -122,9 +122,9 @@ class PolicyAsCodeEngine:
         privileged_actions = set(controls.get("approval_required_actions", []))
 
         reasons: list[str] = []
-        if runtime_id == "dify" and mcp_server not in allowed_mcp:
+        if bool(controls.get("require_mcp_governance", False)) and mcp_server not in allowed_mcp:
             reasons.append(f"policy.mcp_server_not_allowed:{mcp_server or 'missing'}")
-        rules.append("dify.mcp_server_allowlist")
+        rules.append("onyx.mcp_server_allowlist")
 
         if tool_id not in allowed_tools and tool_id not in approval_required_tools:
             reasons.append(f"tool.not_allowed:{tool_id or 'missing'}")

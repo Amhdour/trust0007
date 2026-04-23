@@ -51,7 +51,7 @@ class GovernedLaunchPlan:
 
 
 class OnyxGovernanceLane:
-    """Governed Onyx launch lane for RAG access.
+    """Governed Onyx launch lane for chat, search, and RAG access.
 
     Onyx is treated as a runtime behind data-boundary and retrieval policy,
     never as an unrestricted direct target.
@@ -96,14 +96,14 @@ class OnyxGovernanceLane:
         )
 
 
-class DifyGovernanceLane:
-    """Governed Dify launch lane for autonomous-agent execution.
+class OnyxAgentGovernanceLane:
+    """Governed Onyx launch lane for agentic and MCP/tool execution.
 
-    Dify is treated as an execution plane behind MCP/tool authorization and
-    approval policy, not as a bypass around control-plane controls.
+    Agentic execution remains inside the Onyx governed runtime model. Tool and
+    MCP access are authorized by control-plane policy before the handoff.
     """
 
-    runtime_id = "dify"
+    runtime_id = "onyx"
 
     def __init__(self, policy_engine: PolicyAsCodeEngine) -> None:
         self._policy = policy_engine
@@ -114,7 +114,7 @@ class DifyGovernanceLane:
             {
                 "runtime_id": self.runtime_id,
                 "mcp_server": request.mcp_server,
-                "tool_id": request.tool_id or runtime_descriptor(self.runtime_id).runtime_id,
+                "tool_id": request.tool_id or "onyx.agent",
                 "risk": request.tool_risk,
                 "action_type": request.action_type,
                 "approved": request.approved,
@@ -141,7 +141,7 @@ class DifyGovernanceLane:
             policy_traces=[tool_trace.to_dict()],
             evidence={
                 "readiness": readiness.to_dict(),
-                "workflow_registration": {
+                "agent_workflow_registration": {
                     "runtime_id": self.runtime_id,
                     "requested_path": request.requested_path,
                     "mcp_server": request.mcp_server,

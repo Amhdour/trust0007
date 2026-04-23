@@ -158,6 +158,10 @@ def _public_service_url(port: int, path: str = "") -> str:
     return f"{base}{path}"
 
 
+def _browser_local_service_url(port: int, path: str = "") -> str:
+    return f"http://127.0.0.1:{port}{path}"
+
+
 def _runtime_target(runtime_key: str) -> RuntimeTarget:
     return RUNTIME_REGISTRY.get(runtime_key.strip().lower(), RUNTIME_REGISTRY["onyx"])
 
@@ -179,8 +183,6 @@ def _runtime_local_base_url(target: RuntimeTarget) -> str:
 
 def _runtime_target_path(target: RuntimeTarget, requested_path: str) -> str:
     normalized = requested_path if requested_path.startswith("/") else f"/{requested_path.lstrip('/')}"
-    if target.key == "onyx" and normalized == "/app":
-        return "/app/"
     if target.key == "dify" and normalized == "/apps":
         return "/apps/"
     return normalized
@@ -1251,6 +1253,14 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             self._serve_live_front_door_logout()
             return
 
+        if path == "/chat":
+            self._redirect("/runtime-proxy/onyx/app" + (f"?{parsed.query}" if parsed.query else ""))
+            return
+
+        if path == "/search":
+            self._redirect("/runtime-proxy/onyx/search" + (f"?{parsed.query}" if parsed.query else ""))
+            return
+
         if path.startswith("/runtime-proxy/"):
             self._serve_runtime_proxy(parsed)
             return
@@ -1267,6 +1277,11 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(getattr(self, "path", "/"))
         path = parsed.path
+
+        if path.startswith("/runtime-proxy/"):
+            self._serve_runtime_proxy(parsed)
+            return
+
         payload = self._read_json_body()
 
         for prefix, handler in (
@@ -1280,6 +1295,25 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 return
 
         self._send_json({"error": "not_found", "path": path}, status=HTTPStatus.NOT_FOUND)
+
+    def do_PUT(self) -> None:  # noqa: N802
+        self._serve_mutating_request()
+
+    def do_PATCH(self) -> None:  # noqa: N802
+        self._serve_mutating_request()
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        self._serve_mutating_request()
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self._serve_mutating_request()
+
+    def _serve_mutating_request(self) -> None:
+        parsed = urlparse(getattr(self, "path", "/"))
+        if parsed.path.startswith("/runtime-proxy/"):
+            self._serve_runtime_proxy(parsed)
+            return
+        self._send_json({"error": "not_found", "path": parsed.path}, status=HTTPStatus.NOT_FOUND)
 
     def log_message(self, format: str, *args: object) -> None:  # noqa: A003
         return
@@ -1466,6 +1500,10 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
     def _serve_runtime_proxy(self, parsed) -> None:
         """Proxy runtime UI assets through the dashboard origin after launch approval."""
+        if parsed.path == "/runtime-proxy/onyx/app/":
+            self._redirect("/runtime-proxy/onyx/app" + (f"?{parsed.query}" if parsed.query else ""))
+            return
+
         remainder = parsed.path.removeprefix("/runtime-proxy/").lstrip("/")
         runtime_key, _, proxied_path = remainder.partition("/")
         target = RUNTIME_REGISTRY.get(runtime_key.strip().lower())
@@ -1474,17 +1512,38 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             return
 
         upstream_path = f"/{proxied_path}" if proxied_path else "/"
+        if target.key == "onyx" and upstream_path == "/chat":
+            self._redirect(f"/runtime-proxy/{target.key}/app" + (f"?{parsed.query}" if parsed.query else ""))
+            return
+
         upstream_url = f"{_runtime_local_base_url(target)}{upstream_path}"
         if parsed.query:
             upstream_url = f"{upstream_url}?{parsed.query}"
 
+        method = getattr(self, "command", "GET").upper()
+        request_body = None
+        if method not in {"GET", "HEAD"}:
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                length = 0
+            request_body = self.rfile.read(length) if length > 0 else b""
+
+        forwarded_headers = {
+            "User-Agent": self.headers.get("User-Agent", "trust-control-plane-runtime-proxy"),
+            "Accept": self.headers.get("Accept", "*/*"),
+        }
+        for header in ("Content-Type", "Cookie", "Authorization", "X-Requested-With"):
+            value = self.headers.get(header, "")
+            if value:
+                forwarded_headers[header] = value
+
         try:
             request = Request(
                 upstream_url,
-                headers={
-                    "User-Agent": self.headers.get("User-Agent", "trust-control-plane-runtime-proxy"),
-                    "Accept": self.headers.get("Accept", "*/*"),
-                },
+                data=request_body,
+                headers=forwarded_headers,
+                method=method,
             )
             with urlopen(request, timeout=15) as response:
                 status = getattr(response, "status", HTTPStatus.OK.value)
@@ -1515,8 +1574,18 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                     ("'/_next/", f"'{prefix}/_next/"),
                     ('"/console/', f'"{prefix}/console/'),
                     ('"/api/', f'"{prefix}/api/'),
+                    ('"/app', f'"{prefix}/app'),
+                    ("'/app", f"'{prefix}/app"),
+                    ("`/app", f"`{prefix}/app"),
+                    ('"/chat', f'"{prefix}/chat'),
+                    ("'/chat", f"'{prefix}/chat"),
+                    ("`/chat", f"`{prefix}/chat"),
+                    ('"/search', f'"{prefix}/search'),
+                    ("'/search", f"'{prefix}/search"),
+                    ("`/search", f"`{prefix}/search"),
                     ('"/files/', f'"{prefix}/files/'),
                     ('"/auth/', f'"{prefix}/auth/'),
+                    (';/auth/', f';{prefix}/auth/'),
                 ):
                     text = text.replace(needle, replacement)
                 body = text.encode("utf-8")
@@ -1657,6 +1726,26 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         public_url = _public_service_url(runtime_port, runtime_path)
 
         if not governance_allowed:
+            if live_mode and _live_front_door_enabled():
+                cookies = _cookie_map(self.headers.get("Cookie", ""))
+                has_bearer = bool(self.headers.get("Authorization", "").strip())
+                has_access_cookie = bool(cookies.get("kc_access_token", "").strip())
+                denial_reasons_raw = flow_result.reasons if flow_result else []
+                if (
+                    not has_bearer
+                    and not has_access_cookie
+                    and "identity.missing_bearer_token" in denial_reasons_raw
+                ):
+                    login_href = _live_front_door_login_href(
+                        getattr(
+                            self,
+                            "path",
+                            f"/launch/{runtime_name}?path={quote(safe_path, safe='/?=&')}&mode=live",
+                        )
+                    )
+                    self._redirect(login_href, status=HTTPStatus.SEE_OTHER)
+                    return
+
             runtime_proof = _record_runtime_proof(
                 target=target,
                 requested_path=safe_path,
@@ -1875,13 +1964,17 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 f'<a class="surface-link{" is-active" if href == launch_view_href(safe_path, mode="live", view="embedded") else ""}" href="{href}">{label}</a>'
                 for label, href in workspace_nav
             )
-            dashboard_frame_url = f"/runtime-proxy/{runtime_name}{runtime_path}"
+            dashboard_frame_url = (
+                _browser_local_service_url(runtime_port, runtime_path)
+                if target.key == "onyx"
+                else f"/runtime-proxy/{runtime_name}{runtime_path}"
+            )
             runtime_open_href = dashboard_frame_url if local_ready else public_url
             workspace_main_markup = ""
             frame_callout_markup = ""
             if local_ready:
                 frame_callout_markup = (
-                    f'<p class="frame-status">The live runtime target responded through the dashboard-owned proxy, so you can use {runtime_title} here without leaving the control-plane shell.</p>'
+                    f'<p class="frame-status">The live runtime target responded, so you can use {runtime_title} here without leaving the control-plane shell.</p>'
                 )
                 workspace_main_markup = f"""
       <section class="workspace-runtime" aria-label="Live {runtime_title} runtime">

@@ -9,9 +9,6 @@ from .store import RepairArtifactStore
 
 
 def lane_from_value(value: str) -> RuntimeLane:
-    normalized = value.strip().lower()
-    if normalized == "dify":
-        return RuntimeLane.DIFY
     return RuntimeLane.ONYX
 
 

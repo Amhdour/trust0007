@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from backend.integration_adapter.repository import DIFY_RUNTIME_PROOF_PATH, ONYX_RUNTIME_PROOF_PATH, read_json
+from backend.integration_adapter.repository import ONYX_RUNTIME_PROOF_PATH, read_json
 
 from .evidence import evidence_age_status, latest_timestamp, load_evidence_bundle
 from .incidents import active_incident_controls
@@ -57,7 +57,7 @@ def _runtime_matches(runtime_id: str, summary: dict[str, Any], tool: dict[str, A
 
 
 def _runtime_specific_proof_current(root: Path, runtime_id: str) -> bool:
-    proof_path = ONYX_RUNTIME_PROOF_PATH if runtime_id == "onyx" else DIFY_RUNTIME_PROOF_PATH
+    proof_path = ONYX_RUNTIME_PROOF_PATH
     proof = read_json(root / proof_path)
     if not proof:
         return False
@@ -131,7 +131,7 @@ def compute_runtime_readiness(root: Path | None = None, *, runtime_id: str = "on
         )
     )
 
-    retrieval_mandatory = descriptor.runtime_id == "onyx"
+    retrieval_mandatory = True
     retrieval_ok = (not retrieval_mandatory and not bundle.retrieval) or bool(bundle.retrieval.get("allow", False))
     retrieval_status = "pass" if retrieval_ok else "fail"
     if bundle.retrieval.get("mode") == "degrade":
@@ -153,7 +153,7 @@ def compute_runtime_readiness(root: Path | None = None, *, runtime_id: str = "on
         )
     )
 
-    tool_required = descriptor.runtime_id == "dify"
+    tool_required = True
     denied_tools = list(bundle.tool.get("denied_tools", []))
     mcp_governed = bool(bundle.tool.get("mcp_governed", False))
     tool_ok = not denied_tools and ((not tool_required) or mcp_governed)
