@@ -24,7 +24,7 @@ A live governed handoff is proven only when all of the following are true on the
 ## Runtime-specific strict-live tests
 
 - Onyx lane: `tests/integration/test_strict_live_onyx_end_to_end.py`
-- Dify lane: `tests/integration/test_strict_live_dify_end_to_end.py`
+- Onyx Agent lane: `tests/integration/test_live_end_to_end.py`
 - Mocked dependency fail-closed checks: `tests/integration/test_live_governed_runtime_dependencies.py`
 
 ## Proof matrix
@@ -36,14 +36,14 @@ A live governed handoff is proven only when all of the following are true on the
 | Onyx | OPA unreachable | `/launch/onyx?path=/app&mode=live` | deny | `test_strict_live_onyx_handoff_fails_closed_when_opa_is_unavailable` | `policy-evidence.json` |
 | Onyx | Retrieval backend unavailable | `/launch/onyx?path=/app&mode=live` | deny | `test_strict_live_onyx_handoff_fails_closed_when_qdrant_is_unavailable` | `retrieval-evidence.json` |
 | Onyx | Vault unavailable | `/launch/onyx?path=/app&mode=live` | deny | `test_strict_live_onyx_handoff_fails_closed_when_vault_is_unavailable` | `secret-evidence.json` |
-| Dify | Live pass with governed MCP | `/launch/dify?path=/apps&mode=live&mcp=mcp_server.dashboard_control_plane` | allow | `test_strict_live_dify_handoff_passes_with_runtime_specific_governance` | `dify-runtime-proof.json` + `tool-evidence.json` |
-| Dify | MCP deny (unapproved server) | `/launch/dify?path=/apps&mode=live&mcp=mcp_server.unapproved` | deny | `test_strict_live_dify_handoff_denies_unapproved_mcp_server` | `governed-flow-summary.json` reason codes |
+| Onyx Agent | Live pass with governed MCP | `/launch/onyx/agent&mode=live&mcp=mcp_server.dashboard_control_plane` | allow | `test_strict_live_onyx_handoff_passes_with_runtime_specific_governance` | `onyx-agent-runtime-proof.json` + `tool-evidence.json` |
+| Onyx Agent | MCP deny (unapproved server) | `/launch/onyx/agent&mode=live&mcp=mcp_server.unapproved` | deny | `test_strict_live_onyx_handoff_denies_unapproved_mcp_server` | `governed-flow-summary.json` reason codes |
 
 ## What is proven now
 
 - Strict live governance is exercised through the real control-plane HTTP boundary.
-- Onyx and Dify runtime lanes have explicit dedicated strict-live tests.
-- Dify lane includes explicit tool/MCP governed allow and deny coverage.
+- Onyx and Onyx Agent runtime lanes have explicit dedicated strict-live tests.
+- Onyx Agent lane includes explicit tool/MCP governed allow and deny coverage.
 - Dependency failures are fail-closed and visible in both artifacts and dashboard state.
 
 ## What is not yet fully proven

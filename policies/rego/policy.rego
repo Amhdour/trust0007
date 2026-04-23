@@ -168,7 +168,7 @@ unallowlisted_tool_used if {
 }
 
 mcp_governance_required if {
-  runtime_key == "dify"
+  runtime_key == "onyx"
   object.get(runtime_control, "require_mcp_governance", false)
 }
 

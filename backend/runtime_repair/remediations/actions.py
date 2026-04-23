@@ -274,7 +274,7 @@ def execute_remediation_action(
         elif action.execution_handler == "refresh_runtime_proof":
             bundle = load_evidence_bundle(root)
             refs = bundle.evidence_refs()
-            proof_ref = "overlays/myStarterKit/artifacts/onyx-runtime-proof.json" if action.lane == RuntimeLane.ONYX else "overlays/myStarterKit/artifacts/dify-runtime-proof.json"
+            proof_ref = "overlays/myStarterKit/artifacts/onyx-runtime-proof.json" if action.lane == RuntimeLane.ONYX else "overlays/myStarterKit/artifacts/onyx-agent-runtime-proof.json"
             evidence_refs.append(proof_ref)
             details["proof_ref"] = proof_ref
             details["note"] = "Existing runtime proof was referenced; repair did not fabricate continuity."

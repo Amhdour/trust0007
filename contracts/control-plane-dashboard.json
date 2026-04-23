@@ -1,14 +1,14 @@
 {
   "title": "AI Trust & Security Control Plane",
-  "subtitle": "Shared trust, security, and launch-readiness posture for governed Onyx (RAG) and Dify (Autonomous Agents) runtime access.",
-  "hero_copy": "This dashboard-first control plane is the runtime-access decision surface across two governed AI runtime classes: Onyx for retrieval-grounded RAG and Dify for autonomous agent orchestration. The homepage states the decision, and drill-down sections provide the evidence.",
+  "subtitle": "Shared trust, security, and launch-readiness posture for governed Onyx (RAG) and Onyx Agentic (MCP/Tools) runtime access.",
+  "hero_copy": "This dashboard-first control plane is the runtime-access decision surface across two governed AI runtime classes: Onyx for retrieval-grounded RAG and Onyx Agent for autonomous agent orchestration. The homepage states the decision, and drill-down sections provide the evidence.",
   "landing_steps": [
     "Read the current readiness decision",
     "Confirm trust proof freshness and completeness",
     "Review the top failing or missing security control",
     "Open drill-down sections for detailed evidence"
   ],
-  "repo_description_suggestion": "Decision-first dashboard for governed Onyx (RAG) and Dify (Autonomous Agents) runtime readiness, trust proof, and security posture.",
+  "repo_description_suggestion": "Decision-first dashboard for governed Onyx (RAG) and Onyx Agentic (MCP/Tools) runtime readiness, trust proof, and security posture.",
   "tabs": [
     {
       "id": "launch-gate",
@@ -23,8 +23,8 @@
       "group_label": "Homepage Decision"
     },
     {
-      "id": "dify-agent-access",
-      "label": "Dify Agent Access",
+      "id": "onyx-agent-access",
+      "label": "Onyx Agent Access",
       "group": "reviewer",
       "group_label": "Homepage Decision"
     },
@@ -57,7 +57,7 @@
     {
       "id": "launch-gate",
       "title": "Runtime Portfolio",
-      "description": "Cross-runtime readiness decision, blockers, and residual risk posture for Onyx (RAG) and Dify (Autonomous Agents).",
+      "description": "Cross-runtime readiness decision, blockers, and residual risk posture for Onyx (RAG) and Onyx Agentic (MCP/Tools).",
       "group": "reviewer",
       "group_label": "Homepage Decision"
     },
@@ -69,9 +69,9 @@
       "group_label": "Homepage Decision"
     },
     {
-      "id": "dify-agent-access",
-      "title": "Dify Agent Access",
-      "description": "Governed handoff outcomes, tool/MCP authorization posture, and evidence required for Dify agent runtime access.",
+      "id": "onyx-agent-access",
+      "title": "Onyx Agent Access",
+      "description": "Governed handoff outcomes, tool/MCP authorization posture, and evidence required for Onyx Agent agent runtime access.",
       "group": "reviewer",
       "group_label": "Homepage Decision"
     },
@@ -92,7 +92,7 @@
     {
       "id": "tool-mcp-governance",
       "title": "Tool and MCP Governance",
-      "description": "Governed tool actions, MCP authorizations, denials, and approval-gated operations (Dify emphasis).",
+      "description": "Governed tool actions, MCP authorizations, denials, and approval-gated operations (Onyx Agent emphasis).",
       "group": "operator",
       "group_label": "Evidence Drill-Down"
     },

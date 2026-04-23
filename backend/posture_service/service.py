@@ -2402,11 +2402,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         ],
     }
     onyx_launch_route = _launch_handoff_path("/app", mode="live", view="embedded")
-    dify_launch_route = _launch_handoff_path("/apps", runtime="dify", mode="live", view="embedded")
+    onyx_agent_launch_route = "/launch/onyx/agent?mode=live&view=embedded"
     onyx_portfolio_status = runtime_proof_status if onyx_available else "warning"
-    dify_portfolio_status = "warning" if denied_tool_attempts or confirmation_events else "healthy"
+    onyx_agent_portfolio_status = "warning" if denied_tool_attempts or confirmation_events else "healthy"
     runtime_portfolio = {
-        "summary": "Two governed runtime lanes are active in this control plane: Onyx for RAG and Dify for autonomous agents.",
+        "summary": "Two governed runtime lanes are active in this control plane: Onyx for RAG and Onyx Agent for autonomous agents.",
         "runtimes": [
             {
                 "id": "onyx",
@@ -2433,15 +2433,15 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 "workspace_href": _dashboard_url(onyx_launch_route),
             },
             {
-                "id": "dify",
-                "name": "Dify",
-                "runtime_key": "dify",
+                "id": "onyx-agent",
+                "name": "Onyx Agent",
+                "runtime_key": "onyx_agent",
                 "runtime_class": "autonomous_agents",
                 "description": "Autonomous-agent runtime lane with identity, policy, tool/MCP authorization, audit, and launch-gate controls.",
-                "status": dify_portfolio_status,
-                "launch_route": dify_launch_route,
-                "launch_href": _dashboard_url(dify_launch_route),
-                "evidence_href": _raw("overlays/myStarterKit/artifacts/dify-runtime-proof.json"),
+                "status": onyx_agent_portfolio_status,
+                "launch_route": onyx_agent_launch_route,
+                "launch_href": _dashboard_url(onyx_agent_launch_route),
+                "evidence_href": _raw("overlays/myStarterKit/artifacts/onyx-agent-runtime-proof.json"),
                 "primary_controls": [
                     "Identity",
                     "Policy",
@@ -2450,11 +2450,11 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "Launch gate",
                 ],
                 # Backward-compatible fields consumed by earlier frontend versions.
-                "label": "Dify",
+                "label": "Onyx Agent",
                 "type": "Autonomous Agents",
                 "summary": "Autonomous-agent-governed runtime lane.",
                 "governance_focus": "Tool authorization, MCP server allowlists, and agent capability restrictions.",
-                "workspace_href": _dashboard_url(dify_launch_route),
+                "workspace_href": _dashboard_url(onyx_launch_route),
             },
         ],
     }
@@ -2994,21 +2994,21 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
             )
         )
     onyx_handoffs = onyx_handoffs[:5]
-    dify_handoffs = [
+    onyx_handoffs = [
         _record(
-            title="Latest Dify runtime proof",
+            title="Latest Onyx Agent runtime proof",
             meta="Autonomous-agent lane",
-            detail="Latest post-handoff Dify runtime proof keeps agent-lane posture visible without masking Onyx readiness gaps.",
-            status=dify_portfolio_status,
-            href=_raw("overlays/myStarterKit/artifacts/dify-runtime-proof.json"),
+            detail="Latest post-handoff Onyx Agent runtime proof keeps agent-lane posture visible without masking Onyx readiness gaps.",
+            status=onyx_portfolio_status,
+            href=_raw("overlays/myStarterKit/artifacts/onyx-agent-runtime-proof.json"),
         ),
     ]
     for item in governed_request_feed:
-        if str(item.get("runtime_target", "")).lower() != "dify":
+        if str(item.get("runtime_target", "")).lower() != "onyx":
             continue
-        dify_handoffs.append(
+        onyx_handoffs.append(
             _record(
-                title="Recent Dify governed request",
+                title="Recent Onyx Agent governed request",
                 meta=" | ".join(
                     value
                     for value in (
@@ -3030,7 +3030,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                 ),
             )
         )
-    dify_handoffs = dify_handoffs[:4]
+    onyx_handoffs = onyx_handoffs[:4]
 
     sections = [
         {
@@ -3467,8 +3467,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _card("Denied tool attempts", str(denied_tool_attempts), "critical" if denied_tool_attempts else "healthy", "Blocked tool invocations recorded in telemetry.", "#blocked-actions"),
                         _card("Confirmation required", str(len(confirmation_events)), "warning" if confirmation_events else "healthy", "High-impact tool actions paused pending approval.", "#blocked-actions"),
                         _card("MCP servers", str(len(mcp_servers)), "healthy" if mcp_servers else "warning", "MCP surfaces explicitly present in integration policy.", policy_href),
-                        _card("Runtime emphasis", "Dify (Agents)", "healthy", "This lane emphasizes tool authorization and MCP/agent capability governance.", "#entry-points"),
-                _card("Governed runtimes", "Onyx + Dify", "healthy", "Onyx (RAG) and Dify (Autonomous Agents) are reached through governed launch surfaces only.", "#entry-points"),
+                        _card("Runtime emphasis", "Onyx Agent (Agents)", "healthy", "This lane emphasizes tool authorization and MCP/agent capability governance.", "#entry-points"),
+                _card("Governed runtimes", "Onyx capability lanes", "healthy", "Onyx (RAG) and Onyx Agentic (MCP/Tools) are reached through governed launch surfaces only.", "#entry-points"),
                     ],
                 },
                 {
@@ -3801,7 +3801,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "type": "cards",
                     "title": "AI-access summary",
                     "items": [
-                        _card("Runtime lanes", "Onyx (RAG) + Dify (Agents)", "healthy", "The control plane governs both runtime lanes while preserving evidence and launch-gate controls.", _raw("docs/onyx-integration.md"), id="runtime_lanes", display_label="AI systems being protected", display_value="Onyx + Dify", display_detail="This dashboard decides when runtime access is allowed and what proof is required."),
+                        _card("Runtime lanes", "Onyx (RAG) + Onyx Agent (Agents)", "healthy", "The control plane governs both runtime lanes while preserving evidence and launch-gate controls.", _raw("docs/onyx-integration.md"), id="runtime_lanes", display_label="AI systems being protected", display_value="Onyx capability lanes", display_detail="This dashboard decides when runtime access is allowed and what proof is required."),
                         _card("Latest handoff", "ALLOW" if latest_handoff_allowed else "DENY", "healthy" if latest_handoff_allowed else "critical", f"Latest governed handoff reason: {latest_handoff_reason}.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), id="latest_handoff", display_label="Latest access decision", display_value=_allow_deny_display(latest_handoff_allowed), display_detail="Shows whether the latest checked access into the AI system was allowed or blocked."),
                         _card("Missing handoff evidence", ", ".join(latest_missing_evidence) or "none", "healthy" if not latest_missing_evidence else "critical", "Live-mode missing evidence that affected the latest handoff or launch-gate result.", _raw("overlays/myStarterKit/artifacts/governed-flow-summary.json"), id="missing_handoff_evidence", display_label="Missing proof for access decision", display_value=", ".join(latest_missing_evidence) or "none", display_detail="Missing proof can cause AI access to be blocked or downgraded."),
                         _card("Runtime continuity", runtime_continuity_label, runtime_continuity_status, f"{str(runtime_continuity.get('detail', 'Post-handoff continuity is not available yet.'))} Latest activity: {runtime_latest_activity_summary}", runtime_proof_href, id="onyx_runtime_continuity", display_label="Onyx continuity after access", display_value=runtime_continuity_label, display_detail="Shows whether recent Onyx runtime activity lines up with the governed handoff path."),
@@ -3821,41 +3821,41 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                         _link("Open Chat", _launch_handoff_url("/app"), "Launch the governed Onyx chat surface through the dashboard handoff.", "healthy", display_label="Open chat", display_description="Open the checked chat entry point for the AI system."),
                         _link("Search Knowledge", _launch_handoff_url("/app?chatMode=search"), "Launch the governed search-oriented Onyx surface.", "healthy", display_label="Open search", display_description="Open the checked search entry point for the AI system."),
                         _link("Open Agents", _launch_handoff_url("/app/agents"), "Governed agents surface; non-admin roles should be denied.", "warning", display_label="Open agents", display_description="Open the agents entry point. Non-admin roles should still be blocked here."),
-                        _link("Open Dify Apps", _launch_handoff_url("/apps", runtime="dify"), "Launch the governed Dify autonomous-agent surface through the dashboard handoff.", "healthy", display_label="Open Dify apps", display_description="Open the governed Dify runtime entry point for autonomous agents."),
-                        _link("Open Dify Workspace", _launch_handoff_url("/apps", runtime="dify", mode="live", view="embedded"), "Open the dashboard-owned governed Dify workspace view.", "healthy", display_label="Open Dify workspace", display_description="Open the checked live Dify surface with governance in front."),
+                        _link("Open Onyx Agent Apps", "/launch/onyx/agent", "Launch the governed Onyx Agent autonomous-agent surface through the dashboard handoff.", "healthy", display_label="Open Onyx Agent apps", display_description="Open the governed Onyx Agent runtime entry point for autonomous agents."),
+                        _link("Open Onyx Agent Workspace", "/launch/onyx/agent?mode=live&view=embedded", "Open the dashboard-owned governed Onyx Agent workspace view.", "healthy", display_label="Open Onyx Agent workspace", display_description="Open the checked live Onyx Agent surface with governance in front."),
                         _link("Governed flow API", _dashboard_url("/api/control-plane/governed-flow"), "Trigger a governed flow run to generate fresh runtime artifacts.", "neutral", display_label="Create fresh technical proof", display_description="Run a new checked flow to create fresh AI-access evidence."),
                         _link("Latest Onyx runtime proof", runtime_proof_href, "Post-handoff Onyx runtime reachability and continuity summary for the latest governed request.", runtime_proof_status, display_label="Open Onyx runtime proof", display_description="Open the latest post-handoff Onyx runtime proof."),
-                        _link("Latest Dify runtime proof", _raw("overlays/myStarterKit/artifacts/dify-runtime-proof.json"), "Post-handoff Dify runtime reachability and continuity summary for the latest governed request.", dify_portfolio_status, display_label="Open Dify runtime proof", display_description="Open the latest post-handoff Dify runtime proof."),
+                        _link("Latest Onyx Agent runtime proof", _raw("overlays/myStarterKit/artifacts/onyx-agent-runtime-proof.json"), "Post-handoff Onyx Agent runtime reachability and continuity summary for the latest governed request.", onyx_agent_portfolio_status, display_label="Open Onyx Agent runtime proof", display_description="Open the latest post-handoff Onyx Agent runtime proof."),
                         _link("Onyx integration note", _raw("docs/onyx-integration.md"), "Architecture note for Onyx as the governed RAG runtime lane behind the dashboard control plane.", "neutral", display_label="How Onyx access works", display_description="Open the technical note explaining governed Onyx runtime access."),
-                        _link("Dify integration note", _raw("docs/dify-integration.md"), "Architecture note for Dify as the governed autonomous-agent runtime lane.", "neutral", display_label="How Dify access works", display_description="Open the technical note explaining governed Dify runtime access."),
+                        _link("Onyx Agent integration note", _raw("docs/onyx-integration.md"), "Architecture note for Onyx Agent as the governed autonomous-agent runtime lane.", "neutral", display_label="How Onyx Agent access works", display_description="Open the technical note explaining governed Onyx Agent runtime access."),
                     ],
                 },
             ],
         },
         {
-            **_section_contract_meta(section_contracts, "dify-agent-access"),
+            **_section_contract_meta(section_contracts, "onyx-agent-access"),
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Dify agent lane summary",
+                    "title": "Onyx Agent agent lane summary",
                     "items": [
-                        _card("Runtime lane", "Dify (Autonomous Agents)", "healthy", "This lane emphasizes governed tool/MCP execution behind runtime handoff policy.", _raw("docs/dify-integration.md"), display_label="Agent runtime", display_detail="Autonomous-agent lane behind governed access."),
-                        _card("Lane posture", "Healthy" if dify_portfolio_status == "healthy" else "Needs attention", dify_portfolio_status, "Dify remains visible as a separate lane so Onyx failures cannot be hidden by aggregate status.", _raw("overlays/myStarterKit/artifacts/dify-runtime-proof.json"), display_label="Current Dify lane posture", display_detail="Healthy Dify does not override Onyx-critical gaps."),
+                        _card("Runtime lane", "Onyx Agentic (MCP/Tools)", "healthy", "This lane emphasizes governed tool/MCP execution behind runtime handoff policy.", _raw("docs/onyx-integration.md"), display_label="Agent runtime", display_detail="Autonomous-agent lane behind governed access."),
+                        _card("Lane posture", "Healthy" if onyx_agent_portfolio_status == "healthy" else "Needs attention", onyx_agent_portfolio_status, "Onyx Agent remains visible as a separate lane so Onyx failures cannot be hidden by aggregate status.", _raw("overlays/myStarterKit/artifacts/onyx-agent-runtime-proof.json"), display_label="Current Onyx Agent lane posture", display_detail="Healthy Onyx Agent does not override Onyx-critical gaps."),
                     ],
                 },
                 {
                     "type": "records",
-                    "title": "Recent Dify activity",
-                    "items": dify_handoffs,
+                    "title": "Recent Onyx Agent activity",
+                    "items": onyx_handoffs,
                 },
                 {
                     "type": "links",
-                    "title": "Dify access links",
+                    "title": "Onyx Agent access links",
                     "items": [
-                        _link("Open Dify Apps", _launch_handoff_url("/apps", runtime="dify"), "Launch governed Dify runtime handoff.", "healthy", display_label="Open Dify apps", display_description="Open governed Dify entry point."),
-                        _link("Open Dify Workspace", _launch_handoff_url("/apps", runtime="dify", mode="live", view="embedded"), "Open dashboard-owned governed Dify workspace.", "healthy", display_label="Open Dify workspace", display_description="Open checked Dify live workspace."),
-                        _link("Latest Dify runtime proof", _raw("overlays/myStarterKit/artifacts/dify-runtime-proof.json"), "Post-handoff Dify runtime reachability and continuity summary.", dify_portfolio_status, display_label="Open Dify runtime proof", display_description="Open latest Dify runtime proof."),
-                        _link("Dify integration note", _raw("docs/dify-integration.md"), "Architecture note for Dify as governed autonomous-agent lane.", "neutral", display_label="How Dify access works", display_description="Open Dify governed-runtime note."),
+                        _link("Open Onyx Agent Apps", "/launch/onyx/agent", "Launch governed Onyx Agent runtime handoff.", "healthy", display_label="Open Onyx Agent apps", display_description="Open governed Onyx Agent entry point."),
+                        _link("Open Onyx Agent Workspace", "/launch/onyx/agent?mode=live&view=embedded", "Open dashboard-owned governed Onyx Agent workspace.", "healthy", display_label="Open Onyx Agent workspace", display_description="Open checked Onyx Agent live workspace."),
+                        _link("Latest Onyx Agent runtime proof", _raw("overlays/myStarterKit/artifacts/onyx-agent-runtime-proof.json"), "Post-handoff Onyx Agent runtime reachability and continuity summary.", onyx_agent_portfolio_status, display_label="Open Onyx Agent runtime proof", display_description="Open latest Onyx Agent runtime proof."),
+                        _link("Onyx Agent integration note", _raw("docs/onyx-integration.md"), "Architecture note for Onyx Agent as governed autonomous-agent lane.", "neutral", display_label="How Onyx Agent access works", display_description="Open Onyx Agent governed-runtime note."),
                     ],
                 },
             ],
@@ -3875,7 +3875,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         _link("Policy bundle", policy_href, "Runtime surface, retrieval, and tool governance policy.", "healthy" if policy_source == "overlay" else "warning", id="policy_bundle"),
         _link("Governed flow summary", latest_governed_flow_href, "Latest governed-flow summary including identity, policy, retrieval, secret, trace, and launch-gate evidence.", "healthy" if governed_flow_summary else "warning", id="governed_flow_summary"),
         _link("Onyx runtime proof", runtime_proof_href, "Latest post-handoff Onyx runtime readiness and continuity summary.", runtime_proof_status, id="onyx_runtime_proof"),
-        _link("Dify runtime proof", _raw("overlays/myStarterKit/artifacts/dify-runtime-proof.json"), "Latest post-handoff Dify runtime readiness and continuity summary.", dify_portfolio_status, id="dify_runtime_proof"),
+        _link("Onyx Agent runtime proof", _raw("overlays/myStarterKit/artifacts/onyx-agent-runtime-proof.json"), "Latest post-handoff Onyx Agent runtime readiness and continuity summary.", onyx_portfolio_status, id="onyx_runtime_proof"),
         _link("Upstream usage inventory", _raw("evidence/upstream_usage.inventory.json"), "Classification of active, partial, optional, and reference-only upstream components.", "healthy", id="upstream_usage_inventory"),
         _link("Reviewer evidence bundle", reviewer_href, "Consolidated reviewer-facing evidence pack.", "healthy", id="reviewer_evidence_bundle"),
         _link("Launch report", launch_report_href, "Launch-gate findings and residual risk guidance.", "warning", id="launch_report"),
@@ -4184,7 +4184,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "hero_copy": str(contract.get("hero_copy", "")),
         "landing_steps": list(contract.get("landing_steps", [])),
         "generated_at": dashboard_generated_at,
-        "runtime_module": "Safety review layer over governed Onyx (RAG) and Dify (Autonomous Agents) runtime lanes",
+        "runtime_module": "Safety review layer over governed Onyx (RAG) and Onyx Agentic (MCP/Tools) runtime lanes",
         "data_mode": {
             "label": (
                 "Live current evidence"

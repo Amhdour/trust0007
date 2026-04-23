@@ -6,7 +6,6 @@ from typing import Any
 from backend.trust_readiness.readiness import compute_fleet_readiness, compute_runtime_readiness
 
 from .diagnostics.base import DiagnosticContext
-from .diagnostics.dify import DifyDiagnosticAdapter
 from .diagnostics.onyx import OnyxDiagnosticAdapter
 from .enums import RemediationStatus, RepairMode, RepairRunStatus, RuntimeLane
 from .models import DiagnosticReport, RemediationPlan, RepairRun, iso_now, new_id
@@ -318,7 +317,7 @@ class GovernedRuntimeRepairOrchestrator:
         }
 
     def _adapter(self, lane: RuntimeLane):
-        return OnyxDiagnosticAdapter() if lane == RuntimeLane.ONYX else DifyDiagnosticAdapter()
+        return OnyxDiagnosticAdapter()
 
     def _blocked_result(
         self,

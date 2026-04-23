@@ -6,7 +6,7 @@ from pathlib import Path
 
 from backend.runtime_repair.api import diagnose_lane, execute_lane, plan_lane
 from backend.runtime_repair.diagnostics.base import DiagnosticContext, RuntimeRouteConfig
-from backend.runtime_repair.diagnostics.dify import DifyDiagnosticAdapter
+from backend.runtime_repair.diagnostics.onyx import OnyxDiagnosticAdapter
 from backend.runtime_repair.diagnostics.onyx import OnyxDiagnosticAdapter
 from backend.runtime_repair.enums import FailureCategory, RemediationStatus, RepairMode, RuntimeLane, Severity
 from backend.runtime_repair.models import DiagnosticFinding, new_id
@@ -46,7 +46,7 @@ def _seed_artifacts(
     _write_json(root, "overlays/myStarterKit/artifacts/policy-evidence.json", {"allow": True, "engine_reachable": True, "timestamp": ts, "reason_codes": ["policy.allow"]})
     _write_json(root, "overlays/myStarterKit/artifacts/retrieval-evidence.json", retrieval or {"allow": True, "timestamp": ts, "source": "qdrant", "reason_codes": ["retrieval.allow"]})
     _write_json(root, "overlays/myStarterKit/artifacts/secret-evidence.json", {"required": True, "fetched": True, "backend_available": True, "timestamp": ts})
-    _write_json(root, "overlays/myStarterKit/artifacts/tool-evidence.json", tool or {"mcp_governed": lane == "dify", "denied_tools": [], "allowed_tools": ["dify"], "timestamp": ts})
+    _write_json(root, "overlays/myStarterKit/artifacts/tool-evidence.json", tool or {"mcp_governed": lane == "onyx", "denied_tools": [], "allowed_tools": ["onyx"], "timestamp": ts})
     _write_json(root, "overlays/myStarterKit/artifacts/trace-correlation.json", {"complete": True, "timestamp": ts, "trace_id": "trace-a"})
     _write_json(root, "overlays/myStarterKit/artifacts/launch-gate-result.json", {"generated_at": ts, "machine": {"decision": launch_decision, "blockers": [], "missing_evidence": []}})
     _write_json(root, "overlays/myStarterKit/artifacts/governed-flow-summary.json", {"timestamp": ts, "runtime_target": lane, "trace_id": "trace-a", "tenant_id": "tenant-a", "actor_id": "actor-a", "evidence_mode": "live"})
@@ -128,22 +128,22 @@ def test_onyx_diagnostic_distinguishes_local_reachable_public_unreachable_and_mi
     assert "continuity.missing_after_allowed_handoff" in reason_codes
 
 
-def test_dify_diagnostic_classifies_tool_mcp_policy_violations(tmp_path: Path) -> None:
+def test_onyx_diagnostic_classifies_tool_mcp_policy_violations(tmp_path: Path) -> None:
     _seed_artifacts(
         tmp_path,
-        lane="dify",
+        lane="onyx",
         tool={"mcp_governed": True, "denied_tools": ["shell.exec"], "timestamp": _now()},
     )
-    adapter = DifyDiagnosticAdapter(
+    adapter = OnyxDiagnosticAdapter(
         RuntimeRouteConfig(
-            lane=RuntimeLane.DIFY,
-            runtime_id="dify",
-            label="Dify",
+            lane=RuntimeLane.ONYX,
+            runtime_id="onyx",
+            label="Onyx Agent",
             default_path="/apps",
             local_base_url="http://local",
             public_base_url="http://local",
             expected_routes=["/apps"],
-            proof_path="overlays/myStarterKit/artifacts/dify-runtime-proof.json",
+            proof_path="overlays/myStarterKit/artifacts/onyx-agent-runtime-proof.json",
         )
     )
 

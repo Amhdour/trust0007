@@ -94,7 +94,7 @@ def test_onyx_unreachable_is_top_level_blocker(monkeypatch) -> None:
     assert payload["readiness"]["decision"] == "NO_GO"
     runtime_status = {item["runtime_key"]: item["status"] for item in payload["runtime_portfolio"]["runtimes"]}
     assert runtime_status["onyx"] in {"warning", "critical"}
-    assert runtime_status["dify"] == "healthy"
+    assert runtime_status["onyx"] == "healthy"
 
 
 def test_healthy_live_configuration_can_reach_go(monkeypatch) -> None:

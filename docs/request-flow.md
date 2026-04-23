@@ -3,7 +3,7 @@
 This document describes the governed runtime path in both `demo` and `live` modes.
 
 - `demo` mode exists for local iteration and fallback proof.
-- `live` mode is the strict governed path. In live mode, `/launch/onyx` and `/launch/dify` fail closed unless required identity, policy, runtime-specific controls, trace correlation, and launch-gate evidence all succeed.
+- `live` mode is the strict governed path. In live mode, `/launch/onyx` and `/launch/onyx/agent` fail closed unless required identity, policy, runtime-specific controls, trace correlation, and launch-gate evidence all succeed.
 
 See `docs/upstream-usage-matrix.md` and `docs/live-vs-demo-matrix.md` for the strict activation model.
 
@@ -37,7 +37,7 @@ In live mode, governed handoff to `/launch/{runtime}` requires this order:
 2. OPA receives the live policy input and returns an auditable decision.
 3. Runtime-specific control checks execute:
    - Onyx: retrieval executes against the configured live backend and passes tenant, trust, and provenance checks.
-   - Dify: tool/MCP governance enforces allowlists and action controls.
+   - Onyx Agent: tool/MCP governance enforces allowlists and action controls.
 4. Required runtime secret access succeeds through Vault-backed secret retrieval.
 5. Tool governance is recorded under the same trace and session context.
 6. Live evidence artifacts are written.
@@ -126,9 +126,9 @@ Governed handoff to the Onyx runtime.
 - `mode=demo`: fallback/demo behavior allowed.
 - `mode=live`: strict fail-closed governed handoff.
 
-### `/launch/dify?path=/apps`
+### `/launch/onyx/agent`
 
-Governed handoff to the Dify runtime.
+Governed handoff to the Onyx Agent runtime.
 
 - `mode=demo`: fallback/demo behavior allowed.
 - `mode=live`: strict fail-closed governed handoff with runtime-specific tool/MCP policy checks.

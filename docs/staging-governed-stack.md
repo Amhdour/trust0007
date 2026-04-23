@@ -14,7 +14,7 @@ Success for the first serious preview is **not** “every vendored upstream is r
 - `qdrant` for retrieval checks
 - `vault` for secret checks
 - `onyx` runtime target (behind `/launch/onyx`)
-- `dify` runtime target (behind `/launch/dify`)
+- `onyx` runtime target (behind `/launch/onyx/agent`)
 
 ### Optional/supporting services
 
@@ -34,7 +34,7 @@ Success for the first serious preview is **not** “every vendored upstream is r
 - Bootstrap: `scripts/bootstrap-live-governed-path.sh`
 - Smoke test: `scripts/smoke-live-onyx-handoff.py`
 - Real-stack Onyx test: `tests/integration/test_strict_live_onyx_end_to_end.py`
-- Real-stack Dify test: `tests/integration/test_strict_live_dify_end_to_end.py`
+- Real-stack Onyx Agent test: `tests/integration/test_live_end_to_end.py`
 
 ## Local staging bootstrap
 
@@ -69,8 +69,8 @@ What this does:
 - maps `tenant_id` from a real user attribute into token and userinfo claims
 - seeds Qdrant and Vault with tenant-scoped launch data
 - proves `/launch/onyx?path=/app&mode=live` against the running stack (deepest default sample lane)
-- proves `/launch/dify?path=/apps&mode=live&mcp=mcp_server.dashboard_control_plane` under runtime-specific MCP governance
-- writes fresh governed evidence artifacts consumed by the dashboard (`governed-flow-summary.json`, `onyx-runtime-proof.json`, `dify-runtime-proof.json`, and launch-gate-linked evidence)
+- proves `/launch/onyx/agent&mode=live&mcp=mcp_server.dashboard_control_plane` under runtime-specific MCP governance
+- writes fresh governed evidence artifacts consumed by the dashboard (`governed-flow-summary.json`, `onyx-runtime-proof.json`, `onyx-agent-runtime-proof.json`, and launch-gate-linked evidence)
 
 ## External deployment target
 

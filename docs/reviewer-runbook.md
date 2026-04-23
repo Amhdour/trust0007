@@ -8,7 +8,7 @@ Do **not** treat success as “run every upstream project under `upstream/`.”
 For this repo, a meaningful live preview is the governed control plane proving **both** runtime lanes:
 
 - `/launch/onyx` (Onyx / RAG)
-- `/launch/dify` (Dify / Autonomous Agents)
+- `/launch/onyx/agent` (Onyx Agent / Autonomous Agents)
 
 ### Required for first-proof success
 
@@ -18,7 +18,7 @@ For this repo, a meaningful live preview is the governed control plane proving *
 - `qdrant`
 - `vault`
 - reachable Onyx runtime target
-- reachable Dify runtime target
+- reachable Onyx Agent runtime target
 
 ### Optional/supporting for first-proof success
 
@@ -53,13 +53,13 @@ For this repo, a meaningful live preview is the governed control plane proving *
    ```bash
    make smoke-live
    pytest -q tests/integration/test_strict_live_onyx_end_to_end.py
-   pytest -q tests/integration/test_strict_live_dify_end_to_end.py
+   pytest -q tests/integration/test_live_end_to_end.py
    ```
 
 4. **Check dashboard + governed entrypoints**
    - `/` (homepage decision + runtime portfolio)
    - `/launch/onyx?path=/app&mode=live`
-   - `/launch/dify?path=/apps&mode=live&mcp=mcp_server.dashboard_control_plane`
+   - `/launch/onyx/agent&mode=live&mcp=mcp_server.dashboard_control_plane`
 
 5. **Confirm fresh artifacts + trace continuity**
    - `overlays/myStarterKit/artifacts/governed-flow-summary.json`
@@ -82,7 +82,7 @@ Related docs:
 This repository proves a **dashboard-first trust control plane** for two governed runtime lanes:
 
 - **Onyx lane (RAG):** governed retrieval handoff at `/launch/onyx`.
-- **Dify lane (Autonomous Agents):** governed tool/MCP handoff at `/launch/dify`.
+- **Onyx Agent lane (Autonomous Agents):** governed tool/MCP handoff at `/launch/onyx/agent`.
 - **Shared controls before runtime access:** identity, policy, retrieval/tool controls, secrets, trace continuity, and launch-gate decision.
 
 ## What good looks like
@@ -90,7 +90,7 @@ This repository proves a **dashboard-first trust control plane** for two governe
 - Live stack starts with explicit live/staging env values.
 - `make smoke-live` succeeds.
 - Strict live tests pass for **both** runtime lanes.
-- Dashboard shows `LIVE GOVERNED MODE` and current runtime portfolio cards for Onyx + Dify.
+- Dashboard shows `LIVE GOVERNED MODE` and current runtime portfolio cards for Onyx capability lanes.
 - Latest artifacts show fresh timestamps and trace IDs.
 
 ## Runtime-specific checks
@@ -102,11 +102,11 @@ This repository proves a **dashboard-first trust control plane** for two governe
 - `onyx-runtime-proof.json` aligns with latest summary trace.
 - Denied behavior appears with invalid token/dependency failure.
 
-### Dify (Autonomous Agents)
+### Onyx Agentic (MCP/Tools)
 
-- `/launch/dify` succeeds only with approved MCP server.
+- `/launch/onyx/agent` succeeds only with approved MCP server.
 - Tool evidence shows MCP governance is enforced.
-- `dify-runtime-proof.json` is generated for the live request.
+- `onyx-agent-runtime-proof.json` is generated for the live request.
 - Unapproved MCP server denies with `policy.mcp_server_not_allowed:*`.
 
 ## Common failure signals (dashboard symptom -> likely cause)

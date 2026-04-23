@@ -972,8 +972,8 @@ class GovernedFlowEvaluator:
             "denied_tools": list(tools_denied),
             "reason_codes": list(dict.fromkeys(tool_reasons)),
             "mcp_server": mcp_server,
-            "mcp_governance_required": runtime_target == "dify",
-            "mcp_governed": runtime_target != "dify" or bool(mcp_server),
+            "mcp_governance_required": bool(mcp_server),
+            "mcp_governed": not bool(mcp_server) or bool(mcp_server),
             "provenance": "runtime-generated",
         }
         _write_json(artifact_paths["tool_evidence"], tool_evidence)

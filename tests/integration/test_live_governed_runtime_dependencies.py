@@ -103,7 +103,7 @@ def _mock_urlopen_factory(
                 }
             )
 
-        if "/v1/secret/data/runtime/tenant-stage/onyx" in url or "/v1/secret/data/runtime/tenant-stage/dify" in url:
+        if "/v1/secret/data/runtime/tenant-stage/onyx" in url or "/v1/secret/data/runtime/tenant-stage/onyx" in url:
             if not vault_enabled:
                 raise _http_error(url, 503)
             if headers.get("x-vault-token", "") != "root-token":
@@ -341,7 +341,7 @@ def test_live_handoff_oidc_session_requires_session_linkage():
     assert summary["launch_gate"]["decision"] == "no_go"
 
 
-def test_live_dify_flow_does_not_require_retrieval_live_backend_evidence():
+def test_live_onyx_flow_does_not_require_retrieval_live_backend_evidence():
     with tempfile.TemporaryDirectory() as tmpdir:
         artifact_dir = Path(tmpdir)
         evaluator = _build_live_evaluator(artifact_dir=artifact_dir)
@@ -355,13 +355,13 @@ def test_live_dify_flow_does_not_require_retrieval_live_backend_evidence():
             result = evaluator.run(
                 user_id="dashboard-user",
                 tenant_id="tenant-stage",
-                prompt="Navigate to Dify path: /apps",
-                requested_tools=["dify"],
+                prompt="Navigate to Onyx Agent path: /apps",
+                requested_tools=["onyx"],
                 retrieval_source="qdrant",
                 retrieval_needed=False,
                 roles=["tenant_user"],
-                request_metadata={"requested_path": "/apps", "runtime_key": "dify", "surface": "dify.apps", "surface_query": {}},
-                tool_arguments={"dify": {"path": "/apps", "surface": "dify.apps", "mcp_server": "mcp_server.dashboard_control_plane"}},
+                request_metadata={"requested_path": "/apps", "runtime_key": "onyx", "surface": "onyx.apps", "surface_query": {}},
+                tool_arguments={"onyx": {"path": "/apps", "surface": "onyx.apps", "mcp_server": "mcp_server.dashboard_control_plane"}},
                 policy_source="overlay",
                 policy_path="overlays/myStarterKit/policies/bundles/default/policy.json",
                 authorization_header="Bearer valid-live-token",
@@ -369,9 +369,9 @@ def test_live_dify_flow_does_not_require_retrieval_live_backend_evidence():
                 evidence_mode="live",
                 secret_request={
                     "needed": True,
-                    "secret_path": "secret/data/runtime/tenant-stage/dify",
+                    "secret_path": "secret/data/runtime/tenant-stage/onyx",
                     "secret_key": "api_token",
-                    "purpose": "dify_runtime_handoff",
+                    "purpose": "onyx_runtime_handoff",
                 },
             )
         summary = json.loads((artifact_dir / "governed-flow-summary.json").read_text(encoding="utf-8"))

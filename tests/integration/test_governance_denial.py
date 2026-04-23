@@ -36,7 +36,7 @@ class StrictPolicyDenyAll(PolicyChecker):
 
 class StrictToolDenyForbidden(ToolDecisionChecker):
     """Tool checker that forbids specific dangerous tools."""
-    forbidden = {"admin_shell", "delete_database", "modify_policy"}
+    forbidden = {"admin_shell", "delete_database", "moonyx_policy"}
     
     def check_tools(self, request: NormalizedRequest) -> ToolDecision:
         denied = [t for t in request.requested_tools if t in self.forbidden]
@@ -107,7 +107,7 @@ class BlockingToolExecutor(ToolExecutor):
     """Tool executor that refuses to execute forbidden tools."""
     
     def execute(self, request: ToolActionRequest) -> dict:
-        forbidden = {"admin_shell", "delete_database", "modify_policy"}
+        forbidden = {"admin_shell", "delete_database", "moonyx_policy"}
         if request.tool_name in forbidden:
             raise PermissionError(f"Tool {request.tool_name} is forbidden and cannot execute")
         return {"result": "executed", "tool": request.tool_name}

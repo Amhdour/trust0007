@@ -10,7 +10,7 @@ from backend.trust_readiness.dashboard_api import (
     build_runtime_readiness_page,
     build_tool_mcp_authorization_posture,
 )
-from backend.trust_readiness.launch_lanes import DifyGovernanceLane, GovernedLaunchRequest, OnyxGovernanceLane
+from backend.trust_readiness.launch_lanes import OnyxAgentGovernanceLane, GovernedLaunchRequest, OnyxGovernanceLane
 from backend.trust_readiness.policy_engine import PolicyAsCodeEngine
 from tests.trust_readiness.test_readiness_and_incidents import _seed_ready_artifacts
 
@@ -41,20 +41,20 @@ def test_governed_onyx_lane_denies_retrieval_boundary_violation(tmp_path: Path) 
     assert "retrieval.source_not_allowed:incident-runbooks" in plan.explanation.reason_codes
 
 
-def test_governed_dify_lane_denies_unapproved_mcp_server(tmp_path: Path) -> None:
-    _seed_ready_artifacts(tmp_path, runtime_id="dify")
-    lane = DifyGovernanceLane(PolicyAsCodeEngine.from_file(POLICY_PATH))
+def test_governed_onyx_lane_denies_unapproved_mcp_server(tmp_path: Path) -> None:
+    _seed_ready_artifacts(tmp_path, runtime_id="onyx")
+    lane = OnyxAgentGovernanceLane(PolicyAsCodeEngine.from_file(POLICY_PATH))
 
     plan = lane.plan_launch(
         GovernedLaunchRequest(
-            runtime_id="dify",
+            runtime_id="onyx",
             tenant_id="tenant-dashboard",
             actor_id="user-1",
             requested_path="/apps",
             auth_mode="per_user_auth",
             purpose="runtime_handoff",
             mcp_server="mcp_server.unapproved",
-            tool_id="dify",
+            tool_id="onyx",
             tool_risk="low",
         ),
         root=tmp_path,

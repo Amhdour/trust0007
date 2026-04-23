@@ -8,4 +8,4 @@
 - `governance-overlay/` (local): repository-owned additive wiring, contracts, and environment-specific glue.
 - `client-template/` (local): tokenized scaffold for creating per-client overlays such as `client-acme/`.
 
-Do not modify third-party upstream code directly in this repository; extend behavior via the local overlay and adapter/policy layers.
+Do not moonyx third-party upstream code directly in this repository; extend behavior via the local overlay and adapter/policy layers.

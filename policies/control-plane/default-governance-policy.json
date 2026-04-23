@@ -63,10 +63,7 @@
       "auth_modes": [
         "shared_auth",
         "per_user_auth"
-      ]
-    },
-    "dify": {
-      "runtime_class": "autonomous_agents",
+      ],
       "require_mcp_governance": true,
       "mcp_allowed_servers": [
         "mcp_server.dashboard_control_plane"
@@ -79,7 +76,7 @@
         "privileged_tooling"
       ],
       "approval_required_tools": [
-        "dify_admin",
+        "onyx_admin",
         "email.send",
         "payment.charge"
       ]
@@ -88,18 +85,18 @@
   "tools": {
     "allowed_tools": [
       "onyx",
-      "dify",
-      "search",
+      "onyx_admin",
       "retrieve",
+      "search",
       "summarize",
       "ticket.read"
     ],
     "confirmation_required_tools": [
-      "dify_admin",
       "email.send",
+      "export_evidence",
+      "onyx_admin",
       "payment.charge",
-      "ticket.create",
-      "export_evidence"
+      "ticket.create"
     ],
     "forbidden_tools": [
       "shell.exec",

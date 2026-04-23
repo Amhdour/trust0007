@@ -1,6 +1,6 @@
 # Governed Runtime Repair
 
-Governed Runtime Repair is the diagnostic and bounded-remediation subsystem for the Onyx and Dify runtime lanes. It is designed for broken launch readiness, not for bypassing readiness. The module detects what is unhealthy, explains the evidence behind the finding, proposes policy-checked actions, executes only approved bounded actions, writes audit/evidence records, and recomputes readiness afterward.
+Governed Runtime Repair is the diagnostic and bounded-remediation subsystem for the Onyx and Onyx Agent runtime lanes. It is designed for broken launch readiness, not for bypassing readiness. The module detects what is unhealthy, explains the evidence behind the finding, proposes policy-checked actions, executes only approved bounded actions, writes audit/evidence records, and recomputes readiness afterward.
 
 ## Trust And Safety Constraints
 
@@ -22,11 +22,11 @@ The Onyx diagnostic adapter checks runtime target configuration, local/public ro
 
 It distinguishes local reachable/public unreachable, route alive but governed entry failing, governed handoff allowed without continuity proof, stale/absent retrieval proof, and contradictions between launch gates and runtime state.
 
-### Dify
+### Onyx Agent
 
-The Dify diagnostic adapter checks workspace/app route reachability, governed handoff result, MCP server and tool posture, privileged tool approval requirements, dependency evidence, freshness, launch-gate consistency, and route/config drift.
+The Onyx Agent diagnostic adapter checks workspace/app route reachability, governed handoff result, MCP server and tool posture, privileged tool approval requirements, dependency evidence, freshness, launch-gate consistency, and route/config drift.
 
-Dify is treated as a governed execution plane. Tool and MCP posture failures are repair findings, not invitations to loosen policy.
+Onyx Agent is treated as a governed execution plane. Tool and MCP posture failures are repair findings, not invitations to loosen policy.
 
 ## Remediation Actions
 
@@ -90,11 +90,11 @@ Rules enforced by diagnostics and readiness recomputation:
 POST endpoints:
 
 - `/repair/diagnose/onyx`
-- `/repair/diagnose/dify`
+- `/repair/diagnose/onyx`
 - `/repair/plan/onyx`
-- `/repair/plan/dify`
+- `/repair/plan/onyx`
 - `/repair/execute/onyx`
-- `/repair/execute/dify`
+- `/repair/execute/onyx`
 
 GET endpoints:
 

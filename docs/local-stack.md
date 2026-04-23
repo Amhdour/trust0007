@@ -18,7 +18,7 @@ If you want the production-like governed live path, use [staging-governed-stack.
 
 Compose file: `compose/docker-compose.yml`
 
-These services are not all equally active in the current request path. The dashboard and governed runtime handoffs (`/launch/onyx`, `/launch/dify`) are the primary proof path. In `demo` mode, the repo can still run with local fallback behavior. In `live` mode, Keycloak, OPA, Qdrant, and conditional Vault access become fail-closed dependencies in the governed handoff path. See `docs/upstream-usage-matrix.md` and `docs/live-vs-demo-matrix.md`.
+These services are not all equally active in the current request path. The dashboard and governed runtime handoffs (`/launch/onyx`, `/launch/onyx/agent`) are the primary proof path. In `demo` mode, the repo can still run with local fallback behavior. In `live` mode, Keycloak, OPA, Qdrant, and conditional Vault access become fail-closed dependencies in the governed handoff path. See `docs/upstream-usage-matrix.md` and `docs/live-vs-demo-matrix.md`.
 
 ## 1) Configure environment
 
@@ -104,11 +104,11 @@ docker compose --env-file compose/.env -f compose/docker-compose.yml down -v
 
 ## Notes
 - The dashboard is the main landing page and aggregates posture from repo-owned artifacts plus supporting services.
-- Onyx (RAG) and Dify (Autonomous Agents) are governed runtime lanes. Onyx is the deepest default smoke-path runtime and is started separately from the default compose stack.
+- Onyx (RAG) and Onyx Agentic (MCP/Tools) are governed runtime lanes. Onyx is the deepest default smoke-path runtime and is started separately from the default compose stack.
 - Use `mode=live` on governed endpoints only after Keycloak, OPA, Qdrant, and Vault are configured; live mode is fail-closed by design.
 - The governed live path is what is proven when `make smoke-live` passes. That is stronger than a general “the whole project is live” claim.
 - `make health-check` is the fastest honest project-health answer: it validates the stack, pings the dashboard, runs the live smoke path, and executes the focused governed-flow pytest bundle.
-- Unauthenticated or non-live-token requests to `/launch/onyx` and `/launch/dify` should still fail closed with `403`, even after the local live bootstrap succeeds.
+- Unauthenticated or non-live-token requests to `/launch/onyx` and `/launch/onyx/agent` should still fail closed with `403`, even after the local live bootstrap succeeds.
 - The local Keycloak smoke token must include `openid` scope. Without `openid`, Keycloak `userinfo` returns `403`, and the strict live handoff correctly denies access.
 - In this environment, Keycloak defaults to host port `18080` instead of `8080` because another local service already occupies `8080`.
 - In another Codespace, replace `<codespace-name>` and `<forwarding-domain>` while keeping the same port suffixes.

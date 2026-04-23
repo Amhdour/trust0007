@@ -6,7 +6,7 @@ The repo should be read in tiers instead of as one flat chain:
 
 - **Active now**
   - Dashboard homepage and repo-owned control-plane services
-  - Governed handoff into Onyx (RAG) and Dify (Autonomous Agents) as runtime lanes behind the dashboard
+  - Governed handoff into Onyx (RAG) and Onyx Agentic (MCP/Tools) as runtime lanes behind the dashboard
   - Langfuse-backed runtime visibility when traces are available
   - Strict live governed path through Keycloak, OPA, Qdrant, and conditional Vault access
 - **Platform dependencies with partial wiring**
@@ -36,7 +36,7 @@ See `docs/upstream-usage-matrix.md` and `evidence/upstream_usage.inventory.json`
 - In live mode, governed handoff to `/launch/{runtime}` requires:
   - Keycloak-backed identity
   - live OPA policy evaluation
-  - runtime-specific controls (Onyx retrieval/data-boundary checks, Dify tool/MCP controls)
+  - runtime-specific controls (Onyx retrieval/data-boundary checks, Onyx Agent tool/MCP controls)
   - conditional Vault-backed secret access
   - trace-correlated evidence and launch-gate approval
 - Evidence is captured in repo-owned artifacts first, including explicit audit records, and augmented with Langfuse activity when available.
