@@ -87,8 +87,8 @@ Each scenario file now includes:
   - what it proves:
     - missing live evidence can still block the handoff
 
-Use [strict-live-proof-matrix.md](/workspaces/beta011/docs/strict-live-proof-matrix.md) alongside this folder when you need the exact acceptance criteria and pass/fail test mapping.
-Use [reviewer-fast-path.md](/workspaces/beta011/docs/reviewer-fast-path.md) when you want the shortest route through the proof surface.
-Use [dashboard-visual-proof.md](/workspaces/beta011/docs/dashboard-visual-proof.md) for the fast visual cues.
+Use [strict-live-proof-matrix.md](../../../docs/strict-live-proof-matrix.md) alongside this folder when you need the exact acceptance criteria and pass/fail test mapping.
+Use [reviewer-fast-path.md](../../../docs/reviewer-fast-path.md) when you want the shortest route through the proof surface.
+Use [dashboard-visual-proof.md](../../../docs/dashboard-visual-proof.md) for the fast visual cues.
 
 The raw files remain under `evidence/prod-sim/` so the evidence stays traceable to the captured responses.
