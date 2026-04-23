@@ -1,4 +1,4 @@
-.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check up-dev up-live down-dev down-live verify-live
+.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test verify validate-policy-schema bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check up-dev up-live down-dev down-live verify-live
 
 CLIENT_NAME ?= Example Client
 CLIENT_SLUG ?= example-client
@@ -26,6 +26,15 @@ serve-onyx:
 
 test:
 	python scripts/validate-upstream-state.py
+	python scripts/validate-runtime-policy-schema.py
+	pytest -q
+
+validate-policy-schema:
+	python scripts/validate-runtime-policy-schema.py
+
+verify:
+	python scripts/validate-upstream-state.py
+	python scripts/validate-runtime-policy-schema.py
 	pytest -q
 
 bootstrap-submodules:

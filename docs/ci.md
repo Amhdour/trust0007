@@ -6,6 +6,7 @@ CI workflow file: `.github/workflows/ci.yml`
 - `lint`
 - `unit tests`
 - `policy tests`
+- `runtime policy schema validation`
 - `adapter tests`
 - `telemetry schema tests`
 - `launch-gate smoke test`
@@ -29,6 +30,10 @@ CI workflow file: `.github/workflows/ci.yml`
   - `opa test policies/rego policies/tests -v`
   - `opa test policies/retrieval -v`
 - This stage fails on policy regressions.
+
+### runtime policy schema validation
+- Runs `python scripts/validate-runtime-policy-schema.py`.
+- Fails if baseline policy documents do not include required Onyx runtime controls and required Onyx tool arguments.
 
 ### launch-gate smoke test
 - Runs launch-gate tests under `tests/launch-gate`.

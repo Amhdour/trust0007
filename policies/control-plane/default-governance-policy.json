@@ -103,7 +103,24 @@
       "db.drop",
       "http.post.untrusted",
       "admin_shell"
-    ]
+    ],
+    "argument_policies": {
+      "onyx": {
+        "allowed_arguments": [
+          "surface",
+          "path",
+          "chat_mode",
+          "mcp_server",
+          "action"
+        ]
+      },
+      "onyx_admin": {
+        "allowed_arguments": [
+          "action",
+          "runtime"
+        ]
+      }
+    }
   },
   "launch_gates": {
     "deny_by_default": true,

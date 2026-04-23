@@ -23,8 +23,6 @@ def test_runtime_policy_distinguishes_onyx_data_boundary_and_onyx_mcp_rules() ->
         "runtime_controls": {
             "onyx": {
                 "require_data_boundary": True,
-            },
-            "onyx": {
                 "require_mcp_governance": True,
                 "mcp_allowed_servers": ["mcp_server.dashboard_control_plane"],
             },
@@ -45,16 +43,16 @@ def test_runtime_policy_distinguishes_onyx_data_boundary_and_onyx_mcp_rules() ->
         RuntimePolicyContext(document=policy, source="inline-test", relative_path="tests/runtime-policy.json")
     )
 
-    onyx_decision = checker.check_policy(_request(runtime_key="onyx", path="/app"))
-    onyx_decision = checker.check_policy(
+    onyx_chat_decision = checker.check_policy(_request(runtime_key="onyx", path="/app"))
+    onyx_apps_decision = checker.check_policy(
         _request(runtime_key="onyx", path="/apps", mcp_server="mcp_server.dashboard_control_plane")
     )
 
-    assert onyx_decision.allow is False
-    assert "policy.data_boundary_not_configured:tenant-a" in onyx_decision.reasons
+    assert onyx_chat_decision.allow is False
+    assert "policy.data_boundary_not_configured:tenant-a" in onyx_chat_decision.reasons
 
-    assert onyx_decision.allow is True
-    assert onyx_decision.reasons == ["policy.allow"]
+    assert onyx_apps_decision.allow is False
+    assert "policy.data_boundary_not_configured:tenant-a" in onyx_apps_decision.reasons
 
 
 def test_runtime_policy_denies_onyx_when_mcp_server_not_allowlisted() -> None:

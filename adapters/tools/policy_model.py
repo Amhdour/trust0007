@@ -128,7 +128,7 @@ class StaticToolPolicyEvaluator(ToolPolicyEvaluator):
 
 def default_policy_config() -> ToolPolicyConfig:
     return ToolPolicyConfig(
-        tool_allowlist={"search", "retrieve", "summarize", "ticket.read"},
+        tool_allowlist={"search", "retrieve", "summarize", "ticket.read", "onyx", "onyx_admin"},
         confirmation_required_tools={"ticket.create", "email.send", "payment.charge"},
         forbidden_tools={"shell.exec", "db.drop", "http.post.untrusted"},
         forbidden_arguments={"password", "api_key", "token", "secret"},
@@ -140,6 +140,8 @@ def default_policy_config() -> ToolPolicyConfig:
             "ticket.create": {"title", "body", "priority"},
             "email.send": {"to", "subject", "body"},
             "payment.charge": {"account_id", "amount", "currency"},
+            "onyx": {"path", "surface", "chat_mode", "mcp_server", "action"},
+            "onyx_admin": {"action", "runtime"},
         },
         required_arguments_by_tool={
             "search": {"query"},
@@ -149,6 +151,8 @@ def default_policy_config() -> ToolPolicyConfig:
             "ticket.create": {"title", "body"},
             "email.send": {"to", "subject", "body"},
             "payment.charge": {"account_id", "amount", "currency"},
+            "onyx": {"path"},
+            "onyx_admin": {"action", "runtime"},
         },
         forbidden_argument_value_substrings={
             "search": {"query": {"password", "api_key", "token", "secret"}},

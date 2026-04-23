@@ -170,7 +170,9 @@
         "allowed_arguments": [
           "surface",
           "path",
-          "chat_mode"
+          "chat_mode",
+          "mcp_server",
+          "action"
         ],
         "required_arguments": [
           "surface",
