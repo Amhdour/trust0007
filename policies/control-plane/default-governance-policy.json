@@ -65,6 +65,10 @@
         "per_user_auth"
       ],
       "require_mcp_governance": true,
+      "mcp_governed_surfaces": [
+        "onyx.apps",
+        "onyx.agents"
+      ],
       "mcp_allowed_servers": [
         "mcp_server.dashboard_control_plane"
       ],

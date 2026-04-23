@@ -115,14 +115,20 @@ class PolicyAsCodeEngine:
         approved = bool(request.get("approved", False))
         controls = self._policy.document.get("runtime_controls", {}).get(runtime_id, {})
         allowed_mcp = set(controls.get("mcp_allowed_servers", []))
+        mcp_governed_surfaces = set(controls.get("mcp_governed_surfaces", ["onyx.apps", "onyx.agents"]))
         allowed_tools = set(self._policy.document.get("tools", {}).get("allowed_tools", []))
         approval_required_tools = set(controls.get("approval_required_tools", [])) | set(
             self._policy.document.get("tools", {}).get("confirmation_required_tools", [])
         )
         privileged_actions = set(controls.get("approval_required_actions", []))
+        surface = str(request.get("surface", ""))
 
         reasons: list[str] = []
-        if bool(controls.get("require_mcp_governance", False)) and mcp_server not in allowed_mcp:
+        if (
+            bool(controls.get("require_mcp_governance", False))
+            and surface in mcp_governed_surfaces
+            and mcp_server not in allowed_mcp
+        ):
             reasons.append(f"policy.mcp_server_not_allowed:{mcp_server or 'missing'}")
         rules.append("onyx.mcp_server_allowlist")
 
@@ -148,6 +154,7 @@ class PolicyAsCodeEngine:
             evaluated_rules=rules,
             inputs={
                 "runtime_id": runtime_id,
+                "surface": surface,
                 "mcp_server": mcp_server,
                 "tool_id": tool_id,
                 "risk": risk,

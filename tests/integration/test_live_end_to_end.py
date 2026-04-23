@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -49,7 +51,16 @@ class APIServer:
         self.repo_root = repo_root
         self.extra_env = extra_env or {}
         self.process = None
-        self.port = 3001  # Use different port for testing
+        self.port = self._reserve_port()
+        self._artifacts_tempdir = tempfile.TemporaryDirectory(prefix="control-plane-artifacts-")
+        self.artifacts_dir = Path(self._artifacts_tempdir.name)
+
+    @staticmethod
+    def _reserve_port() -> int:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            return int(sock.getsockname()[1])
 
     def start(self):
         """Start the API server in background."""
@@ -57,6 +68,14 @@ class APIServer:
             "CONTROL_PLANE_REPO_ROOT": str(self.repo_root),
             "CONTROL_PLANE_HOST": "127.0.0.1",
             "CONTROL_PLANE_PORT": str(self.port),
+            "CONTROL_PLANE_GOVERNANCE_MODE": "demo",
+            "CONTROL_PLANE_ENVIRONMENT_MODE": "dev",
+            "CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS": "true",
+            "CONTROL_PLANE_EXTERNAL_REACHABLE": "false",
+            "CONTROL_PLANE_KEYCLOAK_DEV_MODE": "true",
+            "CONTROL_PLANE_VAULT_DEV_MODE": "true",
+            "CONTROL_PLANE_LIVE_FRONT_DOOR_ENABLED": "false",
+            "CONTROL_PLANE_ARTIFACT_DIR": str(self.artifacts_dir),
             "PYTHONPATH": str(self.repo_root),
         }
 
@@ -103,6 +122,7 @@ class APIServer:
             except subprocess.TimeoutExpired:
                 self.process.kill()
                 self.process.wait()
+        self._artifacts_tempdir.cleanup()
 
     def url(self, path: str) -> str:
         """Get full URL for a path."""
@@ -112,7 +132,6 @@ class APIServer:
 def test_live_governed_flow_end_to_end():
     """Test the complete governed flow from API call to artifact consumption."""
     repo_root = Path(__file__).resolve().parents[2]
-    artifacts_dir = repo_root / "overlays" / "myStarterKit" / "artifacts"
 
     server = APIServer(repo_root)
     server.start()
@@ -134,8 +153,8 @@ def test_live_governed_flow_end_to_end():
 
         assert events_file.exists(), "events.jsonl should be created"
         assert gate_file.exists(), "launch-gate-result.json should be created"
-        assert events_file.parent == artifacts_dir
-        assert gate_file.parent == artifacts_dir
+        assert events_file.parent == server.artifacts_dir
+        assert gate_file.parent == server.artifacts_dir
 
         events = [json.loads(line) for line in events_file.read_text().splitlines()]
         event_types = {e["event_type"] for e in events}
@@ -184,7 +203,7 @@ def test_live_onyx_search_handoff_allowed() -> None:
 
     try:
         response = http_get(server.url("/launch/onyx?path=/app?chatMode=search"), timeout=10)
-        runtime_proof_path = repo_root / "overlays" / "myStarterKit" / "artifacts" / "onyx-runtime-proof.json"
+        runtime_proof_path = server.artifacts_dir / "onyx-runtime-proof.json"
 
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         assert "Governance Status:</strong> ✓ Approved" in response.text

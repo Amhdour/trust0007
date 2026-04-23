@@ -83,7 +83,7 @@ static_resources:
                       port_value: 8181
 
 admin:
-  access_log_path: /tmp/admin_access.log
+  access_log_path: /dev/null
   address:
     socket_address:
       address: 0.0.0.0

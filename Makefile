@@ -5,6 +5,7 @@ CLIENT_SLUG ?= example-client
 ENGAGEMENT_TRACK ?= secure-starter-kit
 PRIMARY_RUNTIME ?= Onyx
 LIVE_COMPOSE_PROJECT_NAME ?= trust0007_live
+LIVE_ENV_FILES ?= compose/.env.production .env.live
 
 demo:
 	bash scripts/run-demo.sh
@@ -80,10 +81,10 @@ down-dev:
 	docker compose --env-file compose/.env -f compose/docker-compose.yml down
 
 verify-live:
-	bash scripts/verify-live-env.sh .env.live
+	bash scripts/verify-live-env.sh $(LIVE_ENV_FILES)
 
 up-live: verify-live
-	docker compose --env-file .env.live -p $(LIVE_COMPOSE_PROJECT_NAME) -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml up -d
+	docker compose $(foreach env,$(LIVE_ENV_FILES),--env-file $(env)) -p $(LIVE_COMPOSE_PROJECT_NAME) -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml up -d
 
 down-live:
-	docker compose --env-file .env.live -p $(LIVE_COMPOSE_PROJECT_NAME) -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml down
+	docker compose $(foreach env,$(LIVE_ENV_FILES),--env-file $(env)) -p $(LIVE_COMPOSE_PROJECT_NAME) -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml down

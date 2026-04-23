@@ -30,6 +30,7 @@ def test_tool_policy_blocks_unapproved_mcp_tool_and_requires_privileged_approval
     decision = engine.evaluate_tool_authorization(
         {
             "runtime_id": "onyx",
+            "surface": "onyx.apps",
             "mcp_server": "mcp_server.unapproved",
             "tool_id": "onyx_admin",
             "risk": "high",

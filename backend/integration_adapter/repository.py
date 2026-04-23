@@ -53,6 +53,28 @@ def repo_root(explicit: Path | None = None) -> Path:
     return explicit or Path(__file__).resolve().parents[2]
 
 
+def artifact_dir(root: Path | None = None) -> Path:
+    configured = os.environ.get("CONTROL_PLANE_ARTIFACT_DIR", "").strip()
+    if configured:
+        candidate = Path(configured)
+        if not candidate.is_absolute():
+            candidate = repo_root(root) / candidate
+        return candidate
+    return repo_root(root) / "overlays/myStarterKit/artifacts"
+
+
+def _artifact_path(root: Path | None, filename: str) -> Path:
+    return artifact_dir(root) / filename
+
+
+def _artifact_relative_path(root: Path | None, filename: str) -> str:
+    candidate = _artifact_path(root, filename)
+    try:
+        return str(candidate.relative_to(repo_root(root)))
+    except ValueError:
+        return str(candidate)
+
+
 def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else ""
 
@@ -564,7 +586,7 @@ def load_latest_governed_flow_events(root: Path | None = None) -> list[dict[str,
     after a /api/control-plane/governed-flow request.
     """
     resolved_root = repo_root(root)
-    events_path = resolved_root / "overlays/myStarterKit/artifacts/events.jsonl"
+    events_path = _artifact_path(resolved_root, "events.jsonl")
     return read_jsonl(events_path)
 
 
@@ -574,57 +596,52 @@ def load_latest_governed_flow_launch_gate(root: Path | None = None) -> dict[str,
     Returns empty dict if no governed flow artifacts are available.
     """
     resolved_root = repo_root(root)
-    gate_path = resolved_root / "overlays/myStarterKit/artifacts/launch-gate-result.json"
+    gate_path = _artifact_path(resolved_root, "launch-gate-result.json")
     return read_json(gate_path)
 
 
 def load_latest_governed_flow_summary(root: Path | None = None) -> dict[str, Any]:
-    resolved_root = repo_root(root)
-    return read_json(resolved_root / GOVERNED_FLOW_SUMMARY_PATH)
+    return read_json(_artifact_path(root, "governed-flow-summary.json"))
 
 
 def governed_request_feed_relative_path(root: Path | None = None) -> str:
-    resolved_root = repo_root(root)
-    if (resolved_root / GOVERNED_REQUEST_FEED_PATH).exists():
-        return GOVERNED_REQUEST_FEED_PATH
-    return GOVERNED_REQUEST_FEED_PATH
+    return _artifact_relative_path(root, "governed-request-feed.json")
 
 
 def load_latest_governed_request_feed(root: Path | None = None) -> list[dict[str, Any]]:
-    resolved_root = repo_root(root)
-    return read_json_array(resolved_root / GOVERNED_REQUEST_FEED_PATH)
+    return read_json_array(_artifact_path(root, "governed-request-feed.json"))
 
 
 def load_latest_identity_evidence(root: Path | None = None) -> dict[str, Any]:
-    return read_json(repo_root(root) / IDENTITY_EVIDENCE_PATH)
+    return read_json(_artifact_path(root, "identity-evidence.json"))
 
 
 def load_latest_policy_evidence(root: Path | None = None) -> dict[str, Any]:
-    return read_json(repo_root(root) / POLICY_EVIDENCE_PATH)
+    return read_json(_artifact_path(root, "policy-evidence.json"))
 
 
 def load_latest_retrieval_evidence(root: Path | None = None) -> dict[str, Any]:
-    return read_json(repo_root(root) / RETRIEVAL_EVIDENCE_PATH)
+    return read_json(_artifact_path(root, "retrieval-evidence.json"))
 
 
 def load_latest_secret_evidence(root: Path | None = None) -> dict[str, Any]:
-    return read_json(repo_root(root) / SECRET_EVIDENCE_PATH)
+    return read_json(_artifact_path(root, "secret-evidence.json"))
 
 
 def load_latest_trace_correlation(root: Path | None = None) -> dict[str, Any]:
-    return read_json(repo_root(root) / TRACE_CORRELATION_PATH)
+    return read_json(_artifact_path(root, "trace-correlation.json"))
 
 
 def load_latest_onyx_runtime_proof(root: Path | None = None) -> dict[str, Any]:
-    return read_json(repo_root(root) / ONYX_RUNTIME_PROOF_PATH)
+    return read_json(_artifact_path(root, "onyx-runtime-proof.json"))
 
 
 def load_latest_runtime_proof(root: Path | None = None) -> dict[str, Any]:
-    return read_json(repo_root(root) / RUNTIME_PROOF_PATH)
+    return read_json(_artifact_path(root, "runtime-proof.json"))
 
 
 def load_latest_audit_records(root: Path | None = None) -> list[dict[str, Any]]:
-    return read_jsonl(repo_root(root) / AUDIT_RECORDS_PATH)
+    return read_jsonl(_artifact_path(root, "audit-records.jsonl"))
 
 
 def has_live_governed_flow_artifacts(root: Path | None = None) -> bool:
@@ -634,7 +651,7 @@ def has_live_governed_flow_artifacts(root: Path | None = None) -> bool:
 def validate_live_governed_flow_artifacts(root: Path | None = None) -> dict[str, Any]:
     """Validate that current overlay artifacts represent a fresh, real live governed run."""
     resolved_root = repo_root(root)
-    artifacts_dir = resolved_root / "overlays/myStarterKit/artifacts"
+    artifacts_dir = artifact_dir(resolved_root)
     reasons: list[str] = []
     if not artifacts_dir.exists():
         return {"valid": False, "reasons": ["artifacts_dir_missing"], "checked_at": datetime.now(timezone.utc).isoformat()}

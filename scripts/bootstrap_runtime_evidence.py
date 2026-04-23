@@ -121,7 +121,7 @@ def main() -> int:
     _launch(args.control_plane_base_url, "onyx", "/apps", token, mcp_server=args.mcp_server)
     # Keep Onyx as the final governed run so retrieval/runtime proof in the
     # top-level summary reflects the RAG lane truthfully.
-    _launch(args.control_plane_base_url, "onyx", "/app", token)
+    _launch(args.control_plane_base_url, "onyx", "/app", token, mcp_server=args.mcp_server)
 
     required = [
         "identity-evidence.json",

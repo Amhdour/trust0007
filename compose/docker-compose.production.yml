@@ -20,6 +20,7 @@ services:
       CONTROL_PLANE_QDRANT_COLLECTION: ${CONTROL_PLANE_QDRANT_COLLECTION:-governed_docs}
       CONTROL_PLANE_VAULT_ADDR: ${CONTROL_PLANE_VAULT_ADDR:-http://vault:8200}
       CONTROL_PLANE_VAULT_TOKEN: ${CONTROL_PLANE_VAULT_TOKEN:-}
+      CONTROL_PLANE_VAULT_TOKEN_FILE: ${CONTROL_PLANE_VAULT_TOKEN_FILE:-}
       CONTROL_PLANE_ONYX_SECRET_PATH: ${CONTROL_PLANE_ONYX_SECRET_PATH:-secret/data/runtime/tenant-stage/onyx}
       CONTROL_PLANE_ONYX_HOST: ${CONTROL_PLANE_ONYX_HOST:-127.0.0.1}
       CONTROL_PLANE_ONYX_PORT: ${CONTROL_PLANE_ONYX_PORT:-3010}
@@ -44,6 +45,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - control_plane_artifacts:/app/overlays/myStarterKit/artifacts
+      - ../.runtime/live-governed:/run/control-plane/bootstrap-state:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       keycloak:
@@ -240,6 +242,8 @@ services:
     networks:
       - trust_stack
     read_only: true
+    tmpfs:
+      - /tmp
     security_opt:
       - no-new-privileges:true
 

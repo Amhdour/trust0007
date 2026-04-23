@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from backend.api_gateway import server
@@ -44,6 +46,43 @@ def test_live_startup_validation_passes_with_hardened_configuration(monkeypatch:
     monkeypatch.setenv("CONTROL_PLANE_QDRANT_URL", "http://qdrant:6333")
 
     server._validate_startup_configuration()
+
+
+def test_live_startup_validation_accepts_vault_token_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    token_file = tmp_path / "vault-root-token"
+    token_file.write_text("token-from-file\n", encoding="utf-8")
+
+    monkeypatch.setenv("CONTROL_PLANE_GOVERNANCE_MODE", "live")
+    monkeypatch.setenv("CONTROL_PLANE_ENVIRONMENT_MODE", "staging")
+    monkeypatch.delenv("CONTROL_PLANE_VAULT_TOKEN", raising=False)
+    monkeypatch.setenv("CONTROL_PLANE_VAULT_TOKEN_FILE", str(token_file))
+    monkeypatch.setenv("CONTROL_PLANE_ONYX_SECRET_PATH", "secret/data/runtime/tenant-stage/onyx")
+    monkeypatch.setenv("CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS", "true")
+    monkeypatch.setenv("CONTROL_PLANE_EXTERNAL_REACHABLE", "false")
+    monkeypatch.setenv("CONTROL_PLANE_KEYCLOAK_DEV_MODE", "false")
+    monkeypatch.setenv("CONTROL_PLANE_VAULT_DEV_MODE", "false")
+    monkeypatch.setenv("CONTROL_PLANE_KEYCLOAK_BASE_URL", "http://keycloak:8080")
+    monkeypatch.setenv("CONTROL_PLANE_OPA_URL", "http://opa:8181")
+    monkeypatch.setenv("CONTROL_PLANE_QDRANT_URL", "http://qdrant:6333")
+
+    server._validate_startup_configuration()
+
+
+def test_live_startup_validation_rejects_placeholder_vault_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_GOVERNANCE_MODE", "live")
+    monkeypatch.setenv("CONTROL_PLANE_ENVIRONMENT_MODE", "staging")
+    monkeypatch.setenv("CONTROL_PLANE_VAULT_TOKEN", "replace-with-non-dev-token")
+    monkeypatch.setenv("CONTROL_PLANE_ONYX_SECRET_PATH", "secret/data/runtime/tenant-stage/onyx")
+    monkeypatch.setenv("CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS", "true")
+    monkeypatch.setenv("CONTROL_PLANE_EXTERNAL_REACHABLE", "false")
+    monkeypatch.setenv("CONTROL_PLANE_KEYCLOAK_DEV_MODE", "false")
+    monkeypatch.setenv("CONTROL_PLANE_VAULT_DEV_MODE", "false")
+    monkeypatch.setenv("CONTROL_PLANE_KEYCLOAK_BASE_URL", "http://keycloak:8080")
+    monkeypatch.setenv("CONTROL_PLANE_OPA_URL", "http://opa:8181")
+    monkeypatch.setenv("CONTROL_PLANE_QDRANT_URL", "http://qdrant:6333")
+
+    with pytest.raises(RuntimeError, match="missing_required_env:CONTROL_PLANE_VAULT_TOKEN_OR_VAULT_TOKEN"):
+        server._validate_startup_configuration()
 
 
 def test_runtime_base_url_prefers_explicit_override(monkeypatch: pytest.MonkeyPatch) -> None:

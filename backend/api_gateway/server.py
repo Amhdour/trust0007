@@ -62,6 +62,34 @@ ARTIFACT_DIR = Path(
     )
 ).resolve()
 
+_PLACEHOLDER_SECRET_VALUES = {
+    "",
+    "replace-with-non-dev-token",
+    "replace-me",
+    "changeme",
+    "change-me",
+}
+
+
+def _read_secret_file(path_value: str) -> str:
+    try:
+        return Path(path_value).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _configured_secret_value(*names: str) -> str:
+    for name in names:
+        value = os.environ.get(name, "").strip()
+        if value and value.lower() not in _PLACEHOLDER_SECRET_VALUES:
+            return value
+        file_value = os.environ.get(f"{name}_FILE", "").strip()
+        if file_value:
+            file_secret = _read_secret_file(file_value)
+            if file_secret and file_secret.lower() not in _PLACEHOLDER_SECRET_VALUES:
+                return file_secret
+    return ""
+
 
 def _is_static_candidate(path: Path) -> bool:
     return path.exists() and path.is_file() and (STATIC_ROOT in path.parents or path == STATIC_ROOT / "index.html")
@@ -236,10 +264,7 @@ def _validate_startup_configuration() -> None:
         for env_name in required_env:
             if not os.environ.get(env_name, "").strip():
                 errors.append(f"startup.missing_required_env:{env_name}")
-        if not (
-            os.environ.get("CONTROL_PLANE_VAULT_TOKEN", "").strip()
-            or os.environ.get("VAULT_TOKEN", "").strip()
-        ):
+        if not _configured_secret_value("CONTROL_PLANE_VAULT_TOKEN", "VAULT_TOKEN"):
             errors.append("startup.missing_required_env:CONTROL_PLANE_VAULT_TOKEN_OR_VAULT_TOKEN")
         if not os.environ.get("CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS", "").strip():
             errors.append("startup.missing_required_env:CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS")
@@ -506,9 +531,12 @@ class RuntimePolicyChecker(PolicyChecker):
             if not tenant_sources:
                 return PolicyDecision(allow=False, reasons=[f"policy.data_boundary_not_configured:{request.tenant_id}"])
 
+        mcp_governed_surfaces = set(runtime_controls.get("mcp_governed_surfaces", ["onyx.apps", "onyx.agents"]))
         if bool(runtime_controls.get("require_mcp_governance", False)):
             allowed_mcp_servers = set(runtime_controls.get("mcp_allowed_servers", []))
-            if allowed_mcp_servers:
+            surface_info = _resolve_surface(self._policy, requested_path) if requested_path else {"surface": ""}
+            surface_name = str(surface_info.get("surface", "")).strip()
+            if allowed_mcp_servers and surface_name in mcp_governed_surfaces:
                 requested_mcp_server = str(request.metadata.get("requested_mcp_server", "")).strip()
                 if requested_mcp_server and requested_mcp_server not in allowed_mcp_servers:
                     return PolicyDecision(allow=False, reasons=[f"policy.mcp_server_not_allowed:{requested_mcp_server}"])
@@ -866,7 +894,15 @@ def _record_runtime_proof(
             },
             "matched_activity": {},
         }
-    runtime_artifact = f"{target.key}-runtime-proof.json"
+    runtime_artifact_key = target.key
+    runtime_summary_key = target.key
+    runtime_label = target.label
+    if target.key == "onyx" and requested_path.startswith("/apps"):
+        runtime_artifact_key = "onyx-agent"
+        runtime_summary_key = "onyx_agent"
+        runtime_label = "Onyx Agent"
+
+    runtime_artifact = f"{runtime_artifact_key}-runtime-proof.json"
     latest_path = ARTIFACT_DIR / runtime_artifact
     canonical_latest_path = ARTIFACT_DIR / "runtime-proof.json"
     history_path = ARTIFACT_DIR / "governed-request-history" / trace_id / runtime_artifact if trace_id else None
@@ -885,11 +921,11 @@ def _record_runtime_proof(
             "launch_gate_decision": str(getattr(flow_result, "launch_gate_decision", "") if flow_result else ""),
             "policy_source": str(getattr(flow_result, "policy_source", "") if flow_result else ""),
             "policy_path": str(getattr(flow_result, "policy_path", "") if flow_result else ""),
-            "runtime_key": target.key,
-            "runtime_label": target.label,
+            "runtime_key": runtime_summary_key,
+            "runtime_label": runtime_label,
             "runtime_class": target.runtime_class,
             "reachability": _runtime_reachability_summary(
-                runtime_label=target.label,
+                runtime_label=runtime_label,
                 governance_allowed=governance_allowed,
                 local_ready=local_ready,
                 public_ready=public_ready,
@@ -906,8 +942,8 @@ def _record_runtime_proof(
             trace_id,
             proof,
             refs,
-            artifact_key=f"{target.key}_runtime_proof",
-            runtime_key=target.key,
+            artifact_key=f"{runtime_summary_key}_runtime_proof",
+            runtime_key=runtime_summary_key,
         )
     return proof
 
@@ -1055,9 +1091,7 @@ def _workspace_activity_panel_markup(activity_payload: dict) -> str:
 
 def _build_secret_provider() -> VaultSecretsProvider | None:
     vault_addr = os.environ.get("CONTROL_PLANE_VAULT_ADDR", "http://vault:8200").strip()
-    vault_token = os.environ.get("CONTROL_PLANE_VAULT_TOKEN", "").strip()
-    if not vault_token:
-        vault_token = os.environ.get("VAULT_TOKEN", "").strip()
+    vault_token = _configured_secret_value("CONTROL_PLANE_VAULT_TOKEN", "VAULT_TOKEN")
     if not vault_addr or not vault_token:
         return None
     return VaultSecretsProvider(VaultHTTPClient(base_url=vault_addr, token=vault_token))

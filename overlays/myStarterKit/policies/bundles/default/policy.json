@@ -134,6 +134,10 @@
       "require_retrieval_security": true,
       "require_data_boundary": true,
       "require_mcp_governance": true,
+      "mcp_governed_surfaces": [
+        "onyx.apps",
+        "onyx.agents"
+      ],
       "mcp_allowed_servers": [
         "mcp_server.dashboard_control_plane"
       ],

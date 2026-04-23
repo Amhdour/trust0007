@@ -49,6 +49,8 @@ def _validate(path: Path) -> list[str]:
     else:
         if not bool(onyx_controls.get("require_mcp_governance", False)):
             errors.append(f"{path}: runtime_controls.onyx.require_mcp_governance must be true")
+        if not list(onyx_controls.get("mcp_governed_surfaces", [])):
+            errors.append(f"{path}: runtime_controls.onyx.mcp_governed_surfaces must not be empty")
         if not list(onyx_controls.get("mcp_allowed_servers", [])):
             errors.append(f"{path}: runtime_controls.onyx.mcp_allowed_servers must not be empty")
 

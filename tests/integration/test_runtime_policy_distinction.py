@@ -24,6 +24,7 @@ def test_runtime_policy_distinguishes_onyx_data_boundary_and_onyx_mcp_rules() ->
             "onyx": {
                 "require_data_boundary": True,
                 "require_mcp_governance": True,
+                "mcp_governed_surfaces": ["onyx.apps", "onyx.agents"],
                 "mcp_allowed_servers": ["mcp_server.dashboard_control_plane"],
             },
         },
@@ -60,6 +61,7 @@ def test_runtime_policy_denies_onyx_when_mcp_server_not_allowlisted() -> None:
         "runtime_controls": {
             "onyx": {
                 "require_mcp_governance": True,
+                "mcp_governed_surfaces": ["onyx.apps", "onyx.agents"],
                 "mcp_allowed_servers": ["mcp_server.dashboard_control_plane"],
             }
         },

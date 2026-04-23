@@ -16,6 +16,7 @@ else
 fi
 LIVE_COMPOSE_PROJECT_NAME="${LIVE_COMPOSE_PROJECT_NAME:-trust0007_live}"
 STATE_DIR="${STATE_DIR:-$ROOT_DIR/.runtime/live-governed}"
+VAULT_TOKEN_FILE="${VAULT_TOKEN_FILE:-$STATE_DIR/vault-root-token}"
 
 for env_file in "${ENV_FILE_LIST[@]}"; do
   if [[ ! -f "$env_file" ]]; then
@@ -397,6 +398,10 @@ fi
 require_value "VAULT_TOKEN" "${VAULT_TOKEN:-}"
 require_value "VAULT_UNSEAL_KEY" "${VAULT_UNSEAL_KEY:-}"
 
+mkdir -p "$(dirname "$VAULT_TOKEN_FILE")"
+printf '%s\n' "$VAULT_TOKEN" > "$VAULT_TOKEN_FILE"
+chmod 600 "$VAULT_TOKEN_FILE"
+
 if [[ "$vault_sealed" == "yes" ]]; then
   vault_exec "vault operator unseal ${VAULT_UNSEAL_KEY}" >/dev/null
 fi
@@ -484,6 +489,18 @@ points_req = Request(
                         "quarantined": False,
                         "provenance": {"uri": "kb://governed-live-launch-doc-1"},
                     },
+                },
+                {
+                    "id": 1002,
+                    "vector": [0.1],
+                    "payload": {
+                        "tenant_id": tenant_id,
+                        "source": "qdrant",
+                        "content": "Navigate to Onyx Agent path: /apps governed launch context",
+                        "trust_label": "trusted",
+                        "quarantined": False,
+                        "provenance": {"uri": "kb://governed-live-launch-doc-2"},
+                    },
                 }
             ]
         }
@@ -514,6 +531,7 @@ echo "Realm: ${KEYCLOAK_REALM}"
 echo "User: ${LIVE_USERNAME}"
 echo "Tenant: ${TENANT_ID}"
 echo "Vault state: ${VAULT_INIT_FILE}"
+echo "Vault token file: ${VAULT_TOKEN_FILE}"
 echo
 echo "Next step:"
 echo "  python scripts/smoke-live-onyx-handoff.py"

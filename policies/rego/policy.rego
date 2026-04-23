@@ -167,9 +167,25 @@ unallowlisted_tool_used if {
   not tool in forbidden_tools
 }
 
+mcp_governed_surface if {
+  some surface in object.get(runtime_control, "mcp_governed_surfaces", [])
+  surface == matched_surface
+}
+
+mcp_governed_surface if {
+  count(object.get(runtime_control, "mcp_governed_surfaces", [])) == 0
+  matched_surface == "onyx.apps"
+}
+
+mcp_governed_surface if {
+  count(object.get(runtime_control, "mcp_governed_surfaces", [])) == 0
+  matched_surface == "onyx.agents"
+}
+
 mcp_governance_required if {
   runtime_key == "onyx"
   object.get(runtime_control, "require_mcp_governance", false)
+  mcp_governed_surface
 }
 
 mcp_server_allowed if {
