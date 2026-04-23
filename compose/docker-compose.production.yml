@@ -56,8 +56,6 @@ services:
         condition: service_started
       onyx_runtime:
         condition: service_healthy
-      onyx_runtime:
-        condition: service_healthy
     networks:
       - trust_stack
     read_only: true
@@ -249,22 +247,6 @@ services:
     image: nginx:1.27-alpine
     ports:
       - "${CONTROL_PLANE_ONYX_PORT:-3010}:80"
-    volumes:
-      - ./runtime/onyx:/usr/share/nginx/html:ro
-      - ./runtime/onyx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null 2>&1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks:
-      - trust_stack
-    security_opt:
-      - no-new-privileges:true
-
-  onyx_runtime:
-    image: nginx:1.27-alpine
-    ports:
     volumes:
       - ./runtime/onyx:/usr/share/nginx/html:ro
       - ./runtime/onyx/default.conf:/etc/nginx/conf.d/default.conf:ro

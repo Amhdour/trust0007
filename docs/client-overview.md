@@ -15,7 +15,7 @@ The client overview is the simple visual entry point for:
 It explains:
 
 - what the system does
-- how runtime access is governed across both AI lanes (Onyx RAG and Onyx Agent Autonomous Agents)
+- how runtime access is governed across both AI lanes (Onyx RAG and Onyx Agent tool governance)
 - what checks happen before AI access is allowed
 - what gets blocked
 - why blocked requests matter

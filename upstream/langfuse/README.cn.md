@@ -168,7 +168,6 @@ Langfuse 是一个 **开源 LLM 工程** 平台。它帮助团队协作 **开发
 | [AutoGen](https://langfuse.com/docs/integrations/autogen)               | 代理框架      | 用于构建分布式代理的开源 LLM 平台。                                                     |
 | [Flowise](https://langfuse.com/docs/integrations/flowise)               | 聊天/代理界面 | 基于 JS/TS 的无代码构建器，用于定制化 LLM 流程。                                        |
 | [Langflow](https://langfuse.com/docs/integrations/langflow)             | 聊天/代理界面 | 基于 Python 的 LangChain 用户界面，采用 react-flow 设计，提供便捷的实验与原型构建体验。 |
-| [Dify](https://langfuse.com/docs/integrations/dify)                     | 聊天/代理界面 | 带有无代码构建器的开源 LLM 应用开发平台。                                               |
 | [OpenWebUI](https://langfuse.com/docs/integrations/openwebui)           | 聊天/代理界面 | 自托管的 LLM 聊天网页界面，支持包括自托管和本地模型在内的多种 LLM 运行器。              |
 | [Promptfoo](https://langfuse.com/docs/integrations/promptfoo)           | 工具          | 开源 LLM 测试平台。                                                                     |
 | [LobeChat](https://langfuse.com/docs/integrations/lobechat)             | 聊天/代理界面 | 开源聊天机器人平台。                                                                    |
@@ -290,7 +289,6 @@ _[Langfuse 中的公共示例追踪](https://cloud.langfuse.com/project/cloramnk
 
 | 仓库                                                                                                                                                                                                                                                                |  星数 |
 | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----: |
-| <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/127165244?s=40&v=4" width="20" height="20" alt=""> &nbsp; [langgenius](https://github.com/langgenius) / [dify](https://github.com/langgenius/dify)                                            | 54865 |
 | <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/158137808?s=40&v=4" width="20" height="20" alt=""> &nbsp; [open-webui](https://github.com/open-webui) / [open-webui](https://github.com/open-webui/open-webui)                                | 51531 |
 | <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/131470832?s=40&v=4" width="20" height="20" alt=""> &nbsp; [lobehub](https://github.com/lobehub) / [lobe-chat](https://github.com/lobehub/lobe-chat)                                           | 49003 |
 | <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/85702467?s=40&v=4" width="20" height="20" alt=""> &nbsp; [langflow-ai](https://github.com/langflow-ai) / [langflow](https://github.com/langflow-ai/langflow)                                  | 39093 |

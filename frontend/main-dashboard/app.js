@@ -2265,8 +2265,8 @@ function defaultRuntimePortfolio() {
     {
       name: "Onyx Agent",
       runtime_key: "onyx",
-      runtime_class: "Autonomous Agents",
-      description: "Agent runtime lane with tool, MCP, and authorization governance.",
+      runtime_class: "Tool Governance",
+      description: "Onyx runtime lane with tool, MCP, and authorization governance.",
       status: "neutral",
       launch_href: "/launch/onyx/agent?mode=live&view=embedded",
       evidence_href: "#tool-mcp-governance",

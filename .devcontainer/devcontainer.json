@@ -29,8 +29,7 @@
   },
   "forwardPorts": [
     3000,
-    3010,
-    8088
+    3010
   ],
   "portsAttributes": {
     "3000": {
@@ -39,10 +38,6 @@
     },
     "3010": {
       "label": "Onyx Runtime",
-      "onAutoForward": "silent"
-    },
-    "8088": {
-      "label": "Dify Runtime",
       "onAutoForward": "silent"
     }
   },

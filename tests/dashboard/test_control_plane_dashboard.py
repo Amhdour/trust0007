@@ -195,7 +195,7 @@ def test_dashboard_payload_includes_runtime_summary_and_stack_health() -> None:
     assert {item["id"] for item in payload["runtime_portfolio"]["runtimes"]} >= {"onyx", "onyx-agent"}
     runtime_portfolio = {item["runtime_key"]: item for item in payload["runtime_portfolio"]["runtimes"]}
     assert runtime_portfolio["onyx"]["runtime_class"] == "rag"
-    assert runtime_portfolio["onyx_agent"]["runtime_class"] == "autonomous_agents"
+    assert runtime_portfolio["onyx_agent"]["runtime_class"] == "tool_governance"
     assert runtime_portfolio["onyx"]["launch_route"]
     assert runtime_portfolio["onyx"]["launch_href"]
     assert runtime_portfolio["onyx"]["evidence_href"]

@@ -100,7 +100,6 @@ live_services_running() {
     qdrant
     vault
     onyx_runtime
-    dify_runtime
   )
   local service
   for service in "${required_services[@]}"; do
@@ -130,7 +129,6 @@ required = [
     "secret-evidence.json",
     "launch-gate-result.json",
     "onyx-runtime-proof.json",
-    "dify-runtime-proof.json",
 ]
 def fetch(name: str) -> dict:
     url = f"{base}/raw/overlays/myStarterKit/artifacts/{quote(name)}"
@@ -222,7 +220,7 @@ start_local_control_plane() {
 
 run_live_bootstrap() {
   : >"$LIVE_LOG_FILE"
-  echo "Bootstrapping live governed stack (Onyx + Dify). Logs: $LIVE_LOG_FILE"
+  echo "Bootstrapping live governed stack (Onyx). Logs: $LIVE_LOG_FILE"
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] bootstrap-live-governed-path: start" >>"$LIVE_LOG_FILE"
   if ! ENV_FILES="$(join_by_colon "${LIVE_ENV_FILES[@]}")" \
     COMPOSE_FILES="$(join_by_colon "${LIVE_COMPOSE_FILES[@]}")" \
@@ -253,10 +251,6 @@ cleanup_known_port_conflicts() {
   if grep -Eq '^onyx-nginx-1 .+:3010->' <<<"$container_ports"; then
     echo "Stopping legacy container onyx-nginx-1 to free host port 3010 for compose onyx_runtime."
     docker rm -f onyx-nginx-1 >/dev/null 2>&1 || true
-  fi
-  if grep -Eq '^governed-dify-web .+:8088->' <<<"$container_ports"; then
-    echo "Stopping legacy container governed-dify-web to free host port 8088 for compose dify_runtime."
-    docker rm -f governed-dify-web >/dev/null 2>&1 || true
   fi
 }
 
@@ -306,7 +300,7 @@ fi
 cleanup_known_port_conflicts
 if run_live_bootstrap && wait_for_dashboard_health 30 2 && live_stack_ready; then
   echo "Live governed stack ready at ${LIVE_CONTROL_PLANE_BASE_URL}/"
-  echo "Onyx and Dify runtime evidence refreshed for the dashboard."
+  echo "Onyx runtime evidence refreshed for the dashboard."
   exit 0
 fi
 

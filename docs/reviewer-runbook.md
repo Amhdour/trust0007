@@ -8,7 +8,7 @@ Do **not** treat success as “run every upstream project under `upstream/`.”
 For this repo, a meaningful live preview is the governed control plane proving **both** runtime lanes:
 
 - `/launch/onyx` (Onyx / RAG)
-- `/launch/onyx/agent` (Onyx Agent / Autonomous Agents)
+- `/launch/onyx/agent` (Onyx Agent / Tool Governance)
 
 ### Required for first-proof success
 
@@ -82,7 +82,7 @@ Related docs:
 This repository proves a **dashboard-first trust control plane** for two governed runtime lanes:
 
 - **Onyx lane (RAG):** governed retrieval handoff at `/launch/onyx`.
-- **Onyx Agent lane (Autonomous Agents):** governed tool/MCP handoff at `/launch/onyx/agent`.
+- **Onyx Agent lane (Tool Governance):** governed tool/MCP handoff at `/launch/onyx/agent`.
 - **Shared controls before runtime access:** identity, policy, retrieval/tool controls, secrets, trace continuity, and launch-gate decision.
 
 ## What good looks like

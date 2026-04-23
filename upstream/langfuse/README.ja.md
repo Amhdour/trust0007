@@ -175,7 +175,6 @@ Langfuseチームによるマネージドデプロイメント。充実した無
 | [AutoGen](https://langfuse.com/docs/integrations/autogen)                             | エージェントフレームワーク | 分散型エージェント構築のためのオープンソースLLMプラットフォーム                     |
 | [Flowise](https://langfuse.com/docs/integrations/flowise)                             | チャット/エージェント UI   | JS/TSのノーコードビルダーで、カスタマイズ可能なLLMフローを構築                      |
 | [Langflow](https://langfuse.com/docs/integrations/langflow)                           | チャット/エージェント UI   | PythonベースのUIで、react-flowを用いてLangChainの実験やプロトタイピングを容易に実現 |
-| [Dify](https://langfuse.com/docs/integrations/dify)                                   | チャット/エージェント UI   | ノーコードでLLMアプリ開発が可能なオープンソースプラットフォーム                     |
 | [OpenWebUI](https://langfuse.com/docs/integrations/openwebui)                         | チャット/エージェント UI   | 自前ホストおよびローカルモデルに対応するLLMチャットWeb UI                           |
 | [Promptfoo](https://langfuse.com/docs/integrations/promptfoo)                         | ツール                     | オープンソースのLLMテストプラットフォーム                                           |
 | [LobeChat](https://langfuse.com/docs/integrations/lobechat)                           | チャット/エージェント UI   | オープンソースのチャットボットプラットフォーム                                      |
@@ -296,7 +295,6 @@ Langfuseを利用している主要なオープンソースPythonプロジェク
 
 | リポジトリ                                                                                                                                                                                                                                                          | スター |
 | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -----: |
-| <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/127165244?s=40&v=4" width="20" height="20" alt=""> &nbsp; [langgenius](https://github.com/langgenius) / [dify](https://github.com/langgenius/dify)                                            |  54865 |
 | <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/158137808?s=40&v=4" width="20" height="20" alt=""> &nbsp; [open-webui](https://github.com/open-webui) / [open-webui](https://github.com/open-webui/open-webui)                                |  51531 |
 | <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/131470832?s=40&v=4" width="20" height="20" alt=""> &nbsp; [lobehub](https://github.com/lobehub) / [lobe-chat](https://github.com/lobehub/lobe-chat)                                           |  49003 |
 | <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/85702467?s=40&v=4" width="20" height="20" alt=""> &nbsp; [langflow-ai](https://github.com/langflow-ai) / [langflow](https://github.com/langflow-ai/langflow)                                  |  39093 |

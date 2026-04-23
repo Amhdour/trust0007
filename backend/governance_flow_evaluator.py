@@ -261,7 +261,7 @@ class GovernedFlowEvaluator:
         audit_record_count = 0
         question_telemetry = sanitize_question(prompt)
         runtime_target = str(base_metadata.get("runtime_key", base_metadata.get("runtime_target", "onyx")) or "onyx")
-        runtime_class = str(base_metadata.get("runtime_class", "rag" if runtime_target == "onyx" else "autonomous_agents"))
+        runtime_class = str(base_metadata.get("runtime_class", "rag"))
         request_telemetry_common = {
             "runtime_target": runtime_target,
             "runtime_class": runtime_class,

@@ -162,7 +162,6 @@ Langfuse 팀이 관리하는 배포 방식으로, 후한 무료 플랜(취미 �
 | [AutoGen](https://langfuse.com/docs/integrations/autogen)                             | 에이전트 프레임워크 | 분산 에이전트 구축을 위한 오픈 소스 LLM 플랫폼입니다.                                                       |
 | [Flowise](https://langfuse.com/docs/integrations/flowise)                             | 채팅/에이전트 UI    | 맞춤형 LLM 플로우를 위한 JS/TS 코드 없는(no-code) 빌더입니다.                                               |
 | [Langflow](https://langfuse.com/docs/integrations/langflow)                           | 채팅/에이전트 UI    | react-flow를 활용하여 실험 및 프로토타이핑을 손쉽게 할 수 있도록 디자인된 LangChain용 Python 기반 UI입니다. |
-| [Dify](https://langfuse.com/docs/integrations/dify)                                   | 채팅/에이전트 UI    | 코드 없는 빌더와 함께 제공되는 오픈 소스 LLM 애플리케이션 개발 플랫폼입니다.                                |
 | [OpenWebUI](https://langfuse.com/docs/integrations/openwebui)                         | 채팅/에이전트 UI    | 셀프 호스팅 및 로컬 모델 등 다양한 LLM 실행기를 지원하는 셀프 호스팅 LLM 채팅 웹 UI입니다.                  |
 | [Promptfoo](https://langfuse.com/docs/integrations/promptfoo)                         | 도구                | 오픈 소스 LLM 테스트 플랫폼입니다.                                                                          |
 | [LobeChat](https://langfuse.com/docs/integrations/lobechat)                           | 채팅/에이전트 UI    | 오픈 소스 챗봇 플랫폼입니다.                                                                                |
@@ -278,7 +277,6 @@ _[Langfuse의 공개 예제 trace](https://cloud.langfuse.com/project/cloramnkj0
 
 | 저장소                                                                                                                                                                                                                                                              |    별 |
 | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----: |
-| <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/127165244?s=40&v=4" width="20" height="20" alt=""> &nbsp; [langgenius](https://github.com/langgenius) / [dify](https://github.com/langgenius/dify)                                            | 54865 |
 | <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/158137808?s=40&v=4" width="20" height="20" alt=""> &nbsp; [open-webui](https://github.com/open-webui) / [open-webui](https://github.com/open-webui/open-webui)                                | 51531 |
 | <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/131470832?s=40&v=4" width="20" height="20" alt=""> &nbsp; [lobehub](https://github.com/lobehub) / [lobe-chat](https://github.com/lobehub/lobe-chat)                                           | 49003 |
 | <img class="avatar mr-2" src="https://avatars.githubusercontent.com/u/85702467?s=40&v=4" width="20" height="20" alt=""> &nbsp; [langflow-ai](https://github.com/langflow-ai) / [langflow](https://github.com/langflow-ai/langflow)                                  | 39093 |
