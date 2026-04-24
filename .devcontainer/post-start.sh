@@ -16,9 +16,7 @@ PROJECT_DIR="$(resolve_project_dir)"
 
 cd "$PROJECT_DIR"
 
-echo "==> Active project root: $PROJECT_DIR"
-
-BOOT_MODE="${TRUST_CODESPACE_BOOT_MODE:-compose}"
+BOOT_MODE="${TRUST_CODESPACE_BOOT_MODE:-local}"
 LOG_DIR="$PROJECT_DIR/.devcontainer/.control-plane"
 LOG_FILE="$LOG_DIR/codespace-start.log"
 PID_FILE="$LOG_DIR/control-plane.pid"

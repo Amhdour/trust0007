@@ -13,14 +13,12 @@ resolve_project_dir() {
 }
 
 PROJECT_DIR="$(resolve_project_dir)"
-WORKSPACE_DEFAULT="$PROJECT_DIR"
 
 cd "$REPO_ROOT"
 
 echo "==> Preparing AI Trust & Security Readiness career project"
 echo "==> Repo root: $REPO_ROOT"
 echo "==> Project root: $PROJECT_DIR"
-echo "==> Workspace default: $WORKSPACE_DEFAULT"
 
 if [[ -f .gitmodules ]]; then
   git submodule update --init --recursive || true
@@ -45,6 +43,4 @@ mkdir -p overlays/myStarterKit/artifacts
 mkdir -p .devcontainer/.control-plane
 
 echo "==> Project ready"
-echo "==> Auto-start is enabled for Codespaces startup previews"
-echo "Reviewer fast-path: cd $PROJECT_DIR && make help"
-echo "Manual run (if needed): cd $PROJECT_DIR && make up-dev"
+echo "Run manually with: cd $PROJECT_DIR && make up-dev"

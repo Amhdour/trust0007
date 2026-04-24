@@ -136,20 +136,6 @@ If both verification commands pass, open the Trust dashboard and validate the **
 
 For a complete pre-production checklist, see `docs/onyx-trust-production-checklist.md`.
 
-### If dashboard shows `NO_GO`, `DEMO`, or `UNKNOWN` readiness
-
-Use this exact recovery order:
-
-1. `make verify-remote-onyx` (confirm Onyx endpoint + auth reachability)
-2. `make verify-live` (confirm live env and secret requirements)
-3. `make preflight-onyx-trust` (confirm launch-gate prerequisites)
-4. `make smoke-live` and `pytest -q tests/integration/test_strict_live_onyx_end_to_end.py`
-
-If these pass, refresh dashboard and confirm:
-- proof source is no longer demo-only,
-- identity/policy/retrieval controls are fresh,
-- Onyx continuity/readiness sections are populated.
-
 ## Mocked vs production boundaries (technical clarity)
 
 | Area | Local/dev default | Live expectation |
