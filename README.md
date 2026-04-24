@@ -94,4 +94,12 @@ Use this reusable prompt when asking Codex/agents for a reviewer-grade pass:
 - Architecture and runtime controls: `trust/README.md`
 - Career framing summary: `CAREER_PROJECT.md`
 - CI gates: `.github/workflows/ci.yml`
+- Release proof-pack automation: `.github/workflows/release-proof-pack.yml`
 - Onyx integration details: `trust/docs/onyx-integration.md`
+
+## External staging proof link (recommended)
+
+When an external staging deployment is available, publish one canonical proof URL here for reviewers (for example a signed artifact bundle or immutable object-store link).  
+Suggested placeholder format:
+
+- `https://<your-staging-proof-host>/trust0007/<release-tag>/reviewer-proof-pack.tgz`

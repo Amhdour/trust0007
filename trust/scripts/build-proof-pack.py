@@ -15,6 +15,8 @@ FILES_TO_CAPTURE = [
     Path("artifacts/smoke-junit.xml"),
     Path("artifacts/integration-junit.xml"),
     Path("artifacts/opa-report.json"),
+    Path("artifacts/sbom-cyclonedx.json"),
+    Path("artifacts/pip-audit.json"),
     Path("artifacts/reason-codes-summary.txt"),
     Path("overlays/myStarterKit/artifacts/governed-flow-summary.json"),
     Path("overlays/myStarterKit/artifacts/launch-gate-result.json"),

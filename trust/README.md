@@ -146,3 +146,8 @@ For a complete pre-production checklist, see `docs/onyx-trust-production-checkli
 | Evidence artifacts | Generated locally for reviewer demonstrations | Exported and retained as auditable deployment evidence |
 
 For explicit threat boundaries, see `docs/threat-model.md`. For a concise walkthrough, see `docs/ten-minute-demo.md`.
+
+## Proof-pack provenance and release usage
+
+- CI publishes a `reviewer-proof-pack` artifact and attests its build provenance.
+- Release workflow (`.github/workflows/release-proof-pack.yml`) can attach `reviewer-proof-pack.tgz` to published releases for reviewer-grade, immutable evidence snapshots.
