@@ -1,4 +1,25 @@
 (function (globalScope) {
+  const DEFAULT_ONYX_APP_URL = "https://ubiquitous-spork-r4rrpvw9995wfw7gp-3001.app.github.dev/app";
+  const DEFAULT_GOVERNED_ONYX_LAUNCH_PATH = "/launch/onyx?path=/app&mode=live&view=embedded";
+
+  function getConfiguredOnyxAppUrl(payload = {}) {
+    const payloadValue = String(payload?.live_onyx_project?.direct_onyx_app_url || "").trim();
+    if (payloadValue) {
+      return payloadValue;
+    }
+
+    const globalConfig = globalScope?.CONTROL_PLANE_DASHBOARD_CONFIG || {};
+    const configuredValue = String(
+      globalConfig.CONTROL_PLANE_ONYX_APP_URL || globalConfig.CONTROL_PLANE_ONYX_BASE_URL || "",
+    ).trim();
+    return configuredValue || DEFAULT_ONYX_APP_URL;
+  }
+
+  function getGovernedOnyxLaunchPath(payload = {}) {
+    const payloadValue = String(payload?.live_onyx_project?.governed_launch_path || "").trim();
+    return payloadValue || DEFAULT_GOVERNED_ONYX_LAUNCH_PATH;
+  }
+
   function normalizeEvidenceMode(value) {
     const normalized = String(value || "").trim().toUpperCase();
     if (["LIVE", "PARTIAL", "DEMO", "SAMPLE", "UNKNOWN"].includes(normalized)) {
@@ -199,10 +220,33 @@
     return "UNKNOWN";
   }
 
+  function deriveOnyxControlStatus(payload = {}, runtimeStatus = "UNKNOWN", evidenceMode = "UNKNOWN") {
+    const launchPath = getGovernedOnyxLaunchPath(payload);
+    const decision = String(payload?.readiness?.decision || "").toUpperCase();
+    const hasGovernedPath = launchPath.startsWith("/launch/onyx");
+
+    if (!hasGovernedPath) {
+      return "Not wired yet";
+    }
+    if (decision === "GO" && evidenceMode === "LIVE" && runtimeStatus === "CONNECTED") {
+      return "Launch-gated";
+    }
+    if (evidenceMode === "LIVE" || evidenceMode === "PARTIAL" || runtimeStatus === "PARTIAL") {
+      return "Readiness-only";
+    }
+    if (runtimeStatus === "UNKNOWN" || evidenceMode === "UNKNOWN") {
+      return "Unknown";
+    }
+    return "Direct link only";
+  }
+
   function deriveLiveOnyxProject(payload = {}, launchHeader = null) {
     const header = launchHeader || deriveLaunchDecisionHeader(payload);
     const evidenceMode = deriveOnyxEvidenceMode(payload);
-    const status = deriveOnyxRuntimeStatus(payload, evidenceMode);
+    const runtimeStatus = deriveOnyxRuntimeStatus(payload, evidenceMode);
+    const directOnyxAppUrl = getConfiguredOnyxAppUrl(payload);
+    const governedLaunchPath = getGovernedOnyxLaunchPath(payload);
+    const controlStatus = deriveOnyxControlStatus(payload, runtimeStatus, evidenceMode);
 
     return {
       runtimeName: "Onyx RAG",
@@ -216,16 +260,24 @@
       telemetryPath: "/trust/telemetry",
       folderMap: getLiveOnyxProjectMap(),
       onyxBaseUrlEnv: "CONTROL_PLANE_ONYX_BASE_URL",
+      onyxAppUrlEnv: "CONTROL_PLANE_ONYX_APP_URL",
       onyxApiBaseUrlEnv: "CONTROL_PLANE_ONYX_API_BASE_URL",
       readinessEndpoint: "/api/security/readiness",
       overviewEndpoint: "/api/control-plane/overview",
       liveLogEndpoint: "/api/control-plane/live-log",
-      governedLaunchPath: "/launch/onyx?path=/app&mode=live&view=embedded",
-      status,
+      directOnyxAppUrl,
+      governedLaunchPath,
+      controlStatus,
+      runtimeStatus,
+      status: runtimeStatus,
       evidenceMode,
       lastCheckedAt: payload?.readiness?.last_updated || null,
       explanation:
-        "Onyx is the governed RAG runtime. Trust is the control plane that provides policy, evidence, launch-gate, telemetry, and audit readiness around it. /onyx and /trust are sibling root-level project folders.",
+        "Onyx is the governed RAG runtime. Trust is the security, policy, evidence, telemetry, and launch-readiness layer around it.",
+      governedLaunchNote:
+        "Direct Onyx app URL opens the runtime. Governed Trust launch path records and enforces readiness decisions when backend launch-gate enforcement is wired.",
+      controlPlaneScopeNote:
+        "/onyx and /trust are sibling root-level folders. /onyx is not physically inside /trust.",
     };
   }
 
@@ -271,8 +323,11 @@
   }
 
   const model = {
+    getConfiguredOnyxAppUrl,
+    getGovernedOnyxLaunchPath,
     deriveEvidenceMode,
     deriveOnyxEvidenceMode,
+    deriveOnyxControlStatus,
     deriveOnyxRuntimeStatus,
     deriveRagProofChain,
     deriveLaunchDecisionHeader,

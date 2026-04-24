@@ -163,7 +163,7 @@ function linkAttributes(href) {
   if (isInternalHref(href)) {
     return ` href="${escapeHtml(href)}"`;
   }
-  return ` href="${escapeHtml(href)}" target="_blank" rel="noreferrer"`;
+  return ` href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"`;
 }
 
 function formatTimestamp(value) {
@@ -721,9 +721,11 @@ function updateLiveRuntimeLink() {
 
   liveRuntimeLink.classList.remove("is-disabled");
   liveRuntimeLink.removeAttribute("aria-disabled");
-  liveRuntimeLink.textContent = "Open Onyx workspace";
-  liveRuntimeLink.href = "/launch/onyx?path=/app&mode=live&view=embedded";
-  liveRuntimeLink.title = "Open the governed live workspace; authentication must already be in place";
+  liveRuntimeLink.textContent = "Open Onyx";
+  liveRuntimeLink.href = (decisionModel.getConfiguredOnyxAppUrl || (() => ""))();
+  liveRuntimeLink.target = "_blank";
+  liveRuntimeLink.rel = "noopener noreferrer";
+  liveRuntimeLink.title = "Open the live Onyx app runtime in a new tab.";
 }
 
 function buildAccessRequirementsMeta(payload) {
@@ -2327,6 +2329,8 @@ function renderLiveOnyxProject(derivedState) {
     return;
   }
   const project = derivedState.liveOnyxProject || {};
+  const runtimeStatus = String(project.runtimeStatus || project.status || "UNKNOWN").toUpperCase();
+  const controlStatus = String(project.controlStatus || "Unknown");
   const runtimeStatusUi = {
     CONNECTED: "healthy",
     PARTIAL: "warning",
@@ -2334,7 +2338,16 @@ function renderLiveOnyxProject(derivedState) {
     UNKNOWN: "neutral",
     DEMO: "warning",
     SAMPLE: "warning",
-  }[String(project.status || "").toUpperCase()] || "neutral";
+  }[runtimeStatus] || "neutral";
+  const controlStatusUi = {
+    "Direct link only": "neutral",
+    "Readiness-only": "warning",
+    "Launch-gated": "healthy",
+    "Not wired yet": "critical",
+    Unknown: "neutral",
+  }[controlStatus] || "neutral";
+  const directOnyxUrl = project.directOnyxAppUrl || (decisionModel.getConfiguredOnyxAppUrl || (() => ""))();
+  const governedLaunchPath = project.governedLaunchPath || (decisionModel.getGovernedOnyxLaunchPath || (() => ""))();
   const folderMap = Array.isArray(project.folderMap) && project.folderMap.length
     ? project.folderMap
     : [
@@ -2350,11 +2363,13 @@ function renderLiveOnyxProject(derivedState) {
   liveOnyxProjectRoot.innerHTML = `
     <article class="decision-panel">
       <div class="card-topline">
-        <span class="${statusClass(runtimeStatusUi)}">Runtime status: ${escapeHtml(project.status || "UNKNOWN")}</span>
+        <span class="${statusClass(runtimeStatusUi)}">Runtime status: ${escapeHtml(runtimeStatus)}</span>
+        <span class="${statusClass(controlStatusUi)}">Control status: ${escapeHtml(controlStatus)}</span>
         <span class="chip">Runtime: ${escapeHtml(project.runtimeName || "Onyx RAG")}</span>
         <span class="${evidenceModeClass(project.evidenceMode)}">${escapeHtml(project.evidenceMode || "UNKNOWN")}</span>
       </div>
       <p>${escapeHtml(project.explanation || "Onyx is the governed RAG runtime. Trust is the control plane around it.")}</p>
+      <p class="section-description">${escapeHtml(project.governedLaunchNote || "Direct Onyx app URL opens the runtime. Governed Trust launch path records and enforces readiness decisions when backend launch-gate enforcement is wired.")}</p>
       <div class="live-onyx-folder-grid">
         ${folderMap
           .map(
@@ -2369,17 +2384,42 @@ function renderLiveOnyxProject(derivedState) {
       </div>
       <ul class="decision-list">
         <li><span>Root folder relationship</span><strong><code>/onyx</code> and <code>/trust</code> are sibling root-level folders.</strong></li>
+        <li><span>Folder placement</span><strong><code>/onyx</code> is not physically inside <code>/trust</code>.</strong></li>
         <li><span>API gateway path</span><strong>${escapeHtml(project.apiGatewayPath || "/trust/backend/api_gateway")}</strong></li>
-        <li><span>Live runtime proof available</span><strong>${escapeHtml(project.evidenceMode === "LIVE" && project.status === "CONNECTED" ? "Yes" : "No / not proven")}</strong></li>
+        <li><span>Live runtime proof available</span><strong>${escapeHtml(project.evidenceMode === "LIVE" && runtimeStatus === "CONNECTED" ? "Yes" : "No / not proven")}</strong></li>
         <li><span>Last checked</span><strong>${escapeHtml(project.lastCheckedAt ? formatTimestamp(project.lastCheckedAt) : "Not proven yet.")}</strong></li>
       </ul>
+      <section class="onyx-control-panel" aria-labelledby="onyx-control-title">
+        <div class="card-topline">
+          <h3 id="onyx-control-title">Onyx Control</h3>
+        </div>
+        <ul class="decision-list">
+          <li><span>Runtime</span><strong>${escapeHtml(project.runtimeName || "Onyx RAG")}</strong></li>
+          <li><span>Direct runtime URL</span><strong><a href="${escapeHtml(directOnyxUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(directOnyxUrl)}</a></strong></li>
+          <li><span>Governed Trust path</span><strong><a href="${escapeHtml(governedLaunchPath)}">${escapeHtml(governedLaunchPath)}</a></strong></li>
+          <li><span>Control status</span><strong>${escapeHtml(controlStatus)}</strong></li>
+          <li><span>Runtime status</span><strong>${escapeHtml(runtimeStatus)}</strong></li>
+          <li><span>Evidence mode</span><strong>${escapeHtml(project.evidenceMode || "UNKNOWN")}</strong></li>
+        </ul>
+        <div class="decision-links">
+          <a href="${escapeHtml(directOnyxUrl)}" target="_blank" rel="noopener noreferrer">Open Onyx</a>
+          <a href="${escapeHtml(governedLaunchPath)}">View governed launch path</a>
+          <a href="#launch-gate">View evidence</a>
+          <a href="#live-log-title">View live log</a>
+          <button class="hero-action-button hero-action-button-secondary" type="button" disabled title="Requires backend evidence refresh endpoint.">Refresh evidence</button>
+          <button class="hero-action-button hero-action-button-secondary" type="button" disabled title="Requires backend readiness endpoint.">Run readiness check</button>
+        </div>
+        <p class="section-description">Refresh evidence: Requires backend evidence refresh endpoint. Run readiness check: Requires backend readiness endpoint. Governed redirect enforcement: Requires launch-gate enforcement.</p>
+      </section>
       <div class="decision-links">
-        <a href="${escapeHtml(project.governedLaunchPath || "/launch/onyx?path=/app&mode=live&view=embedded")}">Open Onyx</a>
+        <a href="${escapeHtml(directOnyxUrl)}" target="_blank" rel="noopener noreferrer">Open live Onyx app</a>
+        <a href="${escapeHtml(governedLaunchPath)}">View governed launch path</a>
         <a href="#launch-gate">View evidence</a>
         <a href="#live-log-title">View live log</a>
         <span class="chip">View dashboard source: <code>${escapeHtml(project.dashboardPath || "/trust/frontend/main-dashboard")}</code></span>
       </div>
-      <p class="section-description">Runtime wiring (safe names only): <code>${escapeHtml(project.onyxBaseUrlEnv || "CONTROL_PLANE_ONYX_BASE_URL")}</code>, <code>${escapeHtml(project.onyxApiBaseUrlEnv || "CONTROL_PLANE_ONYX_API_BASE_URL")}</code>, <code>${escapeHtml(project.readinessEndpoint || "/api/security/readiness")}</code>, <code>${escapeHtml(project.overviewEndpoint || "/api/control-plane/overview")}</code>, <code>${escapeHtml(project.liveLogEndpoint || "/api/control-plane/live-log")}</code>, <code>${escapeHtml(project.governedLaunchPath || "/launch/onyx?path=/app&mode=live&view=embedded")}</code></p>
+      <p class="section-description">${escapeHtml(project.controlPlaneScopeNote || "Trust governs Onyx through readiness evidence and launch-gate controls.")}</p>
+      <p class="section-description">Runtime wiring (safe names only): <code>${escapeHtml(project.onyxAppUrlEnv || "CONTROL_PLANE_ONYX_APP_URL")}</code>, <code>${escapeHtml(project.onyxBaseUrlEnv || "CONTROL_PLANE_ONYX_BASE_URL")}</code>, <code>${escapeHtml(project.onyxApiBaseUrlEnv || "CONTROL_PLANE_ONYX_API_BASE_URL")}</code>, <code>${escapeHtml(project.readinessEndpoint || "/api/security/readiness")}</code>, <code>${escapeHtml(project.overviewEndpoint || "/api/control-plane/overview")}</code>, <code>${escapeHtml(project.liveLogEndpoint || "/api/control-plane/live-log")}</code>, <code>${escapeHtml(governedLaunchPath)}</code></p>
     </article>
   `;
 }
@@ -2740,16 +2780,16 @@ function renderDecisionHero(payload) {
 
   const runtimeItems = Array.isArray(payload.runtime_portfolio?.runtimes) ? payload.runtime_portfolio.runtimes : [];
   const runtimeByKey = new Map(runtimeItems.map((item) => [String(item?.runtime_key || item?.id || "").toLowerCase(), item]));
-  const onyxChatLaunchHref = String(
-    runtimeByKey.get("onyx")?.launch_href || runtimeByKey.get("onyx")?.launch_route || "/launch/onyx?path=/app&mode=live&view=embedded",
-  );
+  const onyxAppUrl = String((decisionModel.getConfiguredOnyxAppUrl || (() => ""))(payload));
   const onyxAgentLaunchHref = String(
     runtimeByKey.get("onyx")?.agent_launch_href || "/launch/onyx/agent?mode=live&view=embedded",
   );
 
   if (liveRuntimeLink) {
     liveRuntimeLink.textContent = "Open Onyx";
-    liveRuntimeLink.setAttribute("href", onyxChatLaunchHref);
+    liveRuntimeLink.setAttribute("href", onyxAppUrl);
+    liveRuntimeLink.setAttribute("target", "_blank");
+    liveRuntimeLink.setAttribute("rel", "noopener noreferrer");
   }
   if (liveOnyxAgentLink) {
     liveOnyxAgentLink.textContent = "Onyx Agent (future scope)";

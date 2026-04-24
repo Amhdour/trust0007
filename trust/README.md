@@ -76,6 +76,7 @@ If you open the repository from root, you can run the same commands via the root
 3. Set the forwarded port visibility so this trust0007 Codespace can reach it (typically **Public** or **Organization**).
 4. Copy the forwarded HTTPS URL ending in `.app.github.dev`.
 5. Configure this repository with:
+   - `CONTROL_PLANE_ONYX_APP_URL`
    - `CONTROL_PLANE_ONYX_BASE_URL`
    - `CONTROL_PLANE_ONYX_API_BASE_URL`
 6. Run:
@@ -89,6 +90,7 @@ pytest -q tests/integration/test_strict_live_onyx_end_to_end.py
 Example environment values:
 
 ```bash
+CONTROL_PLANE_ONYX_APP_URL=https://ubiquitous-spork-r4rrpvw9995wfw7gp-3001.app.github.dev/app
 CONTROL_PLANE_ONYX_BASE_URL=https://your-onyx-codespace-port.app.github.dev
 CONTROL_PLANE_ONYX_API_BASE_URL=https://your-onyx-codespace-port.app.github.dev/api
 CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS=false

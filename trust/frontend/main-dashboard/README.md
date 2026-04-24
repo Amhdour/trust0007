@@ -35,6 +35,10 @@ This frontend is the dashboard-first homepage for the repository.
 - `/trust/frontend/main-dashboard` is the reviewer dashboard served by `backend/api_gateway/server.py`.
 - The panel makes folder locations explicit so reviewers can quickly see where runtime, policy, evidence, telemetry, and launch-gate components live.
 - The panel shows runtime status plus evidence mode, and does **not** imply live connectivity unless evidence mode is `LIVE`.
+- The panel now includes an **Onyx Control** area that distinguishes:
+  - direct runtime URL access (`Open Onyx`, opens the configured live app URL in a new tab), and
+  - governed Trust launch path visibility (`/launch/onyx?path=/app&mode=live&view=embedded`) without claiming redirect enforcement unless backend launch-gate enforcement is wired.
+- Runtime URL wiring is centralized with `CONTROL_PLANE_ONYX_APP_URL` (fallback to the local/dev Codespaces URL in `decision-model.js`), plus existing `CONTROL_PLANE_ONYX_BASE_URL` and `CONTROL_PLANE_ONYX_API_BASE_URL`.
 
 ## Scope for this pass
 
