@@ -1,0 +1,55 @@
+{
+  "system": "onyx007",
+  "component_type": "rag_runtime",
+  "environment": "dev",
+  "generated_at": "2026-04-24T10:05:00Z",
+  "overall_status": "fail",
+  "overall_score": 42,
+  "checks": [
+    {
+      "id": "identity.auth_enabled",
+      "category": "identity",
+      "title": "Authentication enabled",
+      "status": "fail",
+      "severity": "critical",
+      "score": 20,
+      "description": "Authentication is disabled.",
+      "evidence": {
+        "source": "config",
+        "value": "auth=false",
+        "details": {
+          "reason": "dev override"
+        }
+      },
+      "recommendation": "Enable OIDC authentication and remove bypass flags."
+    },
+    {
+      "id": "telemetry.audit_retention",
+      "category": "telemetry",
+      "title": "Audit retention window",
+      "status": "warn",
+      "severity": "high",
+      "score": 55,
+      "description": "Audit retention is below policy baseline.",
+      "evidence": {
+        "source": "database",
+        "value": "retention_days=3",
+        "details": {}
+      },
+      "recommendation": "Increase audit retention to at least 30 days."
+    }
+  ],
+  "risk_summary": {
+    "critical": 1,
+    "high": 1,
+    "medium": 0,
+    "low": 0
+  },
+  "capabilities": {
+    "rag": true,
+    "connectors": true,
+    "agents": true,
+    "mcp": true,
+    "tools": true
+  }
+}

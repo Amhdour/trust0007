@@ -93,3 +93,11 @@ CONTROL_PLANE_ONYX_SECRET_PATH=secret/data/runtime/tenant-stage/onyx
 CONTROL_PLANE_RUNTIME_SECRET_KEY=api_token
 CONTROL_PLANE_USE_LOCAL_ONYX=false
 ```
+
+## Onyx Security Readiness Integration
+
+`trust0007` can consume security-readiness telemetry from `onyx007` (`GET <ONYX_BASE_URL>/api/security/readiness`) and render launch-readiness for secure RAG/agent runtime rollout.
+
+- The dashboard now includes an **Onyx Security Readiness** panel with launch-gate decisioning (`APPROVED`, `CONDITIONAL`, `BLOCKED`, `UNKNOWN`), risk summary, capability badges, category gates, detailed checks, evidence, and remediations.
+- The integration is provider-oriented (`provider=onyx`) so additional runtimes can be added without hard-coding the entire dashboard around Onyx.
+- If Onyx is unreachable, the panel degrades safely to `unknown` status and keeps the rest of the dashboard functional.
