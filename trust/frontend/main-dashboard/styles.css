@@ -183,6 +183,72 @@ h3 {
   padding-left: 18px;
 }
 
+.launch-decision-header {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 16px;
+}
+
+.launch-decision-header.launch-decision-nogo {
+  border-color: rgba(157, 45, 45, 0.55);
+  background: rgba(157, 45, 45, 0.08);
+}
+
+.launch-decision-topline {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.evidence-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 0.73rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+}
+
+.evidence-mode-live { background: rgba(15, 108, 94, 0.16); border-color: rgba(15, 108, 94, 0.4); }
+.evidence-mode-partial { background: rgba(173, 93, 22, 0.14); border-color: rgba(173, 93, 22, 0.35); }
+.evidence-mode-demo { background: rgba(48, 84, 111, 0.14); border-color: rgba(48, 84, 111, 0.35); }
+.evidence-mode-sample { background: rgba(91, 77, 54, 0.14); border-color: rgba(91, 77, 54, 0.35); }
+.evidence-mode-unknown { background: rgba(120, 120, 120, 0.16); border-color: rgba(120, 120, 120, 0.35); }
+
+.proof-chain-list {
+  display: grid;
+  gap: 10px;
+}
+
+.proof-chain-item {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 12px;
+}
+
+.audience-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.audience-mode-button {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.audience-mode-button.is-active {
+  border-color: rgba(15, 108, 94, 0.45);
+  background: rgba(15, 108, 94, 0.12);
+}
+
 .live-session-root {
   margin-top: 18px;
 }

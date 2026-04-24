@@ -14,7 +14,7 @@
             <p class="eyebrow" id="hero-eyebrow">AI Runtime Decision Surface</p>
             <h1 id="hero-title">AI Trust & Security Control Plane</h1>
             <p id="hero-copy" class="hero-copy">
-              Loading readiness, trust proof, and security posture for Onyx (RAG) and Onyx Agentic (MCP/Tools).
+              Loading governed launch-readiness posture for Onyx RAG.
             </p>
             <div class="hero-meta" id="hero-meta"></div>
             <div class="hero-meta" id="runtime-lanes-meta"></div>
@@ -42,11 +42,67 @@
         </div>
       </header>
 
+      <section class="briefing-panel launch-decision-panel" aria-labelledby="launch-decision-title">
+        <div class="section-head">
+          <p class="eyebrow">Launch decision</p>
+          <h2 id="launch-decision-title">Governed RAG Launch Decision Header</h2>
+          <p class="section-description">Decision-first view: GO / NO-GO / CONDITIONAL / UNKNOWN with explicit proof mode.</p>
+        </div>
+        <div id="launch-decision-root">
+          <section class="loading-panel">
+            <p class="eyebrow">Loading</p>
+            <h3>Deriving launch decision header</h3>
+            <p>Calculating runtime, blocker, next action, and proof recency.</p>
+          </section>
+        </div>
+      </section>
+
+      <section class="briefing-panel audience-mode-panel" aria-labelledby="audience-mode-title">
+        <div class="section-head">
+          <p class="eyebrow">Audience modes</p>
+          <h2 id="audience-mode-title">Executive · Security Reviewer · Operator · Evidence/API</h2>
+        </div>
+        <div id="audience-modes-root"></div>
+      </section>
+
+      <section class="briefing-panel" aria-labelledby="live-onyx-project-title">
+        <div class="section-head">
+          <p class="eyebrow">Runtime mapping</p>
+          <h2 id="live-onyx-project-title">Live Onyx Project</h2>
+          <p class="section-description">How `/onyx` runtime and `/trust` control plane connect for governed RAG launch readiness.</p>
+        </div>
+        <div id="live-onyx-project-root"></div>
+      </section>
+
+      <section class="briefing-panel" aria-labelledby="rag-proof-chain-title">
+        <div class="section-head">
+          <p class="eyebrow">RAG proof chain</p>
+          <h2 id="rag-proof-chain-title">Identity → Policy → Retrieval Boundary → Source Boundary → Secrets → Telemetry → Launch Gate</h2>
+        </div>
+        <div id="rag-proof-chain-root"></div>
+      </section>
+
+      <section class="briefing-panel" aria-labelledby="why-not-go-title">
+        <div class="section-head">
+          <p class="eyebrow">Fail-closed rationale</p>
+          <h2 id="why-not-go-title">Why not GO?</h2>
+        </div>
+        <div id="why-not-go-root"></div>
+      </section>
+
+      <section class="briefing-panel" aria-labelledby="launch-gate-packet-title">
+        <div class="section-head">
+          <p class="eyebrow">Evidence bundle</p>
+          <h2 id="launch-gate-packet-title">Download Launch Gate Packet</h2>
+        </div>
+        <div id="launch-gate-packet-root"></div>
+      </section>
+
       <section class="briefing-panel" aria-labelledby="runtime-portfolio-title">
         <div class="section-head">
           <p class="eyebrow">Runtime portfolio</p>
-          <h2 id="runtime-portfolio-title">Governed Runtime Lanes: Onyx (RAG) and Onyx Agentic (MCP/Tools)</h2>
-          <p class="section-description">Decision-first runtime portfolio view before technical drill-down.</p>
+          <h2 id="runtime-portfolio-title">Governed Runtime Lane: Onyx RAG</h2>
+          <p class="section-description">Current launch scope is Onyx RAG. Agent/MCP surfaces are compatibility-only and deferred from active launch claims.</p>
         </div>
         <div id="runtime-portfolio-root" class="decision-panels-root">
           <section class="loading-panel">
@@ -138,6 +194,7 @@
     </div>
 
     <noscript>This dashboard needs JavaScript enabled to show governance posture, evidence, and launch readiness.</noscript>
+    <script src="/decision-model.js" defer></script>
     <script src="/app.js" defer></script>
   </body>
 </html>
