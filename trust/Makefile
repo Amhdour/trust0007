@@ -1,4 +1,4 @@
-.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test verify validate-policy-schema bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check preflight-onyx-trust up-dev up-live down-dev down-live verify-live verify-remote-onyx
+.PHONY: help reviewer-fast-path demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test verify validate-policy-schema bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check preflight-onyx-trust up-dev up-live down-dev down-live verify-live verify-remote-onyx
 
 CLIENT_NAME ?= Example Client
 CLIENT_SLUG ?= example-client
@@ -6,6 +6,29 @@ ENGAGEMENT_TRACK ?= secure-starter-kit
 PRIMARY_RUNTIME ?= Onyx
 LIVE_COMPOSE_PROJECT_NAME ?= trust0007_live
 LIVE_ENV_FILES ?= compose/.env.production .env.live
+
+help:
+	@echo "AI Trust & Security Readiness Control Plane"
+	@echo ""
+	@echo "Common targets:"
+	@echo "  make up-dev             # Start local compose stack"
+	@echo "  make down-dev           # Stop local compose stack"
+	@echo "  make test               # Run validation + pytest suite"
+	@echo "  make verify             # Alias for full local verification"
+	@echo "  make test-live-stack    # Run strict live integration tests"
+	@echo "  make verify-live        # Validate live env + remote Onyx"
+	@echo "  make preflight-onyx-trust # Production preflight checks"
+	@echo "  make health-check       # Project health checks"
+	@echo ""
+	@echo "Career-offer flows:"
+	@echo "  Layer Retrofit:         make verify-live"
+	@echo "  Secure Starter Kit:     make up-dev && make test"
+	@echo "  Launch Gate:            make preflight-onyx-trust"
+
+reviewer-fast-path:
+	@echo "1) make test"
+	@echo "2) make up-dev"
+	@echo "3) open http://127.0.0.1:3000"
 
 demo:
 	bash scripts/run-demo.sh

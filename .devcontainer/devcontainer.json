@@ -1,7 +1,7 @@
 {
   "name": "AI Trust & Security Readiness Engineer - RAG & Agents",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}/trust",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/python:1": {
@@ -15,6 +15,9 @@
     },
     "ghcr.io/devcontainers/features/go:1": {},
     "ghcr.io/devcontainers/features/rust:1": {}
+  },
+  "remoteEnv": {
+    "TRUST_CODESPACE_BOOT_MODE": "compose"
   },
   "customizations": {
     "vscode": {
@@ -33,7 +36,7 @@
   "portsAttributes": {
     "3000": {
       "label": "Trust Control Plane Dashboard",
-      "onAutoForward": "openBrowserOnce"
+      "onAutoForward": "openPreview"
     },
     "3010": {
       "label": "Onyx Runtime",
@@ -56,7 +59,7 @@
       "onAutoForward": "silent"
     }
   },
-  "postCreateCommand": "bash /workspaces/${localWorkspaceFolderBasename}/.devcontainer/post-create.sh",
+  "postCreateCommand": "bash /workspaces/${localWorkspaceFolderBasename}/.devcontainer/post-create.sh && bash /workspaces/${localWorkspaceFolderBasename}/.devcontainer/post-start.sh",
   "postStartCommand": "bash /workspaces/${localWorkspaceFolderBasename}/.devcontainer/post-start.sh",
   "postAttachCommand": "bash /workspaces/${localWorkspaceFolderBasename}/.devcontainer/post-start.sh"
 }

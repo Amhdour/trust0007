@@ -59,11 +59,14 @@ In `live` mode, governed Onyx handoff is denied unless all required controls pas
 ## Quick start
 
 ```bash
+make help
 make up-dev
 make test-live-stack
 ```
 
 Use the dashboard to launch governed capability lanes and inspect evidence artifacts under `overlays/myStarterKit/artifacts/`.
+
+If you open the repository from root, you can run the same commands via the root wrapper Makefile (`make help`, `make test`, `make up-dev`).
 
 ## Using remote Onyx from another GitHub Codespace
 
