@@ -7,7 +7,7 @@ const {
   deriveLaunchDecisionHeader,
   deriveRagProofChain,
   deriveLiveOnyxProject,
-  getProjectFolderMap,
+  getLiveOnyxProjectMap,
   buildLaunchGatePacket,
 } = require("./decision-model.js");
 
@@ -44,8 +44,8 @@ test("deriveLiveOnyxProject keeps /onyx and /trust mapping", () => {
   assert.equal(liveProject.apiGatewayPath, "/trust/backend/api_gateway");
 });
 
-test("getProjectFolderMap includes required root and dashboard folders", () => {
-  const paths = getProjectFolderMap().map((item) => item.path);
+test("getLiveOnyxProjectMap includes required root and dashboard folders", () => {
+  const paths = getLiveOnyxProjectMap().map((item) => item.path);
   assert.ok(paths.includes("/onyx"));
   assert.ok(paths.includes("/trust"));
   assert.ok(paths.includes("/trust/frontend/main-dashboard"));

@@ -72,7 +72,7 @@ Related denial/no-go artifacts:
 ## Reviewer reading order
 
 1. Check the homepage mode banner and command summary.
-2. Check runtime portfolio and latest governed handoff.
+2. Check Launch Decision Header and Live Onyx Project (including `/onyx` and `/trust` sibling-root mapping).
 3. Use artifact links for the corresponding trace.
 4. Use strict live tests as final proof authority.
 

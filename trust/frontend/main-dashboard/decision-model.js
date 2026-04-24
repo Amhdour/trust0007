@@ -156,7 +156,7 @@
     };
   }
 
-  function getProjectFolderMap() {
+  function getLiveOnyxProjectMap() {
     return [
       { path: "/onyx", description: "Onyx runtime source" },
       { path: "/trust", description: "Trust control-plane root" },
@@ -214,7 +214,7 @@
       evidencePath: "/trust/evidence",
       policiesPath: "/trust/policies",
       telemetryPath: "/trust/telemetry",
-      folderMap: getProjectFolderMap(),
+      folderMap: getLiveOnyxProjectMap(),
       onyxBaseUrlEnv: "CONTROL_PLANE_ONYX_BASE_URL",
       onyxApiBaseUrlEnv: "CONTROL_PLANE_ONYX_API_BASE_URL",
       readinessEndpoint: "/api/security/readiness",
@@ -277,7 +277,8 @@
     deriveRagProofChain,
     deriveLaunchDecisionHeader,
     deriveLiveOnyxProject,
-    getProjectFolderMap,
+    getLiveOnyxProjectMap,
+    getProjectFolderMap: getLiveOnyxProjectMap,
     buildLaunchGatePacket,
   };
 

@@ -1,10 +1,10 @@
-# trust0007 — AI Trust & Security Readiness Control Plane Portfolio
+# trust0007 — Trust Readiness Dashboard for the Onyx RAG Project
 
 ![CI](https://github.com/Amhdour/trust0007/actions/workflows/ci.yml/badge.svg)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)
 ![Policy as Code](https://img.shields.io/badge/policy-OPA%20Rego-7A2CF4)
 
-This repository demonstrates a production-style operating model for an **AI Trust & Security Readiness Engineer** focused on governed **RAG** and **Autonomous Agents**.
+This repository demonstrates a production-style operating model where **Onyx RAG is the governed runtime** and **Trust is the readiness control plane** proving whether Onyx can launch safely.
 
 ## Career positioning
 
@@ -19,7 +19,7 @@ Capability domains:
 - AI Security Evals & Red Teaming
 - Policy-as-Code & Runtime Guardrails
 - Retrieval Security & Data Boundary Design
-- Agent Identity, Tool Authorization & MCP Hardening
+- Agent/MCP governance (deferred from current Onyx RAG launch scope)
 - Telemetry, Auditability & Incident Readiness
 
 ## Repository layout
@@ -64,10 +64,10 @@ If all pass, reload `http://127.0.0.1:3000` and confirm the **Onyx Security Read
 Dashboard/UI (port 3000)
         |
         v
-Governed launch lanes (/launch/onyx, /launch/onyx/agent)
+Governed launch lane (/launch/onyx)
         |
         v
-Identity -> Policy (OPA) -> Retrieval Boundary -> Tool/MCP Auth -> Secret Health
+Identity -> Policy (OPA) -> Retrieval Boundary -> Source Boundary -> Secret Health -> Telemetry -> Launch Gate
         |
         v
 Telemetry + Evidence -> Launch Gate Decision -> Onyx Runtime Handoff

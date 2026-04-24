@@ -2161,6 +2161,7 @@ function renderLiveLog(payload) {
         <span class="chip">Auto-refresh ${intervalSeconds}s</span>
         <span class="chip">Last updated ${escapeHtml(refreshedAt)}</span>
         <span class="chip">Showing ${escapeHtml(String(filteredEntries.length))} of ${escapeHtml(String(entries.length))} recent items</span>
+        <span class="${evidenceModeClass(lastDerivedDashboardState?.launchHeader?.evidenceMode || "UNKNOWN")}">Evidence ${escapeHtml(lastDerivedDashboardState?.launchHeader?.evidenceMode || "UNKNOWN")}</span>
       </div>
       <a class="live-log-source"${linkAttributes(payload.source_href || "/api/control-plane/live-log?limit=50")}>
         Open activity feed
@@ -2410,7 +2411,7 @@ function renderWhyNotGoPanel(derivedState) {
 
 function downloadLaunchGatePacket(packet) {
   const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "-");
-  const filename = `rag-launch-gate-packet-${timestamp}.json`;
+  const filename = `onyx-rag-launch-gate-packet-${timestamp}.json`;
   const blob = new Blob([JSON.stringify(packet, null, 2)], { type: "application/json" });
   const href = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -2534,7 +2535,7 @@ function renderRuntimePortfolio(payload) {
         .map(
           (card) => `
             <article class="decision-panel runtime-lane-card">
-              <p class="eyebrow">${escapeHtml(card.runtimeClass)}</p>
+              <p class="eyebrow">${escapeHtml(card.runtimeClass)} · Current RAG launch scope</p>
               <h3>${escapeHtml(card.name)}</h3>
               <p>${escapeHtml(card.description)}</p>
               ${renderStatusPill(card.status, { label: statusLabel(card.status) })}
@@ -2691,10 +2692,10 @@ function renderDecisionHero(payload) {
     heroEyebrow.textContent = "Start here";
   }
   if (heroTitle) {
-    heroTitle.textContent = payload.title || "AI Trust & Security Control Plane";
+    heroTitle.textContent = "Trust Readiness Dashboard for the Onyx RAG Project";
   }
   if (heroCopy) {
-    heroCopy.textContent = "Evidence-backed launch readiness for Onyx RAG: decision, blocker, required action, and proof mode.";
+    heroCopy.textContent = "Onyx is the governed RAG runtime. Trust is the security, policy, evidence, telemetry, and launch-readiness layer around it.";
   }
 
   const readiness = payload.readiness || {};
@@ -2827,7 +2828,7 @@ function renderHomepagePanels(payload) {
         ${trustRow("Identity", trust.identity_proven ? "Proven" : "Missing")}
         ${trustRow("Policy", trust.policy_proven ? "Proven" : "Missing")}
         ${trustRow("Retrieval", trust.retrieval_proven ? "Proven" : "Missing")}
-        ${trustRow("Tool governance", trust.tool_governance_proven ? "Proven" : "Missing")}
+        ${trustRow("Source boundary", trust.retrieval_proven ? "Proven" : "Missing")}
         ${trustRow("Audit", trust.audit_proven ? "Proven" : "Missing")}
         ${trustRow("Evidence freshness", trust.evidence_freshness || "Unavailable")}
       </ul>
