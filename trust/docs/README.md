@@ -14,6 +14,7 @@ Additional homepage-focused notes:
 - `control-plane-dashboard-homepage.md`: current homepage information architecture, plain-language first-layer rules, top-summary versus drilldown rules, terminology mapping, and demo-versus-live guidance.
 - `client-template-kit.md`: how to use this repo as a reusable client starter kit, what the init script generates, and what to customize per engagement.
 - `client-engagement-tracks.md`: recommended service tracks for layer retrofit, secure starter kits, and launch-gate work.
+- `career-prototype-roadmap.md`: 90-day build plan and portfolio strategy for AI Trust & Security Readiness engineering using this repo.
 - `submodules.md`: overlay submodule handling and vendored upstream tracking model.
 - `upstream-usage-matrix.md`: strict classification of active, partial, optional, and reference-only upstream integrations.
 - `live-vs-demo-matrix.md`: exact differences between fallback demo mode and strict live governed mode.

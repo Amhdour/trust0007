@@ -52,5 +52,4 @@ pytest -q \
   "$ROOT_DIR/tests/dashboard/test_control_plane_dashboard.py" \
   "$ROOT_DIR/tests/integration/test_strict_live_onyx_end_to_end.py" \
   "$ROOT_DIR/tests/integration/test_live_end_to_end.py" \
-  "$ROOT_DIR/tests/observability/test_onyx_workspace_activity.py" \
-  "$ROOT_DIR/tests/integration/test_live_end_to_end.py"
+  "$ROOT_DIR/tests/observability/test_onyx_workspace_activity.py"

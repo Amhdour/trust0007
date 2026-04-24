@@ -1,0 +1,62 @@
+{
+  "name": "AI Trust & Security Readiness Engineer - RAG & Agents",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}/trust",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21"
+    },
+    "ghcr.io/devcontainers/features/go:1": {},
+    "ghcr.io/devcontainers/features/rust:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "ms-python.python",
+        "golang.go",
+        "redhat.java",
+        "redhat.vscode-yaml",
+        "yzhang.markdown-all-in-one",
+        "github.vscode-github-actions"
+      ]
+    }
+  },
+  "forwardPorts": [3000, 3010, 3001, 3002, 8181, 8200],
+  "portsAttributes": {
+    "3000": {
+      "label": "Trust Control Plane Dashboard",
+      "onAutoForward": "openBrowserOnce"
+    },
+    "3010": {
+      "label": "Onyx Runtime",
+      "onAutoForward": "silent"
+    },
+    "3001": {
+      "label": "Grafana Evidence Dashboard",
+      "onAutoForward": "silent"
+    },
+    "3002": {
+      "label": "Langfuse Traces",
+      "onAutoForward": "silent"
+    },
+    "8181": {
+      "label": "OPA Policy Engine",
+      "onAutoForward": "silent"
+    },
+    "8200": {
+      "label": "Vault Dev Server",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "bash /workspaces/${localWorkspaceFolderBasename}/.devcontainer/post-create.sh",
+  "postStartCommand": "bash /workspaces/${localWorkspaceFolderBasename}/.devcontainer/post-start.sh",
+  "postAttachCommand": "bash /workspaces/${localWorkspaceFolderBasename}/.devcontainer/post-start.sh"
+}
