@@ -1,4 +1,4 @@
-.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test verify validate-policy-schema bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check up-dev up-live down-dev down-live verify-live
+.PHONY: demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test verify validate-policy-schema bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check up-dev up-live down-dev down-live verify-live verify-remote-onyx
 
 CLIENT_NAME ?= Example Client
 CLIENT_SLUG ?= example-client
@@ -80,8 +80,12 @@ up-dev:
 down-dev:
 	docker compose --env-file compose/.env -f compose/docker-compose.yml down
 
+verify-remote-onyx:
+	bash scripts/verify-remote-onyx.sh $(LIVE_ENV_FILES)
+
 verify-live:
 	bash scripts/verify-live-env.sh $(LIVE_ENV_FILES)
+	bash scripts/verify-remote-onyx.sh $(LIVE_ENV_FILES)
 
 up-live: verify-live
 	docker compose $(foreach env,$(LIVE_ENV_FILES),--env-file $(env)) -p $(LIVE_COMPOSE_PROJECT_NAME) -f compose/docker-compose.production.yml -f compose/docker-compose.live.yml up -d

@@ -64,3 +64,32 @@ make test-live-stack
 ```
 
 Use the dashboard to launch governed capability lanes and inspect evidence artifacts under `overlays/myStarterKit/artifacts/`.
+
+## Using remote Onyx from another GitHub Codespace
+
+1. Start your Onyx stack in a separate Codespace.
+2. Forward the Onyx web/API port in that Onyx Codespace.
+3. Set the forwarded port visibility so this trust0007 Codespace can reach it (typically **Public** or **Organization**).
+4. Copy the forwarded HTTPS URL ending in `.app.github.dev`.
+5. Configure this repository with:
+   - `CONTROL_PLANE_ONYX_BASE_URL`
+   - `CONTROL_PLANE_ONYX_API_BASE_URL`
+6. Run:
+
+```bash
+make verify-remote-onyx
+make verify-live
+pytest -q tests/integration/test_strict_live_onyx_end_to_end.py
+```
+
+Example environment values:
+
+```bash
+CONTROL_PLANE_ONYX_BASE_URL=https://your-onyx-codespace-port.app.github.dev
+CONTROL_PLANE_ONYX_API_BASE_URL=https://your-onyx-codespace-port.app.github.dev/api
+CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS=false
+CONTROL_PLANE_EXTERNAL_REACHABLE=true
+CONTROL_PLANE_ONYX_SECRET_PATH=secret/data/runtime/tenant-stage/onyx
+CONTROL_PLANE_RUNTIME_SECRET_KEY=api_token
+CONTROL_PLANE_USE_LOCAL_ONYX=false
+```
