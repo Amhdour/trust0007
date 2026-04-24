@@ -1,18 +1,18 @@
 {
-  "title": "AI Trust & Security Control Plane",
-  "subtitle": "Shared trust, security, and launch-readiness posture for governed Onyx (RAG) and Onyx Agentic (MCP/Tools) runtime access.",
-  "hero_copy": "This dashboard-first control plane is the runtime-access decision surface across two governed AI runtime classes: Onyx for retrieval-grounded RAG and Onyx Agent for autonomous agent orchestration. The homepage states the decision, and drill-down sections provide the evidence.",
+  "title": "Trust Readiness Dashboard for the Onyx RAG Project",
+  "subtitle": "Onyx is the governed RAG runtime. Trust is the security, policy, evidence, telemetry, and launch-readiness layer around it.",
+  "hero_copy": "The dashboard proves whether Onyx can safely launch. It leads with decision, blockers, required action, and evidence mode, then shows the RAG proof chain and launch-gate evidence.",
   "landing_steps": [
     "Read the current readiness decision",
     "Confirm trust proof freshness and completeness",
     "Review the top failing or missing security control",
     "Open drill-down sections for detailed evidence"
   ],
-  "repo_description_suggestion": "Decision-first dashboard for governed Onyx (RAG) and Onyx Agentic (MCP/Tools) runtime readiness, trust proof, and security posture.",
+  "repo_description_suggestion": "Decision-first Trust readiness dashboard for governed Onyx RAG launch approval.",
   "tabs": [
     {
       "id": "launch-gate",
-      "label": "Runtime Portfolio",
+      "label": "Onyx RAG Readiness",
       "group": "reviewer",
       "group_label": "Homepage Decision"
     },
@@ -24,7 +24,7 @@
     },
     {
       "id": "onyx-agent-access",
-      "label": "Onyx Agent Access",
+      "label": "Onyx Agent (Deferred Scope)",
       "group": "reviewer",
       "group_label": "Homepage Decision"
     },
@@ -42,7 +42,7 @@
     },
     {
       "id": "tool-mcp-governance",
-      "label": "Tools / MCP",
+      "label": "Tools / MCP (Deferred Scope)",
       "group": "operator",
       "group_label": "Evidence Drill-Down"
     },
@@ -56,8 +56,8 @@
   "sections": [
     {
       "id": "launch-gate",
-      "title": "Runtime Portfolio",
-      "description": "Cross-runtime readiness decision, blockers, and residual risk posture for Onyx (RAG) and Onyx Agentic (MCP/Tools).",
+      "title": "Onyx RAG Readiness",
+      "description": "Current launch-scope readiness decision, blockers, and residual risk posture for Onyx RAG.",
       "group": "reviewer",
       "group_label": "Homepage Decision"
     },
@@ -70,8 +70,8 @@
     },
     {
       "id": "onyx-agent-access",
-      "title": "Onyx Agent Access",
-      "description": "Governed handoff outcomes, tool/MCP authorization posture, and evidence required for Onyx Agent agent runtime access.",
+      "title": "Onyx Agent Access (Deferred Scope)",
+      "description": "Optional future expansion context; not part of the current Onyx RAG launch approval path.",
       "group": "reviewer",
       "group_label": "Homepage Decision"
     },
@@ -91,8 +91,8 @@
     },
     {
       "id": "tool-mcp-governance",
-      "title": "Tool and MCP Governance",
-      "description": "Governed tool actions, MCP authorizations, denials, and approval-gated operations (Onyx Agent emphasis).",
+      "title": "Tool and MCP Governance (Deferred Scope)",
+      "description": "Deferred future scope for agent/tool pathways; not an active current-scope RAG launch claim.",
       "group": "operator",
       "group_label": "Evidence Drill-Down"
     },

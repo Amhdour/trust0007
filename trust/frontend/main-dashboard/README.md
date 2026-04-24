@@ -23,7 +23,7 @@ This frontend is the dashboard-first homepage for the repository.
 - It now foregrounds a plain-language first layer, a compact command summary, a dominant live-vs-demo mode banner, a short reading guide, lighter summary-first reviewer sections, and deeper technical drilldowns.
 - The homepage consumes `/api/control-plane/overview` for posture and evidence panels and `/api/control-plane/live-log` for recent activity.
 - The client overview page reuses the same overview payload and the reviewer allow/deny artifacts, but presents them as simple visuals for non-technical audiences.
-- The hero includes direct governed live workspace links for Onyx and an Onyx Agent compatibility link. Agent/MCP/tool-governance capabilities are visible only as deferred/future scope, not as active current RAG launch claims.
+- The hero and top panels frame the page as **Trust Readiness Dashboard for the Onyx RAG Project**. Onyx Agent/MCP/tool-governance items are demoted to deferred/future scope and are not active current RAG launch claims.
 - The adjacent access-requirements panel explains that the deployment must already provide a valid Keycloak-backed browser session or bearer token.
 - Drill-through links are expected to point at raw repo artifacts exposed by the API gateway under `/raw/...`.
 
