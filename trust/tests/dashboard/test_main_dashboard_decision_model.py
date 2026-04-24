@@ -31,3 +31,4 @@ def test_dashboard_launch_surfaces_and_live_onyx_mapping_exist() -> None:
     assert 'runtimeSource: "/onyx"' in model_js
     assert 'trustRoot: "/trust"' in model_js
     assert 'dashboardPath: "/trust/frontend/main-dashboard"' in model_js
+    assert 'apiGatewayPath: "/trust/backend/api_gateway"' in model_js

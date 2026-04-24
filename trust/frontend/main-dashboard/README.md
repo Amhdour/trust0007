@@ -12,6 +12,11 @@ This frontend is the dashboard-first homepage for the repository.
   - `/onyx` = runtime source
   - `/trust` = trust control plane
   - `/trust/frontend/main-dashboard` = reviewer dashboard
+  - `/trust/backend/api_gateway` = dashboard/API gateway
+  - `/trust/launch-gate` = launch readiness gate
+  - `/trust/evidence` = evidence artifacts
+  - `/trust/policies` = policy-as-code controls
+  - `/trust/telemetry` = telemetry + audit readiness
 - A **Download Launch Gate Packet** control exports a deterministic JSON evidence bundle from the current dashboard state.
 - Evidence mode is rendered with explicit badges: `LIVE`, `PARTIAL`, `DEMO`, `SAMPLE`, `UNKNOWN`.
 - Audience modes are available for Executive, Security Reviewer, Operator, and Evidence/API reading paths.
@@ -21,6 +26,15 @@ This frontend is the dashboard-first homepage for the repository.
 - The hero includes direct governed live workspace links for Onyx and an Onyx Agent compatibility link. Agent/MCP/tool-governance capabilities are visible only as deferred/future scope, not as active current RAG launch claims.
 - The adjacent access-requirements panel explains that the deployment must already provide a valid Keycloak-backed browser session or bearer token.
 - Drill-through links are expected to point at raw repo artifacts exposed by the API gateway under `/raw/...`.
+
+## Live Onyx Project panel
+
+- `/onyx` is the **root-level** Onyx governed RAG runtime source.
+- `/trust` is the **root-level** Trust control-plane folder.
+- `/onyx` and `/trust` are sibling project folders at repository root (the panel does not imply `/onyx` is inside `/trust`).
+- `/trust/frontend/main-dashboard` is the reviewer dashboard served by `backend/api_gateway/server.py`.
+- The panel makes folder locations explicit so reviewers can quickly see where runtime, policy, evidence, telemetry, and launch-gate components live.
+- The panel shows runtime status plus evidence mode, and does **not** imply live connectivity unless evidence mode is `LIVE`.
 
 ## Scope for this pass
 

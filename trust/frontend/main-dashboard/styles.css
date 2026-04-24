@@ -2783,6 +2783,27 @@ body[data-dashboard-view="runtime"] .hero-copy {
   background: rgba(255, 255, 255, 0.78);
 }
 
+.live-onyx-folder-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.live-onyx-folder-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 10px;
+}
+
+.live-onyx-folder-card p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+
 .decision-list {
   list-style: none;
   margin: 12px 0 0;
