@@ -2829,6 +2829,12 @@ body[data-dashboard-view="runtime"] .hero-copy {
   gap: 6px;
 }
 
+.onyx-control-panel {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
 .decision-failing-controls {
   margin-top: 12px;
 }
