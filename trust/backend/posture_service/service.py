@@ -3697,7 +3697,19 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "type": "cards",
                     "title": "Safety-check summary",
                     "items": [
-                        _card("Readiness status", launch_summary["status"].upper(), _status_from_launch(launch_summary["status"]), "Current launch verdict from the launch-gate summary.", launch_report_href, display_label="Current safety decision", display_value=_readiness_display(launch_summary["status"]), display_detail=f"Current score: {launch_summary['readiness_score']}/100."),
+                        _card(
+                            "Readiness status",
+                            launch_summary["status"].upper(),
+                            _status_from_launch(launch_summary["status"]),
+                            "Current launch verdict from the launch-gate summary.",
+                            launch_report_href,
+                            display_label="Current safety decision",
+                            display_value=_readiness_display(launch_summary["status"]),
+                            display_detail=(
+                                f"Launch-gate score: {launch_summary['readiness_score']}/100 "
+                                f"(advisory-hardened score: {readiness_panel['score']}/100)."
+                            ),
+                        ),
                         _card("Failing controls", str(len(failing_controls)), "critical" if failing_controls else "healthy", "Controls that are not in a full pass state.", launch_report_href, display_label="Important issues still open", display_detail="These are the main issues still keeping the system from a cleaner ready state."),
                         _card(
                             "Evidence mode",

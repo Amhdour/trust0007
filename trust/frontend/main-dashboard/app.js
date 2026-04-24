@@ -2534,6 +2534,9 @@ function renderHomepagePanels(payload) {
   const readiness = payload.readiness || {};
   const trust = payload.trust_proof || {};
   const security = payload.security_posture || {};
+  const scoreBasis = readiness.score_basis || {};
+  const launchGateScore = scoreBasis.launch_gate_score ?? "n/a";
+  const hardenedScore = readiness.readiness_score ?? "n/a";
   const runtimeByKey = new Map((payload.runtime_portfolio?.runtimes || []).map((item) => [String(item?.runtime_key || "").toLowerCase(), item]));
   const onyxRuntime = runtimeByKey.get("onyx") || {};
   const fallbackFailingControls = Array.isArray(security.failing_controls) && security.failing_controls.length
@@ -2550,7 +2553,8 @@ function renderHomepagePanels(payload) {
       <h3>Can we launch now?</h3>
       <ul class="decision-list">
         <li><span>Decision</span><strong>${escapeHtml(readiness.decision || "UNKNOWN")}</strong></li>
-        <li><span>Readiness score</span><strong>${escapeHtml(String(readiness.readiness_score ?? "n/a"))}</strong></li>
+        <li><span>Launch-gate score (hard gate)</span><strong>${escapeHtml(String(launchGateScore))}</strong></li>
+        <li><span>Advisory readiness score</span><strong>${escapeHtml(String(hardenedScore))}</strong></li>
         <li><span>Latest handoff</span><strong>${escapeHtml(readiness.latest_handoff_decision || "UNKNOWN")}</strong></li>
         <li><span>Proof source</span><strong>${escapeHtml(String(readiness.evidence_mode || "unavailable").toUpperCase())}</strong></li>
         <li><span>Main issue</span><strong>${escapeHtml(readiness.top_blocker || "No blocker listed.")}</strong></li>
