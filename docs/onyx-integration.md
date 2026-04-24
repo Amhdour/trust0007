@@ -78,3 +78,24 @@ This keeps the proof model honest: the control plane proves the launch decision 
 - happy path allow scenario,
 - deny path scenario,
 - telemetry emission assertions.
+
+## Using remote Onyx from another GitHub Codespace
+
+Remote Onyx is the primary integration mode for live verification in this repository.
+
+1. Start Onyx in a separate GitHub Codespace.
+2. Forward the Onyx web/API port from that Codespace.
+3. Set port visibility so this trust0007 Codespace can access it (**Public** or **Organization**).
+4. Copy the forwarded `.app.github.dev` URL.
+5. Set:
+   - `CONTROL_PLANE_ONYX_BASE_URL=https://your-onyx-codespace-port.app.github.dev`
+   - `CONTROL_PLANE_ONYX_API_BASE_URL=https://your-onyx-codespace-port.app.github.dev/api`
+6. Verify configuration and governed handoff:
+
+```bash
+make verify-remote-onyx
+make verify-live
+pytest -q tests/integration/test_strict_live_onyx_end_to_end.py
+```
+
+Use `CONTROL_PLANE_USE_LOCAL_ONYX=true` only for explicit local dev workflows that rely on `upstream/onyx`.

@@ -1,12 +1,9 @@
-from pathlib import Path
-
 from backend.posture_service.service import build_control_plane_dashboard
 
 
 def test_onyx_is_the_primary_runtime_target() -> None:
     payload = build_control_plane_dashboard()
 
-    assert Path("upstream/onyx").exists()
     assert "Onyx" in payload["runtime_module"]
     assert "Onyx Agent" in payload["runtime_module"]
 

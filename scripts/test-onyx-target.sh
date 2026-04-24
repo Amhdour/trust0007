@@ -5,11 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 python - <<'PY'
-from pathlib import Path
-
 from backend.posture_service.service import build_control_plane_dashboard
-
-assert Path("upstream/onyx").exists(), "missing vendored upstream/onyx path"
 
 payload = build_control_plane_dashboard()
 runtime_module = payload["runtime_module"]

@@ -3,48 +3,19 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ONYX_COMPOSE_DIR="$ROOT_DIR/upstream/onyx/deployment/docker_compose"
+USE_LOCAL_ONYX="${CONTROL_PLANE_USE_LOCAL_ONYX:-false}"
 
-if [[ ! -d "$ONYX_COMPOSE_DIR" ]]; then
+if [[ "${USE_LOCAL_ONYX,,}" != "true" ]]; then
+  echo "error: local Onyx startup is disabled by default." >&2
+  echo "hint: set CONTROL_PLANE_USE_LOCAL_ONYX=true to use upstream/onyx for local development." >&2
+  exit 1
+fi
+
+if [[ ! -f "$ONYX_COMPOSE_DIR/docker-compose.yml" ]]; then
   echo "error: upstream/onyx is not available at $ONYX_COMPOSE_DIR" >&2
+  echo "hint: use remote Onyx by setting CONTROL_PLANE_ONYX_BASE_URL and CONTROL_PLANE_ONYX_API_BASE_URL." >&2
   exit 1
 fi
 
 cd "$ONYX_COMPOSE_DIR"
-
-if [[ ! -f .env ]]; then
-  echo "error: missing $ONYX_COMPOSE_DIR/.env" >&2
-  echo "Create it first or let the repository bootstrap generate it." >&2
-  exit 1
-fi
-
-set -a
-# shellcheck disable=SC1091
-source .env
-set +a
-
-host_port="${HOST_PORT:-3000}"
-app_url="http://127.0.0.1:${host_port}/"
-startup_timeout_seconds="${ONYX_STARTUP_TIMEOUT_SECONDS:-300}"
-startup_deadline=$((SECONDS + startup_timeout_seconds))
-
-docker compose \
-  -f docker-compose.yml \
-  -f docker-compose.onyx-lite.yml \
-  -f docker-compose.dev.yml \
-  up -d
-
-echo "Waiting for Onyx Lite at ${app_url}"
-until curl -fsS -o /dev/null "$app_url"; do
-  if (( SECONDS >= startup_deadline )); then
-    echo "error: Onyx Lite did not become reachable within ${startup_timeout_seconds}s" >&2
-    docker compose \
-      -f docker-compose.yml \
-      -f docker-compose.onyx-lite.yml \
-      -f docker-compose.dev.yml \
-      ps >&2
-    exit 1
-  fi
-  sleep 5
-done
-
-echo "Onyx Lite is available at ${app_url}"
+docker compose up -d

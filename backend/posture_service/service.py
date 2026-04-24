@@ -1523,7 +1523,10 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     forbidden_tools = list(policy.get("tools", {}).get("forbidden_tools", []))
     confirmation_required_tools = list(policy.get("tools", {}).get("confirmation_required_tools", []))
     all_tools = sorted(set(allowed_tools + forbidden_tools + confirmation_required_tools))
-    onyx_available = path_has_files(resolved_root, "upstream/onyx")
+    onyx_base_url = str(os.environ.get("CONTROL_PLANE_ONYX_BASE_URL", "")).strip()
+    onyx_api_base_url = str(os.environ.get("CONTROL_PLANE_ONYX_API_BASE_URL", "")).strip()
+    use_local_onyx = str(os.environ.get("CONTROL_PLANE_USE_LOCAL_ONYX", "false")).strip().lower() in {"1", "true", "yes"}
+    onyx_available = bool(onyx_base_url or onyx_api_base_url) or (use_local_onyx and path_has_files(resolved_root, "upstream/onyx"))
 
     audit_trace_ids = {
         str(event.get("trace_id", ""))
