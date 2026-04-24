@@ -1,4 +1,4 @@
-.PHONY: help reviewer-fast-path demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test verify validate-policy-schema bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check preflight-onyx-trust up-dev up-live down-dev down-live verify-live verify-remote-onyx
+.PHONY: help reviewer-fast-path demo test-demo test-onyx-target test-governance serve-dashboard serve-onyx test verify validate-policy-schema bootstrap-submodules update-submodules validate-upstream list-upstream-default list-upstream-opt-in sync-upstream-pins stage-default-upstream init-client-template bootstrap-live smoke-live test-live-stack health-check proof-pack preflight-onyx-trust up-dev up-live down-dev down-live verify-live verify-remote-onyx
 
 CLIENT_NAME ?= Example Client
 CLIENT_SLUG ?= example-client
@@ -18,6 +18,7 @@ help:
 	@echo "  make test-live-stack    # Run strict live integration tests"
 	@echo "  make verify-live        # Validate live env + remote Onyx"
 	@echo "  make preflight-onyx-trust # Production preflight checks"
+	@echo "  make proof-pack         # Build reviewer-ready proof bundle"
 	@echo "  make health-check       # Project health checks"
 	@echo ""
 	@echo "Career-offer flows:"
@@ -96,6 +97,9 @@ test-live-stack:
 
 health-check:
 	bash scripts/check-project-health.sh
+
+proof-pack:
+	python scripts/build-proof-pack.py
 
 up-dev:
 	docker compose --env-file compose/.env -f compose/docker-compose.yml up -d

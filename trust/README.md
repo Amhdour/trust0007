@@ -135,3 +135,14 @@ make preflight-onyx-trust
 If both verification commands pass, open the Trust dashboard and validate the **Onyx Security Readiness** panel is populated (instead of `UNKNOWN`) with checks/evidence from the remote Onyx runtime.
 
 For a complete pre-production checklist, see `docs/onyx-trust-production-checklist.md`.
+
+## Mocked vs production boundaries (technical clarity)
+
+| Area | Local/dev default | Live expectation |
+|---|---|---|
+| Onyx readiness feed | Local `onyx_runtime` mock service can provide deterministic readiness payloads | Real Onyx endpoint behind `CONTROL_PLANE_ONYX_BASE_URL` / `CONTROL_PLANE_ONYX_API_BASE_URL` |
+| Secrets and tokens | Development placeholders allowed only for local compose workflows | Non-placeholder Vault token/path and live secret validation required |
+| Governance mode | `demo`/`dev` accepted for rapid local iteration | `live` governance + non-dev environment mode enforced for serious rollout |
+| Evidence artifacts | Generated locally for reviewer demonstrations | Exported and retained as auditable deployment evidence |
+
+For explicit threat boundaries, see `docs/threat-model.md`. For a concise walkthrough, see `docs/ten-minute-demo.md`.
