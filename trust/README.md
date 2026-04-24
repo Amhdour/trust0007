@@ -59,11 +59,15 @@ In `live` mode, governed Onyx handoff is denied unless all required controls pas
 ## Quick start
 
 ```bash
+make help
 make up-dev
 make test-live-stack
 ```
 
 Use the dashboard to launch governed capability lanes and inspect evidence artifacts under `overlays/myStarterKit/artifacts/`.
+`make up-dev` now also brings up a local `onyx_runtime` service on port `3010`, and the dashboard's **Onyx Security Readiness** panel is wired to that runtime (`/api/security/readiness`) for immediate visibility in Codespaces.
+
+If you open the repository from root, you can run the same commands via the root wrapper Makefile (`make help`, `make test`, `make up-dev`).
 
 ## Using remote Onyx from another GitHub Codespace
 
@@ -131,3 +135,19 @@ make preflight-onyx-trust
 If both verification commands pass, open the Trust dashboard and validate the **Onyx Security Readiness** panel is populated (instead of `UNKNOWN`) with checks/evidence from the remote Onyx runtime.
 
 For a complete pre-production checklist, see `docs/onyx-trust-production-checklist.md`.
+
+## Mocked vs production boundaries (technical clarity)
+
+| Area | Local/dev default | Live expectation |
+|---|---|---|
+| Onyx readiness feed | Local `onyx_runtime` mock service can provide deterministic readiness payloads | Real Onyx endpoint behind `CONTROL_PLANE_ONYX_BASE_URL` / `CONTROL_PLANE_ONYX_API_BASE_URL` |
+| Secrets and tokens | Development placeholders allowed only for local compose workflows | Non-placeholder Vault token/path and live secret validation required |
+| Governance mode | `demo`/`dev` accepted for rapid local iteration | `live` governance + non-dev environment mode enforced for serious rollout |
+| Evidence artifacts | Generated locally for reviewer demonstrations | Exported and retained as auditable deployment evidence |
+
+For explicit threat boundaries, see `docs/threat-model.md`. For a concise walkthrough, see `docs/ten-minute-demo.md`.
+
+## Proof-pack provenance and release usage
+
+- CI publishes a `reviewer-proof-pack` artifact and attests its build provenance.
+- Release workflow (`.github/workflows/release-proof-pack.yml`) can attach `reviewer-proof-pack.tgz` to published releases for reviewer-grade, immutable evidence snapshots.
