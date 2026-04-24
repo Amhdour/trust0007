@@ -2326,31 +2326,59 @@ function renderLiveOnyxProject(derivedState) {
     return;
   }
   const project = derivedState.liveOnyxProject || {};
+  const runtimeStatusUi = {
+    CONNECTED: "healthy",
+    PARTIAL: "warning",
+    BLOCKED: "critical",
+    UNKNOWN: "neutral",
+    DEMO: "warning",
+    SAMPLE: "warning",
+  }[String(project.status || "").toUpperCase()] || "neutral";
+  const folderMap = Array.isArray(project.folderMap) && project.folderMap.length
+    ? project.folderMap
+    : [
+        { path: "/onyx", description: "Onyx runtime source" },
+        { path: "/trust", description: "Trust control-plane root" },
+        { path: "/trust/frontend/main-dashboard", description: "Reviewer dashboard" },
+        { path: "/trust/backend/api_gateway", description: "Dashboard/API gateway" },
+        { path: "/trust/launch-gate", description: "Launch readiness gate" },
+        { path: "/trust/evidence", description: "Readiness evidence artifacts" },
+        { path: "/trust/policies", description: "Policy-as-code controls" },
+        { path: "/trust/telemetry", description: "Telemetry and audit readiness" },
+      ];
   liveOnyxProjectRoot.innerHTML = `
     <article class="decision-panel">
       <div class="card-topline">
-        <span class="${statusClass(project.status === "BLOCKED" ? "critical" : "neutral")}">${escapeHtml(project.status || "UNKNOWN")}</span>
+        <span class="${statusClass(runtimeStatusUi)}">Runtime status: ${escapeHtml(project.status || "UNKNOWN")}</span>
+        <span class="chip">Runtime: ${escapeHtml(project.runtimeName || "Onyx RAG")}</span>
         <span class="${evidenceModeClass(project.evidenceMode)}">${escapeHtml(project.evidenceMode || "UNKNOWN")}</span>
       </div>
-      <p>${escapeHtml(project.explanation || "")}</p>
+      <p>${escapeHtml(project.explanation || "Onyx is the governed RAG runtime. Trust is the control plane around it.")}</p>
+      <div class="live-onyx-folder-grid">
+        ${folderMap
+          .map(
+            (entry) => `
+              <article class="live-onyx-folder-card">
+                <strong><code>${escapeHtml(entry.path || "")}</code></strong>
+                <p>${escapeHtml(entry.description || "")}</p>
+              </article>
+            `,
+          )
+          .join("")}
+      </div>
       <ul class="decision-list">
-        <li><span>Onyx runtime source</span><strong>${escapeHtml(project.runtimeSource || "/onyx")}</strong></li>
-        <li><span>Trust control plane</span><strong>${escapeHtml(project.trustRoot || "/trust")}</strong></li>
-        <li><span>Dashboard path</span><strong>${escapeHtml(project.dashboardPath || "/trust/frontend/main-dashboard")}</strong></li>
-        <li><span>Launch gate</span><strong>${escapeHtml(project.launchGatePath || "/trust/launch-gate")}</strong></li>
-        <li><span>Evidence</span><strong>${escapeHtml(project.evidencePath || "/trust/evidence")}</strong></li>
-        <li><span>Policies</span><strong>${escapeHtml(project.policiesPath || "/trust/policies")}</strong></li>
-        <li><span>Telemetry</span><strong>${escapeHtml(project.telemetryPath || "/trust/telemetry")}</strong></li>
+        <li><span>Root folder relationship</span><strong><code>/onyx</code> and <code>/trust</code> are sibling root-level folders.</strong></li>
+        <li><span>API gateway path</span><strong>${escapeHtml(project.apiGatewayPath || "/trust/backend/api_gateway")}</strong></li>
         <li><span>Live runtime proof available</span><strong>${escapeHtml(project.evidenceMode === "LIVE" && project.status === "CONNECTED" ? "Yes" : "No / not proven")}</strong></li>
         <li><span>Last checked</span><strong>${escapeHtml(project.lastCheckedAt ? formatTimestamp(project.lastCheckedAt) : "Not proven yet.")}</strong></li>
       </ul>
       <div class="decision-links">
-        <a href="${escapeHtml(project.governedLaunchPath || "/launch/onyx?path=/app&mode=live&view=embedded")}">Open Onyx workspace</a>
-        <a href="#launch-gate">View Trust dashboard evidence</a>
-        <a href="/api/control-plane/live-log">View live log</a>
-        <a href="/raw/docs/onyx-integration.md">View Onyx integration docs</a>
+        <a href="${escapeHtml(project.governedLaunchPath || "/launch/onyx?path=/app&mode=live&view=embedded")}">Open Onyx</a>
+        <a href="#launch-gate">View evidence</a>
+        <a href="#live-log-title">View live log</a>
+        <span class="chip">View dashboard source: <code>${escapeHtml(project.dashboardPath || "/trust/frontend/main-dashboard")}</code></span>
       </div>
-      <p class="section-description"><code>${escapeHtml(project.onyxBaseUrlEnv || "CONTROL_PLANE_ONYX_BASE_URL")}</code>, <code>${escapeHtml(project.onyxApiBaseUrlEnv || "CONTROL_PLANE_ONYX_API_BASE_URL")}</code>, <code>${escapeHtml(project.readinessEndpoint || "/api/security/readiness")}</code>, <code>${escapeHtml(project.overviewEndpoint || "/api/control-plane/overview")}</code>, <code>${escapeHtml(project.liveLogEndpoint || "/api/control-plane/live-log")}</code></p>
+      <p class="section-description">Runtime wiring (safe names only): <code>${escapeHtml(project.onyxBaseUrlEnv || "CONTROL_PLANE_ONYX_BASE_URL")}</code>, <code>${escapeHtml(project.onyxApiBaseUrlEnv || "CONTROL_PLANE_ONYX_API_BASE_URL")}</code>, <code>${escapeHtml(project.readinessEndpoint || "/api/security/readiness")}</code>, <code>${escapeHtml(project.overviewEndpoint || "/api/control-plane/overview")}</code>, <code>${escapeHtml(project.liveLogEndpoint || "/api/control-plane/live-log")}</code>, <code>${escapeHtml(project.governedLaunchPath || "/launch/onyx?path=/app&mode=live&view=embedded")}</code></p>
     </article>
   `;
 }

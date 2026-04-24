@@ -2,9 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  deriveOnyxEvidenceMode,
+  deriveOnyxRuntimeStatus,
   deriveLaunchDecisionHeader,
   deriveRagProofChain,
   deriveLiveOnyxProject,
+  getProjectFolderMap,
   buildLaunchGatePacket,
 } = require("./decision-model.js");
 
@@ -34,9 +37,34 @@ test("deriveRagProofChain marks launch gate fail when required control fails", (
 
 test("deriveLiveOnyxProject keeps /onyx and /trust mapping", () => {
   const liveProject = deriveLiveOnyxProject({ readiness: { evidence_mode: "sample" } });
+  assert.equal(liveProject.runtimeName, "Onyx RAG");
   assert.equal(liveProject.runtimeSource, "/onyx");
   assert.equal(liveProject.trustRoot, "/trust");
   assert.equal(liveProject.dashboardPath, "/trust/frontend/main-dashboard");
+  assert.equal(liveProject.apiGatewayPath, "/trust/backend/api_gateway");
+});
+
+test("getProjectFolderMap includes required root and dashboard folders", () => {
+  const paths = getProjectFolderMap().map((item) => item.path);
+  assert.ok(paths.includes("/onyx"));
+  assert.ok(paths.includes("/trust"));
+  assert.ok(paths.includes("/trust/frontend/main-dashboard"));
+});
+
+test("deriveOnyxRuntimeStatus degrades when readiness evidence is unreachable", () => {
+  const status = deriveOnyxRuntimeStatus(
+    {
+      readiness: { evidence_mode: "live", top_blocker: "Onyx readiness endpoint unreachable" },
+      runtime_portfolio: { runtimes: [{ runtime_key: "onyx", status: "healthy" }] },
+    },
+    "LIVE",
+  );
+  assert.equal(status, "BLOCKED");
+});
+
+test("deriveOnyxEvidenceMode keeps demo/sample from appearing live", () => {
+  assert.equal(deriveOnyxEvidenceMode({ readiness: { evidence_mode: "demo" } }), "DEMO");
+  assert.equal(deriveOnyxEvidenceMode({ readiness: { evidence_mode: "sample" } }), "SAMPLE");
 });
 
 test("buildLaunchGatePacket includes proof chain and live project mapping", () => {

@@ -33,6 +33,10 @@
     return normalizeEvidenceMode(`${modeLabel} ${modeDisplay}`);
   }
 
+  function deriveOnyxEvidenceMode(payload = {}) {
+    return deriveEvidenceMode(payload);
+  }
+
   function mapControlStatus(value, required = true) {
     const normalized = String(value || "").trim().toUpperCase();
     if (["PASS", "FAIL", "WARN", "UNKNOWN", "N/A"].includes(normalized)) {
@@ -152,34 +156,65 @@
     };
   }
 
+  function getProjectFolderMap() {
+    return [
+      { path: "/onyx", description: "Onyx runtime source" },
+      { path: "/trust", description: "Trust control-plane root" },
+      { path: "/trust/frontend/main-dashboard", description: "Reviewer dashboard" },
+      { path: "/trust/backend/api_gateway", description: "Dashboard/API gateway" },
+      { path: "/trust/launch-gate", description: "Launch readiness gate" },
+      { path: "/trust/evidence", description: "Readiness evidence artifacts" },
+      { path: "/trust/policies", description: "Policy-as-code controls" },
+      { path: "/trust/telemetry", description: "Telemetry and audit readiness" },
+    ];
+  }
+
+  function deriveOnyxRuntimeStatus(payload = {}, evidenceMode = "UNKNOWN") {
+    const onyx = (payload?.runtime_portfolio?.runtimes || []).find((item) => String(item?.runtime_key || "").toLowerCase() === "onyx") || {};
+    const runtimeStatus = String(onyx?.status || "").toLowerCase();
+    const readinessMessage = String(payload?.onyx_security_readiness?.message || "").toLowerCase();
+    const topBlocker = String(payload?.readiness?.top_blocker || "").toLowerCase();
+
+    if (evidenceMode === "DEMO") {
+      return "DEMO";
+    }
+    if (evidenceMode === "SAMPLE") {
+      return "SAMPLE";
+    }
+    if (runtimeStatus === "critical") {
+      return "BLOCKED";
+    }
+    if (readinessMessage.includes("unreachable") || topBlocker.includes("unreachable")) {
+      return "BLOCKED";
+    }
+    if (runtimeStatus === "healthy") {
+      return evidenceMode === "LIVE" ? "CONNECTED" : "PARTIAL";
+    }
+    if (runtimeStatus === "warning") {
+      return "PARTIAL";
+    }
+    if (evidenceMode === "PARTIAL") {
+      return "PARTIAL";
+    }
+    return "UNKNOWN";
+  }
+
   function deriveLiveOnyxProject(payload = {}, launchHeader = null) {
     const header = launchHeader || deriveLaunchDecisionHeader(payload);
-    const onyx = (payload?.runtime_portfolio?.runtimes || []).find((item) => String(item?.runtime_key || "").toLowerCase() === "onyx") || {};
-    let status = "UNKNOWN";
-    const runtimeStatus = String(onyx?.status || "").toLowerCase();
-    if (header.evidenceMode === "DEMO") {
-      status = "DEMO";
-    } else if (header.evidenceMode === "SAMPLE") {
-      status = "SAMPLE";
-    } else if (runtimeStatus === "healthy") {
-      status = "CONNECTED";
-    } else if (runtimeStatus === "critical") {
-      status = "BLOCKED";
-    } else if (runtimeStatus === "warning") {
-      status = "PARTIAL";
-    }
-    if (header.evidenceMode === "PARTIAL" && status === "CONNECTED") {
-      status = "PARTIAL";
-    }
+    const evidenceMode = deriveOnyxEvidenceMode(payload);
+    const status = deriveOnyxRuntimeStatus(payload, evidenceMode);
 
     return {
+      runtimeName: "Onyx RAG",
       runtimeSource: "/onyx",
       trustRoot: "/trust",
       dashboardPath: "/trust/frontend/main-dashboard",
+      apiGatewayPath: "/trust/backend/api_gateway",
       launchGatePath: "/trust/launch-gate",
       evidencePath: "/trust/evidence",
       policiesPath: "/trust/policies",
       telemetryPath: "/trust/telemetry",
+      folderMap: getProjectFolderMap(),
       onyxBaseUrlEnv: "CONTROL_PLANE_ONYX_BASE_URL",
       onyxApiBaseUrlEnv: "CONTROL_PLANE_ONYX_API_BASE_URL",
       readinessEndpoint: "/api/security/readiness",
@@ -187,10 +222,10 @@
       liveLogEndpoint: "/api/control-plane/live-log",
       governedLaunchPath: "/launch/onyx?path=/app&mode=live&view=embedded",
       status,
-      evidenceMode: header.evidenceMode,
+      evidenceMode,
       lastCheckedAt: payload?.readiness?.last_updated || null,
       explanation:
-        "Onyx is the RAG runtime. Trust is the governance, policy, launch-gate, and evidence control plane.",
+        "Onyx is the governed RAG runtime. Trust is the control plane that provides policy, evidence, launch-gate, telemetry, and audit readiness around it. /onyx and /trust are sibling root-level project folders.",
     };
   }
 
@@ -237,9 +272,12 @@
 
   const model = {
     deriveEvidenceMode,
+    deriveOnyxEvidenceMode,
+    deriveOnyxRuntimeStatus,
     deriveRagProofChain,
     deriveLaunchDecisionHeader,
     deriveLiveOnyxProject,
+    getProjectFolderMap,
     buildLaunchGatePacket,
   };
 
