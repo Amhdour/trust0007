@@ -101,3 +101,33 @@ CONTROL_PLANE_USE_LOCAL_ONYX=false
 - The dashboard now includes an **Onyx Security Readiness** panel with launch-gate decisioning (`APPROVED`, `CONDITIONAL`, `BLOCKED`, `UNKNOWN`), risk summary, capability badges, category gates, detailed checks, evidence, and remediations.
 - The integration is provider-oriented (`provider=onyx`) so additional runtimes can be added without hard-coding the entire dashboard around Onyx.
 - If Onyx is unreachable, the panel degrades safely to `unknown` status and keeps the rest of the dashboard functional.
+
+## Run Onyx + Trust together (recommended wiring)
+
+Yes — the intended operating model is:
+
+- **Onyx** = AI/RAG runtime system.
+- **Trust** = governance, policy, launch-gate, and evidence control plane.
+
+To see Onyx status in the Trust dashboard:
+
+1. Run Onyx and ensure it is externally reachable from the Trust environment.
+2. Set these Trust environment values:
+   - `CONTROL_PLANE_ONYX_BASE_URL`
+   - `CONTROL_PLANE_ONYX_API_BASE_URL`
+   - `CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS=false`
+   - `CONTROL_PLANE_EXTERNAL_REACHABLE=true`
+3. Ensure runtime secret pointers are configured:
+   - `CONTROL_PLANE_ONYX_SECRET_PATH`
+   - `CONTROL_PLANE_RUNTIME_SECRET_KEY`
+4. Verify connectivity before launch:
+
+```bash
+make verify-remote-onyx
+make verify-live
+make preflight-onyx-trust
+```
+
+If both verification commands pass, open the Trust dashboard and validate the **Onyx Security Readiness** panel is populated (instead of `UNKNOWN`) with checks/evidence from the remote Onyx runtime.
+
+For a complete pre-production checklist, see `docs/onyx-trust-production-checklist.md`.
