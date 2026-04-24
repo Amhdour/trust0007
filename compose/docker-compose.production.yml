@@ -25,7 +25,8 @@ services:
       CONTROL_PLANE_ONYX_HOST: ${CONTROL_PLANE_ONYX_HOST:-127.0.0.1}
       CONTROL_PLANE_ONYX_PORT: ${CONTROL_PLANE_ONYX_PORT:-3010}
       CONTROL_PLANE_ONYX_SECRET_KEY: ${CONTROL_PLANE_ONYX_SECRET_KEY:-api_token}
-      CONTROL_PLANE_ONYX_BASE_URL: ${CONTROL_PLANE_ONYX_BASE_URL:-http://onyx_runtime:80}
+      CONTROL_PLANE_ONYX_BASE_URL: ${CONTROL_PLANE_ONYX_BASE_URL:-http://web_server:3000}
+      CONTROL_PLANE_ONYX_API_BASE_URL: ${CONTROL_PLANE_ONYX_API_BASE_URL:-http://api_server:8080}
       CONTROL_PLANE_REQUIRED_SECRET_PATH: ${CONTROL_PLANE_REQUIRED_SECRET_PATH:-secret/data/runtime/tenant-stage/governed-flow}
       CONTROL_PLANE_REQUIRED_SECRET_KEY: ${CONTROL_PLANE_REQUIRED_SECRET_KEY:-api_token}
       CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS: ${CONTROL_PLANE_ALLOW_LOCAL_RUNTIME_TARGETS:-true}
@@ -60,6 +61,7 @@ services:
         condition: service_healthy
     networks:
       - trust_stack
+      - onyx_upstream
     read_only: true
     tmpfs:
       - /tmp
@@ -267,6 +269,9 @@ services:
 networks:
   trust_stack:
     name: trust_stack_production
+  onyx_upstream:
+    external: true
+    name: ${CONTROL_PLANE_ONYX_DOCKER_NETWORK:-onyx_default}
 
 volumes:
   control_plane_artifacts:

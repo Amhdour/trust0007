@@ -196,8 +196,21 @@ def _runtime_local_base_url(target: RuntimeTarget) -> str:
     return f"http://{host}:{_runtime_port(target)}"
 
 
+def _runtime_api_base_url(target: RuntimeTarget) -> str:
+    if target.key == "onyx":
+        explicit = os.environ.get("CONTROL_PLANE_ONYX_API_BASE_URL", "").strip().rstrip("/")
+        if explicit:
+            return explicit
+        return "http://api_server:8080"
+    return _runtime_local_base_url(target)
+
+
 def _runtime_target_path(target: RuntimeTarget, requested_path: str) -> str:
     return requested_path if requested_path.startswith("/") else f"/{requested_path.lstrip('/')}"
+
+
+def _runtime_proxy_path(target: RuntimeTarget, requested_path: str) -> str:
+    return f"/runtime-proxy/{target.key}{_runtime_target_path(target, requested_path)}"
 
 
 def _governance_mode(explicit: str = "") -> str:
@@ -342,6 +355,14 @@ def _request_is_https(headers: dict[str, str]) -> bool:
         return True
     forwarded = str(headers.get("Forwarded", "")).lower()
     return "proto=https" in forwarded
+
+
+def _expects_html(headers: dict[str, str]) -> bool:
+    accept = str(headers.get("Accept", ""))
+    if not accept:
+        return False
+    lowered = accept.lower()
+    return "text/html" in lowered or "application/xhtml+xml" in lowered
 
 
 def _access_token_cookie(token: str, max_age_seconds: int, *, secure: bool) -> str:
@@ -1558,7 +1579,12 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             self._redirect(f"/runtime-proxy/{target.key}/app" + (f"?{parsed.query}" if parsed.query else ""))
             return
 
-        upstream_url = f"{_runtime_local_base_url(target)}{upstream_path}"
+        upstream_base_url = _runtime_local_base_url(target)
+        if target.key == "onyx" and (upstream_path == "/api" or upstream_path.startswith("/api/")):
+            upstream_base_url = _runtime_api_base_url(target)
+            upstream_path = upstream_path.removeprefix("/api") or "/"
+
+        upstream_url = f"{upstream_base_url}{upstream_path}"
         if parsed.query:
             upstream_url = f"{upstream_url}?{parsed.query}"
 
@@ -1687,6 +1713,22 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         dashboard_workspace_view = view_mode in {"dashboard", "embedded", "workspace"}
         live_mode = flow_mode == "live"
         question = query.get("question", [f"Navigate to {runtime_title} path: {safe_path}"])[-1]
+        request_headers = dict(self.headers.items())
+        request_cookies = _cookie_map(self.headers.get("Cookie", ""))
+
+        if live_mode and _live_front_door_enabled():
+            has_bearer = bool(self.headers.get("Authorization", "").strip())
+            has_access_cookie = bool(request_cookies.get("kc_access_token", "").strip())
+            if not has_bearer and not has_access_cookie and _expects_html(request_headers):
+                login_href = _live_front_door_login_href(
+                    getattr(
+                        self,
+                        "path",
+                        f"/launch/{runtime_name}?path={quote(safe_path, safe='/?=&')}&mode=live",
+                    )
+                )
+                self._redirect(login_href, status=HTTPStatus.SEE_OTHER)
+                return
 
         def launch_view_href(path: str, *, mode: str = "", view: str = "") -> str:
             href = f"/launch/{runtime_name}?path={quote(path, safe='/?=&')}"
@@ -1751,8 +1793,8 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 policy_source=policy_context.source,
                 policy_path=policy_context.relative_path,
                 authorization_header=self.headers.get("Authorization", ""),
-                request_headers=dict(self.headers.items()),
-                cookies=_cookie_map(self.headers.get("Cookie", "")),
+                request_headers=request_headers,
+                cookies=request_cookies,
                 evidence_mode=flow_mode,
                 secret_request={
                     "needed": live_mode,
@@ -1771,8 +1813,9 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         runtime_port = _runtime_port(target)
         local_base_url = _runtime_local_base_url(target)
         runtime_path = _runtime_target_path(target, safe_path)
+        runtime_proxy_path = _runtime_proxy_path(target, safe_path)
         local_url = f"{local_base_url}{runtime_path}"
-        public_url = _public_service_url(runtime_port, runtime_path)
+        public_url = runtime_proxy_path if target.key == "onyx" else _public_service_url(runtime_port, runtime_path)
 
         if not governance_allowed:
             if live_mode and _live_front_door_enabled():
@@ -1918,7 +1961,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
 
         # Governance allowed the handoff, proceed with link
         local_ready = any(self._url_is_reachable(candidate) for candidate in _runtime_reachability_targets(local_base_url, safe_path))
-        codespaces_visible = self._url_is_reachable(_public_service_url(runtime_port))
+        codespaces_visible = local_ready if target.key == "onyx" else self._url_is_reachable(_public_service_url(runtime_port))
         runtime_proof = _record_runtime_proof(
             target=target,
             requested_path=safe_path,
@@ -2013,11 +2056,7 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
                 f'<a class="surface-link{" is-active" if href == launch_view_href(safe_path, mode="live", view="embedded") else ""}" href="{href}">{label}</a>'
                 for label, href in workspace_nav
             )
-            dashboard_frame_url = (
-                _browser_local_service_url(runtime_port, runtime_path)
-                if target.key == "onyx"
-                else f"/runtime-proxy/{runtime_name}{runtime_path}"
-            )
+            dashboard_frame_url = runtime_proxy_path
             runtime_open_href = dashboard_frame_url if local_ready else public_url
             workspace_main_markup = ""
             frame_callout_markup = ""

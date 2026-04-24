@@ -20,7 +20,9 @@ import socket
 import subprocess
 import tempfile
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.request import HTTPRedirectHandler, build_opener
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
@@ -28,9 +30,10 @@ import pytest
 
 
 class HTTPResponse:
-    def __init__(self, status_code: int, text: str):
+    def __init__(self, status_code: int, text: str, headers: dict[str, str] | None = None):
         self.status_code = status_code
         self.text = text
+        self.headers = headers or {}
 
     def json(self):
         return json.loads(self.text)
@@ -39,9 +42,27 @@ class HTTPResponse:
 def http_get(url: str, timeout: int = 10) -> HTTPResponse:
     try:
         with urlopen(url, timeout=timeout) as response:
-            return HTTPResponse(getattr(response, "status", 200), response.read().decode("utf-8"))
+            return HTTPResponse(
+                getattr(response, "status", 200),
+                response.read().decode("utf-8"),
+                dict(response.headers.items()),
+            )
     except HTTPError as exc:
-        return HTTPResponse(exc.code, exc.read().decode("utf-8"))
+        return HTTPResponse(exc.code, exc.read().decode("utf-8"), dict(exc.headers.items()))
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def http_get_no_redirect(url: str, timeout: int = 10) -> tuple[int, str, dict[str, str]]:
+    opener = build_opener(_NoRedirectHandler())
+    try:
+        with opener.open(url, timeout=timeout) as response:
+            return getattr(response, "status", 200), response.read().decode("utf-8"), dict(response.headers.items())
+    except HTTPError as exc:
+        return exc.code, exc.read().decode("utf-8"), dict(exc.headers.items())
 
 
 class APIServer:
@@ -127,6 +148,48 @@ class APIServer:
     def url(self, path: str) -> str:
         """Get full URL for a path."""
         return f"http://127.0.0.1:{self.port}{path}"
+
+
+class UpstreamProbeServer:
+    def __init__(self, label: str):
+        self.label = label
+        self.port = APIServer._reserve_port()
+        self._server = None
+        self._thread = None
+
+    def start(self) -> None:
+        label = self.label
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:  # noqa: N802
+                body = json.dumps({"label": label, "path": self.path}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("X-Upstream-Label", label)
+                self.send_header("X-Upstream-Path", self.path)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, format: str, *args) -> None:  # noqa: A003
+                return
+
+        self._server = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        self._server.timeout = 0.5
+        import threading
+
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        if self._server:
+            self._server.shutdown()
+            self._server.server_close()
+        if self._thread:
+            self._thread.join(timeout=2)
+
+    def url(self) -> str:
+        return f"http://127.0.0.1:{self.port}"
 
 
 def test_live_governed_flow_end_to_end():
@@ -235,6 +298,42 @@ def test_live_onyx_agents_handoff_requires_admin_role() -> None:
         server.stop()
 
 
+def test_runtime_proxy_routes_onyx_api_calls_to_backend_upstream() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    web_upstream = UpstreamProbeServer("web")
+    api_upstream = UpstreamProbeServer("api")
+    web_upstream.start()
+    api_upstream.start()
+    server = APIServer(
+        repo_root,
+        extra_env={
+            "CONTROL_PLANE_ONYX_BASE_URL": web_upstream.url(),
+            "CONTROL_PLANE_ONYX_API_BASE_URL": api_upstream.url(),
+        },
+    )
+    server.start()
+
+    try:
+        runtime_page = http_get(server.url("/runtime-proxy/onyx/app"), timeout=10)
+        assert runtime_page.status_code == 200
+        assert runtime_page.headers["X-Upstream-Label"] == "web"
+        assert runtime_page.headers["X-Upstream-Path"] == "/app"
+
+        settings = http_get(server.url("/runtime-proxy/onyx/api/settings"), timeout=10)
+        assert settings.status_code == 200
+        assert settings.headers["X-Upstream-Label"] == "api"
+        assert settings.headers["X-Upstream-Path"] == "/settings"
+
+        auth_type = http_get(server.url("/runtime-proxy/onyx/api/auth/type"), timeout=10)
+        assert auth_type.status_code == 200
+        assert auth_type.headers["X-Upstream-Label"] == "api"
+        assert auth_type.headers["X-Upstream-Path"] == "/auth/type"
+    finally:
+        server.stop()
+        web_upstream.stop()
+        api_upstream.stop()
+
+
 def test_live_onyx_handoff_route_is_governed() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     server = APIServer(repo_root)
@@ -317,6 +416,25 @@ def test_live_dashboard_consumes_artifacts():
         assert upstream_response.status_code == 200
         upstream_inventory = upstream_response.json()
         assert any(component["component_name"] == "Onyx" for component in upstream_inventory["components"])
+    finally:
+        server.stop()
+
+
+def test_live_browser_launch_redirects_to_front_door_before_denial() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    server = APIServer(
+        repo_root,
+        extra_env={
+            "CONTROL_PLANE_LIVE_FRONT_DOOR_ENABLED": "true",
+        },
+    )
+    server.start()
+
+    try:
+        status_code, _, headers = http_get_no_redirect(server.url("/launch/onyx?path=/app&mode=live"), timeout=10)
+
+        assert status_code == 303, f"Expected 303, got {status_code}"
+        assert headers.get("Location", "").startswith("/auth/live/login?next=%2Flaunch%2Fonyx%3Fpath%3D%2Fapp%26mode%3Dlive")
     finally:
         server.stop()
 

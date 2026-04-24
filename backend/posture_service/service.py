@@ -162,6 +162,26 @@ def _launch_handoff_path(path: str, *, runtime: str = "onyx", mode: str = "", vi
 def _launch_handoff_url(path: str, *, runtime: str = "onyx", mode: str = "", view: str = "") -> str:
     return _dashboard_url(_launch_handoff_path(path, runtime=runtime, mode=mode, view=view))
 
+
+def _runtime_proxy_path(path: str, *, runtime: str = "onyx") -> str:
+    runtime_name = runtime.strip().lower() or "onyx"
+    normalized_path = path if str(path).startswith("/") else f"/{str(path).lstrip('/')}"
+    return f"/runtime-proxy/{runtime_name}{normalized_path}"
+
+
+def _runtime_local_base_url(runtime: str = "onyx") -> str:
+    runtime_name = runtime.strip().lower() or "onyx"
+    base_env = f"CONTROL_PLANE_{runtime_name.upper()}_BASE_URL"
+    host_env = f"CONTROL_PLANE_{runtime_name.upper()}_HOST"
+    port_env = f"CONTROL_PLANE_{runtime_name.upper()}_PORT"
+    explicit = os.environ.get(base_env, "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    host = os.environ.get(host_env, "127.0.0.1").strip() or "127.0.0.1"
+    port = os.environ.get(port_env, "3010").strip() or "3010"
+    return f"http://{host}:{port}"
+
+
 def _status_from_launch(verdict: str) -> str:
     return {
         "go": "healthy",
@@ -1716,8 +1736,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     runtime_proof_status = _combine_statuses(runtime_continuity_status, runtime_readiness_status)
     onyx_governed_entry_url = _launch_handoff_url(latest_requested_path)
     onyx_live_workspace_url = _launch_handoff_path(latest_requested_path, mode="live", view="embedded")
-    onyx_runtime_public_url = str(runtime_readiness.get("public_url", "")).strip() or _public_service_url(3010, latest_requested_path)
-    onyx_runtime_local_url = str(runtime_readiness.get("local_url", "")).strip() or f"http://127.0.0.1:3010{latest_requested_path}"
+    onyx_runtime_public_url = str(runtime_readiness.get("public_url", "")).strip() or _runtime_proxy_path(latest_requested_path)
+    onyx_runtime_local_url = str(runtime_readiness.get("local_url", "")).strip() or f"{_runtime_local_base_url('onyx')}{latest_requested_path}"
     runtime_activity_href = (
         f"/api/control-plane/onyx-activity?path={quote(latest_requested_path, safe='/?=&')}"
         f"&trace_id={quote(latest_trace_id, safe='')}"
