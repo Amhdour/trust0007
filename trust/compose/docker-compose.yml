@@ -20,6 +20,11 @@ services:
       CONTROL_PLANE_VAULT_TOKEN_FILE: ${CONTROL_PLANE_VAULT_TOKEN_FILE:-}
       CONTROL_PLANE_ONYX_SECRET_PATH: ${CONTROL_PLANE_ONYX_SECRET_PATH:-secret/data/dev/tenant-dashboard/runtime}
       CONTROL_PLANE_ONYX_SECRET_KEY: ${CONTROL_PLANE_ONYX_SECRET_KEY:-api_token}
+      CONTROL_PLANE_ONYX_BASE_URL: ${CONTROL_PLANE_ONYX_BASE_URL:-http://onyx_runtime}
+      CONTROL_PLANE_ONYX_API_BASE_URL: ${CONTROL_PLANE_ONYX_API_BASE_URL:-http://onyx_runtime}
+      ONYX_BASE_URL: ${ONYX_BASE_URL:-http://onyx_runtime}
+      ONYX_READINESS_PATH: ${ONYX_READINESS_PATH:-/api/security/readiness}
+      ONYX_READINESS_ENABLED: ${ONYX_READINESS_ENABLED:-true}
       CODESPACE_NAME: ${CODESPACE_NAME:-}
       GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: ${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}
     ports:
@@ -36,6 +41,7 @@ services:
       - superset
       - opa
       - envoy
+      - onyx_runtime
     networks:
       - trust_stack
 
@@ -169,6 +175,21 @@ services:
       - "9901:9901"
     depends_on:
       - opa
+    networks:
+      - trust_stack
+
+  onyx_runtime:
+    image: nginx:1.27-alpine
+    ports:
+      - "3010:80"
+    volumes:
+      - ./runtime/onyx:/usr/share/nginx/html:ro
+      - ./runtime/onyx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - trust_stack
 

@@ -1,0 +1,57 @@
+name: Release Proof Pack
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-attach-proof-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Resolve project root
+        id: project-root
+        run: |
+          if [[ -d trust && -f trust/Makefile ]]; then
+            echo "dir=trust" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install release proof dependencies
+        working-directory: ${{ steps.project-root.outputs.dir }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest cyclonedx-bom
+
+      - name: Generate release evidence snapshot
+        working-directory: ${{ steps.project-root.outputs.dir }}
+        run: |
+          mkdir -p artifacts
+          python -m compileall adapters telemetry tests launch-gate
+          pytest -q tests/retrieval tests/secrets tests/tools --junitxml=artifacts/smoke-junit.xml
+          cyclonedx-py environment --output-file artifacts/sbom-cyclonedx.json --output-format JSON
+          python scripts/build-proof-pack.py
+          tar -czf artifacts/reviewer-proof-pack.tgz -C artifacts proof-pack
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reviewer-proof-pack-release
+          path: ${{ steps.project-root.outputs.dir }}/artifacts/reviewer-proof-pack.tgz
+
+      - name: Attach proof pack to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.project-root.outputs.dir }}/artifacts/reviewer-proof-pack.tgz
