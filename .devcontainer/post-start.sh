@@ -2,12 +2,22 @@
 set -Eeuo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TRUST_DIR="$REPO_ROOT/trust"
 
-cd "$TRUST_DIR"
+resolve_project_dir() {
+  if [[ -d "$REPO_ROOT/trust" && -f "$REPO_ROOT/trust/Makefile" ]]; then
+    printf '%s\n' "$REPO_ROOT/trust"
+    return
+  fi
+
+  printf '%s\n' "$REPO_ROOT"
+}
+
+PROJECT_DIR="$(resolve_project_dir)"
+
+cd "$PROJECT_DIR"
 
 BOOT_MODE="${TRUST_CODESPACE_BOOT_MODE:-local}"
-LOG_DIR="$TRUST_DIR/.devcontainer/.control-plane"
+LOG_DIR="$PROJECT_DIR/.devcontainer/.control-plane"
 LOG_FILE="$LOG_DIR/codespace-start.log"
 PID_FILE="$LOG_DIR/control-plane.pid"
 
@@ -26,7 +36,7 @@ fi
 
 if [[ "${BOOT_MODE}" == "none" ]]; then
   echo "TRUST_CODESPACE_BOOT_MODE=none; not auto-starting services."
-  echo "Manual run: cd trust && make up-dev"
+  echo "Manual run: cd $PROJECT_DIR && make up-dev"
   exit 0
 fi
 

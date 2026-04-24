@@ -2,22 +2,29 @@
 set -Eeuo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TRUST_DIR="$REPO_ROOT/trust"
 
-if [[ ! -d "$TRUST_DIR" ]]; then
-  echo "ERROR: expected trust/ directory at $TRUST_DIR" >&2
-  exit 1
-fi
+resolve_project_dir() {
+  if [[ -d "$REPO_ROOT/trust" && -f "$REPO_ROOT/trust/Makefile" ]]; then
+    printf '%s\n' "$REPO_ROOT/trust"
+    return
+  fi
+
+  printf '%s\n' "$REPO_ROOT"
+}
+
+PROJECT_DIR="$(resolve_project_dir)"
 
 cd "$REPO_ROOT"
 
 echo "==> Preparing AI Trust & Security Readiness career project"
+echo "==> Repo root: $REPO_ROOT"
+echo "==> Project root: $PROJECT_DIR"
 
 if [[ -f .gitmodules ]]; then
   git submodule update --init --recursive || true
 fi
 
-cd "$TRUST_DIR"
+cd "$PROJECT_DIR"
 
 python -m pip install --upgrade pip setuptools wheel
 
@@ -36,4 +43,4 @@ mkdir -p overlays/myStarterKit/artifacts
 mkdir -p .devcontainer/.control-plane
 
 echo "==> Project ready"
-echo "Run manually with: make up-dev"
+echo "Run manually with: cd $PROJECT_DIR && make up-dev"
