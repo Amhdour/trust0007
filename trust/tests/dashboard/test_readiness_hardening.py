@@ -17,7 +17,7 @@ def _configure_common(monkeypatch, *, evidence_mode: str = "live", retrieval_liv
         "validate_live_governed_flow_artifacts",
         lambda root: {"valid": evidence_mode == "live", "reasons": []},
     )
-    monkeypatch.setattr(posture_service_module, "_event_feed", lambda root: ([
+    monkeypatch.setattr(posture_service_module, "_event_feed", lambda root, governance_mode="": ([
         {"event_type": "policy.decision", "payload": {"allow": True}, "trace_id": "trace-1"},
         {"event_type": "handoff.decision", "payload": {"allow": True}, "trace_id": "trace-1"},
     ], "Governed events", "overlays/myStarterKit/artifacts/events.jsonl"))

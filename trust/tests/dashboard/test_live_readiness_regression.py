@@ -42,7 +42,7 @@ def _healthy_live_summary() -> dict:
 
 def test_dashboard_reaches_go_for_healthy_live_configuration(monkeypatch) -> None:
     monkeypatch.setenv("CONTROL_PLANE_GOVERNANCE_MODE", "live")
-    monkeypatch.setattr(posture_service_module, "_event_feed", lambda root: ([
+    monkeypatch.setattr(posture_service_module, "_event_feed", lambda root, governance_mode="": ([
         {"event_type": "policy.decision", "payload": {"allow": True}, "trace_id": "trace-live-1"},
         {"event_type": "retrieval.decision", "payload": {"decision": "allow"}, "trace_id": "trace-live-1"},
         {"event_type": "tool.decision", "payload": {"allowed": ["onyx"], "denied": []}, "trace_id": "trace-live-1"},

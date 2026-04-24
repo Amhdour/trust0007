@@ -723,8 +723,10 @@ def _artifact_integrity(path: Path, relative_path: str, root: Path) -> tuple[str
     return "neutral", "Raw artifact available"
 
 
-def _event_feed(root: Path) -> tuple[list[dict[str, Any]], str, str]:
-    governance_mode = os.environ.get("CONTROL_PLANE_GOVERNANCE_MODE", "demo").strip().lower() or "demo"
+def _event_feed(root: Path, governance_mode_override: str = "") -> tuple[list[dict[str, Any]], str, str]:
+    governance_mode = (
+        governance_mode_override or os.environ.get("CONTROL_PLANE_GOVERNANCE_MODE", "demo")
+    ).strip().lower() or "demo"
     if has_live_governed_flow_artifacts(root):
         summary = load_latest_governed_flow_summary(root)
         evidence_mode = str(summary.get("evidence_mode", "live")).lower()
@@ -1356,9 +1358,11 @@ def build_control_plane_live_log(root: Path | None = None, limit: int = 12) -> d
     return build_activity_snapshot(resolved_root, limit=limit)
 
 
-def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
+def build_control_plane_dashboard(root: Path | None = None, governance_mode_override: str = "") -> dict[str, Any]:
     resolved_root = repo_root(root)
-    governance_mode = os.environ.get("CONTROL_PLANE_GOVERNANCE_MODE", "demo").strip().lower() or "demo"
+    governance_mode = (
+        governance_mode_override or os.environ.get("CONTROL_PLANE_GOVERNANCE_MODE", "demo")
+    ).strip().lower() or "demo"
     contract = load_dashboard_contract(resolved_root)
     section_contracts = _section_meta(contract)
     services = load_service_inventory(resolved_root)
@@ -1371,7 +1375,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         }
     ) or _upstream_components_by_classification(upstream_components)
     upstream_audit = dict(upstream_inventory.get("audit", {}))
-    events, event_feed_label, event_feed_path = _event_feed(resolved_root)
+    events, event_feed_label, event_feed_path = _event_feed(resolved_root, governance_mode)
     governed_flow_summary = load_latest_governed_flow_summary(resolved_root)
     governed_request_feed = _governed_request_feed(
         load_latest_governed_request_feed(resolved_root),
@@ -2449,7 +2453,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     }
     onyx_launch_route = _launch_handoff_path("/app", mode="live", view="embedded")
     onyx_agent_launch_route = "/launch/onyx/agent?mode=live&view=embedded"
-    onyx_portfolio_status = runtime_proof_status if onyx_available else "warning"
+    onyx_portfolio_status = runtime_proof_status if (onyx_available or runtime_proof_status == "healthy") else "warning"
     onyx_agent_portfolio_status = "warning" if denied_tool_attempts or confirmation_events else "healthy"
     runtime_portfolio = {
         "summary": "Two governed runtime lanes are active in this control plane: Onyx for RAG and Onyx Agent for autonomous agents.",

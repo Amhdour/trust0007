@@ -38,6 +38,7 @@ const liveOnyxAgentLink = document.getElementById("live-onyx-link");
 const viewEvidenceLink = document.getElementById("view-evidence-link");
 const refreshDashboardButton = document.getElementById("refresh-dashboard-button");
 
+const DASHBOARD_OVERVIEW_URL = "/api/control-plane/overview?mode=live";
 const LIVE_LOG_LIMIT = 6;
 const DEFAULT_LIVE_LOG_POLL_MS = 5000;
 const SECTION_SCROLL_OFFSET_PX = 152;
@@ -2933,7 +2934,7 @@ function renderDrilldownTabs(tabs) {
 
 async function boot() {
   try {
-    const response = await fetch("/api/control-plane/overview", { cache: "no-store" });
+    const response = await fetch(DASHBOARD_OVERVIEW_URL, { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`Dashboard API returned ${response.status}`);
     }
@@ -2972,14 +2973,14 @@ async function boot() {
 async function refreshDashboard() {
   if (refreshDashboardButton) {
     refreshDashboardButton.disabled = true;
-    refreshDashboardButton.textContent = "Refreshing...";
+    refreshDashboardButton.textContent = "Refreshing live proof...";
   }
 
   await Promise.all([boot(), loadLiveLog()]);
 
   if (refreshDashboardButton) {
     refreshDashboardButton.disabled = false;
-    refreshDashboardButton.textContent = "Refresh evidence";
+    refreshDashboardButton.textContent = "Refresh live proof";
   }
 }
 

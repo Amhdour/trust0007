@@ -22,6 +22,7 @@ This repo keeps both `demo` and `live` governed modes, but they are not equivale
 - `live` mode
   - `CONTROL_PLANE_GOVERNANCE_MODE=live`
   - or `mode=live` on `/api/control-plane/governed-flow`, `/launch/onyx`, and `/launch/onyx/agent`
+  - the main dashboard requests `/api/control-plane/overview?mode=live` by default, so missing live artifacts are shown as a live bootstrap blocker rather than sample proof
 
 ## Reviewer guidance
 

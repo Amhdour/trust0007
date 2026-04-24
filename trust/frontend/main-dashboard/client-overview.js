@@ -414,7 +414,7 @@ function renderError(error) {
 
 async function boot() {
   try {
-    const payload = await fetchJson("/api/control-plane/overview");
+    const payload = await fetchJson("/api/control-plane/overview?mode=live");
     const [allowedResult, deniedResult] = await Promise.allSettled([
       fetchJson("/raw/evidence/reviewer/inspectable-live-runtime/allowed-flow.json"),
       fetchJson("/raw/evidence/reviewer/inspectable-live-runtime/denied-flow.json"),

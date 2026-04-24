@@ -64,7 +64,7 @@ def test_frontend_assets_exist_for_dashboard_homepage() -> None:
     assert "readiness.decision" in js
     assert "trustProof.identity_proven" in js
     assert "security.blocked_actions_count" in js
-    assert "/api/control-plane/overview" in js
+    assert "/api/control-plane/overview?mode=live" in js
 
 
 def test_client_overview_assets_exist_and_reuse_real_dashboard_signals() -> None:
@@ -75,7 +75,7 @@ def test_client_overview_assets_exist_and_reuse_real_dashboard_signals() -> None
     assert 'id="traffic-summary-root"' in html
     assert 'id="process-root"' in html
     assert 'id="examples-root"' in html
-    assert "/api/control-plane/overview" in js
+    assert "/api/control-plane/overview?mode=live" in js
     assert "/raw/evidence/reviewer/inspectable-live-runtime/allowed-flow.json" in js
     assert "/raw/evidence/reviewer/inspectable-live-runtime/denied-flow.json" in js
     assert "evidence_freshness" in js
@@ -247,13 +247,14 @@ def test_frontend_runtime_portfolio_fallback_is_rag_first_and_keeps_compatibilit
     assert "runtimeByKey.get(\"onyx\")?.launch_href" in js
     assert "liveRuntimeLink.setAttribute(\"href\", onyxChatLaunchHref)" in js
     assert "liveOnyxAgentLink.setAttribute(\"href\", onyxAgentLaunchHref)" in js
+    assert 'const DASHBOARD_OVERVIEW_URL = "/api/control-plane/overview?mode=live"' in js
 
 
 def test_fallback_mode_banner_uses_review_only_copy(monkeypatch) -> None:
     monkeypatch.setattr(
         posture_service_module,
         "_event_feed",
-        lambda resolved_root: ([], "Sample or fallback events", "telemetry/exports/sample_events.jsonl"),
+        lambda resolved_root, governance_mode="": ([], "Sample or fallback events", "telemetry/exports/sample_events.jsonl"),
     )
     monkeypatch.setattr(posture_service_module, "load_latest_governed_flow_summary", lambda resolved_root: {})
     monkeypatch.setattr(posture_service_module, "load_latest_identity_evidence", lambda resolved_root: {})
@@ -282,12 +283,35 @@ def test_fallback_mode_banner_uses_review_only_copy(monkeypatch) -> None:
     assert mode_banner["disclosure_label"] == "What this mode means"
 
 
+def test_dashboard_mode_override_requests_live_without_env(monkeypatch) -> None:
+    monkeypatch.delenv("CONTROL_PLANE_GOVERNANCE_MODE", raising=False)
+    monkeypatch.setattr(posture_service_module, "has_live_governed_flow_artifacts", lambda root: False)
+    monkeypatch.setattr(
+        posture_service_module,
+        "validate_live_governed_flow_artifacts",
+        lambda root: {"valid": False, "reasons": ["missing"]},
+    )
+    monkeypatch.setattr(posture_service_module, "load_sample_events", lambda root: [{"event_type": "sample"}])
+    monkeypatch.setattr(posture_service_module, "load_latest_governed_flow_summary", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_identity_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_policy_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_retrieval_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_secret_evidence", lambda resolved_root: {})
+    monkeypatch.setattr(posture_service_module, "load_latest_trace_correlation", lambda resolved_root: {})
+
+    payload = build_control_plane_dashboard(governance_mode_override="live")
+
+    assert payload["mode_banner"]["label"] == "LIVE GOVERNED MODE"
+    assert payload["readiness"]["evidence_mode"] == "live"
+    assert payload["mode_banner"]["chips"][0]["display_value"] == "Live mode awaiting governed artifacts"
+
+
 def test_live_mode_without_bootstrapped_artifacts_does_not_fall_back_to_demo(monkeypatch) -> None:
     monkeypatch.setenv("CONTROL_PLANE_GOVERNANCE_MODE", "live")
     monkeypatch.setattr(
         posture_service_module,
         "_event_feed",
-        lambda resolved_root: ([], "Live governed artifacts missing; governed bootstrap has not completed", "overlays/myStarterKit/artifacts/events.jsonl"),
+        lambda resolved_root, governance_mode="": ([], "Live governed artifacts missing; governed bootstrap has not completed", "overlays/myStarterKit/artifacts/events.jsonl"),
     )
     monkeypatch.setattr(posture_service_module, "load_latest_governed_flow_summary", lambda resolved_root: {})
     monkeypatch.setattr(posture_service_module, "load_latest_identity_evidence", lambda resolved_root: {})

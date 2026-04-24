@@ -21,9 +21,11 @@ This frontend is the dashboard-first homepage for the repository.
 - Evidence mode is rendered with explicit badges: `LIVE`, `PARTIAL`, `DEMO`, `SAMPLE`, `UNKNOWN`.
 - Audience modes are available for Executive, Security Reviewer, Operator, and Evidence/API reading paths.
 - It now foregrounds a plain-language first layer, a compact command summary, a dominant live-vs-demo mode banner, a short reading guide, lighter summary-first reviewer sections, and deeper technical drilldowns.
-- The homepage consumes `/api/control-plane/overview` for posture and evidence panels and `/api/control-plane/live-log` for recent activity.
-- The client overview page reuses the same overview payload and the reviewer allow/deny artifacts, but presents them as simple visuals for non-technical audiences.
+- The homepage consumes `/api/control-plane/overview?mode=live` for posture and evidence panels and `/api/control-plane/live-log` for recent activity.
+- The overview request is live-first: if current governed live artifacts are missing, the dashboard shows the fail-closed live bootstrap state instead of silently falling back to sample proof.
+- The client overview page reuses the same live overview payload and the reviewer allow/deny artifacts, but presents them as simple visuals for non-technical audiences.
 - The hero and top panels frame the page as **Trust Readiness Dashboard for the Onyx RAG Project**. Onyx Agent/MCP/tool-governance items are demoted to deferred/future scope and are not active current RAG launch claims.
+- The hero includes direct governed live workspace links for Onyx and Onyx Agent at `/launch/onyx?path=/app&mode=live&view=embedded` and `/launch/onyx/agent?mode=live&view=embedded`.
 - The adjacent access-requirements panel explains that the deployment must already provide a valid Keycloak-backed browser session or bearer token.
 - Drill-through links are expected to point at raw repo artifacts exposed by the API gateway under `/raw/...`.
 

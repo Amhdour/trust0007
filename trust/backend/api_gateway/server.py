@@ -1195,7 +1195,13 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             return
 
         if path in {"/api/control-plane", "/api/control-plane/overview"}:
-            self._send_json(build_control_plane_dashboard(REPO_ROOT))
+            query = parse_qs(parsed.query)
+            self._send_json(
+                build_control_plane_dashboard(
+                    REPO_ROOT,
+                    governance_mode_override=self._query_value(query, "mode", ""),
+                )
+            )
             return
 
         if path == "/api/fleet/overview":
