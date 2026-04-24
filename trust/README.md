@@ -65,6 +65,7 @@ make test-live-stack
 ```
 
 Use the dashboard to launch governed capability lanes and inspect evidence artifacts under `overlays/myStarterKit/artifacts/`.
+`make up-dev` now also brings up a local `onyx_runtime` service on port `3010`, and the dashboard's **Onyx Security Readiness** panel is wired to that runtime (`/api/security/readiness`) for immediate visibility in Codespaces.
 
 If you open the repository from root, you can run the same commands via the root wrapper Makefile (`make help`, `make test`, `make up-dev`).
 
