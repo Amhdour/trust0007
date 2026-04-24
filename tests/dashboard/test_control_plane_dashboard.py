@@ -175,6 +175,19 @@ def test_dashboard_surfaces_briefing_kpis_and_readiness() -> None:
         "failing_controls",
         "residual_risk_count",
     }
+    assert set(payload["onyx_security_readiness"]) >= {
+        "provider",
+        "system",
+        "component_type",
+        "environment",
+        "generated_at",
+        "overall_status",
+        "overall_score",
+        "risk_summary",
+        "capabilities",
+        "launch_gate_decision",
+        "message",
+    }
 
 
 def test_dashboard_payload_includes_runtime_summary_and_stack_health() -> None:

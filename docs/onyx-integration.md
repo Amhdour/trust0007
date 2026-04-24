@@ -99,3 +99,61 @@ pytest -q tests/integration/test_strict_live_onyx_end_to_end.py
 ```
 
 Use `CONTROL_PLANE_USE_LOCAL_ONYX=true` only for explicit local dev workflows that rely on `upstream/onyx`.
+
+## Onyx Security Readiness Integration
+
+The dashboard can ingest runtime security-readiness telemetry from an Onyx-compatible provider (`provider=onyx`) so launch decisions remain evidence-backed even when governance checks pass.
+
+### Required environment variables
+
+```bash
+ONYX_BASE_URL=http://localhost:3000
+ONYX_READINESS_PATH=/api/security/readiness
+ONYX_READINESS_TOKEN=
+ONYX_READINESS_TIMEOUT_MS=5000
+ONYX_READINESS_ENABLED=true
+```
+
+- `ONYX_READINESS_TOKEN` is optional; if present the client sends `Authorization: Bearer <token>`.
+- `ONYX_READINESS_ENABLED=false` disables remote calls and forces a safe degraded `unknown` readiness result.
+
+### Expected endpoint shape
+
+The endpoint is expected to return:
+- system metadata (`system`, `component_type`, `environment`, `generated_at`)
+- overall security posture (`overall_status`, `overall_score`)
+- detailed checks with severity, status, evidence source/value/details, and recommendation
+- risk rollups (`critical/high/medium/low`)
+- capabilities (`rag`, `connectors`, `agents`, `mcp`, `tools`)
+
+### Dashboard behavior
+
+The **Onyx Security Readiness** panel (under **Onyx RAG Access**) shows:
+- overall readiness status, score, generated timestamp, and environment
+- capability badges and risk summary
+- launch-gate category mapping across Identity, Retrieval, Connector, Prompt/Context, Agent Tool Auth, MCP, Secrets, Telemetry, and Incident families
+- detailed check table (check/category/severity/status/score/evidence source/recommendation)
+- evidence summaries and remediation list
+
+If the endpoint is unreachable or invalid, the dashboard does **not** crash. It surfaces:
+- `overall_status=unknown`
+- `overall_score=0`
+- message: `Onyx readiness endpoint unreachable`
+- launch gate decision: `UNKNOWN`
+
+### Launch gate decision logic
+
+- **BLOCKED**: any critical check fails, or overall status is `fail`, or score `< 60`
+- **CONDITIONAL**: overall status is `warn`, or score is `60-84`, or high-severity warning exists
+- **APPROVED**: overall status is `pass`, score `>= 85`, and no critical/high failures
+- **UNKNOWN**: endpoint unreachable, payload invalid, or unknown checks exceed threshold
+
+### Example local setup
+
+1. Start the control plane dashboard (`make serve-dashboard`).
+2. Start Onyx or a local mock endpoint serving `/api/security/readiness`.
+3. Export readiness env vars above.
+4. Refresh the dashboard and open **Onyx RAG Access** → **Onyx Security Readiness**.
+5. For local validation, use fixtures:
+   - `fixtures/onyx-readiness-pass.json`
+   - `fixtures/onyx-readiness-fail.json`

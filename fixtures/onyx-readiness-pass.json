@@ -1,0 +1,55 @@
+{
+  "system": "onyx007",
+  "component_type": "rag_runtime",
+  "environment": "dev",
+  "generated_at": "2026-04-24T10:00:00Z",
+  "overall_status": "pass",
+  "overall_score": 92,
+  "checks": [
+    {
+      "id": "identity.auth_enabled",
+      "category": "identity",
+      "title": "Authentication enabled",
+      "status": "pass",
+      "severity": "high",
+      "score": 95,
+      "description": "OIDC authentication is enforced.",
+      "evidence": {
+        "source": "config",
+        "value": "oidc_required=true",
+        "details": {
+          "provider": "keycloak"
+        }
+      },
+      "recommendation": "Keep OIDC enforcement enabled."
+    },
+    {
+      "id": "retrieval.boundary_filters",
+      "category": "retrieval",
+      "title": "Tenant retrieval boundaries",
+      "status": "pass",
+      "severity": "medium",
+      "score": 90,
+      "description": "Tenant/source filters are active.",
+      "evidence": {
+        "source": "runtime",
+        "value": "filters_active",
+        "details": {}
+      },
+      "recommendation": "Continue validating filters in CI."
+    }
+  ],
+  "risk_summary": {
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 2
+  },
+  "capabilities": {
+    "rag": true,
+    "connectors": true,
+    "agents": false,
+    "mcp": false,
+    "tools": false
+  }
+}

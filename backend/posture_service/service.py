@@ -41,6 +41,7 @@ from backend.integration_adapter.repository import (
     validate_live_governed_flow_artifacts,
 )
 from backend.launch_gate_service.service import build_launch_gate_summary
+from backend.integrations.onyx import OnyxReadinessClient, map_to_launch_gates
 from backend.trust_readiness.readiness import compute_fleet_readiness
 
 
@@ -211,6 +212,26 @@ def _status_display(status: str) -> str:
         "critical": "Serious issue",
         "neutral": "For context",
     }.get(status, status.title())
+
+
+def _status_from_readiness(value: str) -> str:
+    normalized = str(value or "").strip().lower()
+    return {
+        "pass": "healthy",
+        "warn": "warning",
+        "fail": "critical",
+        "unknown": "neutral",
+    }.get(normalized, "neutral")
+
+
+def _status_from_launch_gate_decision(value: str) -> str:
+    normalized = str(value or "").strip().upper()
+    return {
+        "APPROVED": "healthy",
+        "CONDITIONAL": "warning",
+        "BLOCKED": "critical",
+        "UNKNOWN": "neutral",
+    }.get(normalized, "neutral")
 
 
 def _readiness_display(verdict: str) -> str:
@@ -1527,6 +1548,8 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     onyx_api_base_url = str(os.environ.get("CONTROL_PLANE_ONYX_API_BASE_URL", "")).strip()
     use_local_onyx = str(os.environ.get("CONTROL_PLANE_USE_LOCAL_ONYX", "false")).strip().lower() in {"1", "true", "yes"}
     onyx_available = bool(onyx_base_url or onyx_api_base_url) or (use_local_onyx and path_has_files(resolved_root, "upstream/onyx"))
+    onyx_readiness = OnyxReadinessClient().fetch()
+    onyx_launch_gates = map_to_launch_gates(onyx_readiness)
 
     audit_trace_ids = {
         str(event.get("trace_id", ""))
@@ -3832,6 +3855,140 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     ],
                 },
                 {
+                    "type": "cards",
+                    "title": "Onyx Security Readiness",
+                    "items": [
+                        _card(
+                            "Launch Gate",
+                            onyx_launch_gates.decision,
+                            _status_from_launch_gate_decision(onyx_launch_gates.decision),
+                            onyx_readiness.message or "Derived from readiness status, score, and severity-aware check outcomes.",
+                            _raw("docs/onyx-integration.md"),
+                        ),
+                        _card(
+                            "Overall readiness status",
+                            str(onyx_readiness.overall_status).upper(),
+                            _status_from_readiness(onyx_readiness.overall_status),
+                            "Onyx runtime readiness state reported by the runtime security endpoint.",
+                        ),
+                        _card(
+                            "Overall score",
+                            str(onyx_readiness.overall_score),
+                            "healthy" if onyx_readiness.overall_score >= 85 else ("warning" if onyx_readiness.overall_score >= 60 else "critical"),
+                            "Composite runtime security score used in launch-gate decisioning.",
+                        ),
+                        _card(
+                            "Environment",
+                            onyx_readiness.environment or "unknown",
+                            "neutral",
+                            f"Generated at: {onyx_readiness.generated_at or 'Unavailable'}.",
+                        ),
+                        _card(
+                            "Capabilities",
+                            ", ".join(
+                                label
+                                for enabled, label in [
+                                    (onyx_readiness.capabilities.rag, "RAG"),
+                                    (onyx_readiness.capabilities.connectors, "Connectors"),
+                                    (onyx_readiness.capabilities.agents, "Agents"),
+                                    (onyx_readiness.capabilities.mcp, "MCP"),
+                                    (onyx_readiness.capabilities.tools, "Tools"),
+                                ]
+                                if enabled
+                            )
+                            or "None",
+                            "healthy" if onyx_readiness.capabilities.rag else "warning",
+                            "Capability badges from Onyx readiness telemetry.",
+                        ),
+                        _card(
+                            "Risk summary",
+                            f"C:{onyx_readiness.risk_summary.critical} H:{onyx_readiness.risk_summary.high} M:{onyx_readiness.risk_summary.medium} L:{onyx_readiness.risk_summary.low}",
+                            "critical" if onyx_readiness.risk_summary.critical else ("warning" if onyx_readiness.risk_summary.high else "healthy"),
+                            "Severity rollup from Onyx readiness checks.",
+                        ),
+                    ],
+                },
+                {
+                    "type": "table",
+                    "title": "Onyx launch-gate categories",
+                    "columns": [
+                        {"key": "category", "label": "Category"},
+                        {"key": "status", "label": "Status"},
+                        {"key": "score", "label": "Score"},
+                        {"key": "failed_checks", "label": "Failed checks"},
+                        {"key": "warning_checks", "label": "Warning checks"},
+                        {"key": "unknown_checks", "label": "Unknown checks"},
+                        {"key": "recommended_remediations", "label": "Recommended remediations"},
+                    ],
+                    "rows": [
+                        {
+                            "category": category.name,
+                            "status": str(category.status).upper(),
+                            "score": str(category.score),
+                            "failed_checks": "; ".join(category.failed_checks) or "none",
+                            "warning_checks": "; ".join(category.warning_checks) or "none",
+                            "unknown_checks": "; ".join(category.unknown_checks) or "none",
+                            "recommended_remediations": "; ".join(category.remediations) or "none",
+                        }
+                        for category in onyx_launch_gates.categories
+                    ],
+                },
+                {
+                    "type": "table",
+                    "title": "Onyx detailed readiness checks",
+                    "collapsed": True,
+                    "summary": "Open Onyx readiness check details",
+                    "columns": [
+                        {"key": "check", "label": "Check"},
+                        {"key": "category", "label": "Category"},
+                        {"key": "severity", "label": "Severity"},
+                        {"key": "status", "label": "Status"},
+                        {"key": "score", "label": "Score"},
+                        {"key": "evidence_source", "label": "Evidence Source"},
+                        {"key": "recommendation", "label": "Recommendation"},
+                    ],
+                    "rows": [
+                        {
+                            "check": item.title,
+                            "category": item.category,
+                            "severity": str(item.severity).upper(),
+                            "status": str(item.status).upper(),
+                            "score": str(item.score),
+                            "evidence_source": item.evidence.source,
+                            "recommendation": item.recommendation or "none",
+                        }
+                        for item in onyx_readiness.checks
+                    ],
+                },
+                {
+                    "type": "records",
+                    "title": "Onyx evidence summary",
+                    "items": [
+                        _record(
+                            title=f"{item.source.upper()} evidence",
+                            meta=item.value or "summary unavailable",
+                            detail=str(item.details) if item.details else "No extra evidence details.",
+                            status="neutral",
+                        )
+                        for item in onyx_launch_gates.evidence_summary[:8]
+                    ]
+                    or [_record("No evidence available", "Onyx endpoint", "Onyx readiness endpoint is unreachable or returned no checks.", "warning")],
+                },
+                {
+                    "type": "records",
+                    "title": "Onyx remediations",
+                    "items": [
+                        _record(
+                            title="Recommended remediation",
+                            meta="Onyx readiness",
+                            detail=remediation,
+                            status="warning",
+                        )
+                        for remediation in onyx_launch_gates.remediation_list[:8]
+                    ]
+                    or [_record("No remediation required", "All checks passing", "No warning/fail remediation guidance is currently required.", "healthy")],
+                },
+                {
                     "type": "records",
                     "title": "Recent AI-access outcomes",
                     "items": onyx_handoffs[:3],
@@ -4233,6 +4390,30 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         "readiness": readiness,
         "trust_proof": trust_proof,
         "security_posture": security_posture,
+        "onyx_security_readiness": {
+            "provider": onyx_readiness.provider,
+            "system": onyx_readiness.system,
+            "component_type": onyx_readiness.component_type,
+            "environment": onyx_readiness.environment,
+            "generated_at": onyx_readiness.generated_at,
+            "overall_status": onyx_readiness.overall_status,
+            "overall_score": onyx_readiness.overall_score,
+            "risk_summary": {
+                "critical": onyx_readiness.risk_summary.critical,
+                "high": onyx_readiness.risk_summary.high,
+                "medium": onyx_readiness.risk_summary.medium,
+                "low": onyx_readiness.risk_summary.low,
+            },
+            "capabilities": {
+                "rag": onyx_readiness.capabilities.rag,
+                "connectors": onyx_readiness.capabilities.connectors,
+                "agents": onyx_readiness.capabilities.agents,
+                "mcp": onyx_readiness.capabilities.mcp,
+                "tools": onyx_readiness.capabilities.tools,
+            },
+            "launch_gate_decision": onyx_launch_gates.decision,
+            "message": onyx_readiness.message,
+        },
         "repo_description_suggestion": str(contract.get("repo_description_suggestion", "")),
         "mode_banner": mode_banner,
         "reading_guide": reading_guide,
