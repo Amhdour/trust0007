@@ -27,6 +27,12 @@ const liveLogRoot = document.getElementById("live-log-root");
 const trustScorecardRoot = document.getElementById("trust-scorecard-root");
 const secondaryContextRoot = document.getElementById("secondary-context-root");
 const runtimePortfolioRoot = document.getElementById("runtime-portfolio-root");
+const launchDecisionRoot = document.getElementById("launch-decision-root");
+const audienceModesRoot = document.getElementById("audience-modes-root");
+const liveOnyxProjectRoot = document.getElementById("live-onyx-project-root");
+const ragProofChainRoot = document.getElementById("rag-proof-chain-root");
+const whyNotGoRoot = document.getElementById("why-not-go-root");
+const launchGatePacketRoot = document.getElementById("launch-gate-packet-root");
 const liveRuntimeLink = document.getElementById("live-runtime-link");
 const liveOnyxAgentLink = document.getElementById("live-onyx-link");
 const viewEvidenceLink = document.getElementById("view-evidence-link");
@@ -42,6 +48,13 @@ const LIVE_LOG_STATUS_FILTERS = [
   ["neutral", "Info"],
 ];
 const DASHBOARD_VIEW_MODES = { operator: { label: "Operator" } };
+const AUDIENCE_MODES = [
+  { id: "executive", label: "Executive View" },
+  { id: "security", label: "Security Reviewer View" },
+  { id: "operator", label: "Operator View" },
+  { id: "evidence", label: "Evidence/API View" },
+];
+const decisionModel = window.DashboardDecisionModel || {};
 // Keep a single source of truth for visible drill-down sections in the
 // shared control plane. New dual-runtime IDs are primary, while legacy IDs
 // remain supported for backwards compatibility with older payloads.
@@ -58,13 +71,10 @@ const LEGACY_SECTION_ID_BY_CANONICAL = {
 const ACTIVE_DRILLDOWN_SECTION_IDS = new Set([
   "runtime-portfolio",
   "rag-runtime-access",
-  "agent-runtime-access",
   "launch-gate",
   "entry-points",
-  "onyx-agent-access",
   "policy-enforcement",
   "retrieval-boundaries",
-  "tool-mcp-governance",
   "audit-replay",
 ]);
 let liveLogTimer = 0;
@@ -73,6 +83,7 @@ let activeTabSyncFrame = 0;
 let tabStripScrollBound = false;
 let presentationModeEnabled = false;
 let dashboardViewMode = "operator";
+let activeAudienceMode = "executive";
 let dashboardSectionQuery = "";
 let lastOverviewPayload = null;
 let lastLiveLogPayload = null;
@@ -82,6 +93,7 @@ let dashboardFingerprints = new Map();
 let changedDashboardKeys = new Set();
 let changeHighlightTimer = 0;
 let sectionDisclosureState = new Map();
+let lastDerivedDashboardState = null;
 
 function canonicalSectionId(value) {
   return SECTION_ID_ALIASES[value] || value;
@@ -2201,6 +2213,208 @@ function renderLiveLogError(error) {
   `;
 }
 
+function evidenceModeClass(mode) {
+  return `evidence-badge evidence-mode-${String(mode || "UNKNOWN").toLowerCase()}`;
+}
+
+function setAudienceMode(mode) {
+  activeAudienceMode = AUDIENCE_MODES.some((item) => item.id === mode) ? mode : "executive";
+  document.body.setAttribute("data-audience-mode", activeAudienceMode);
+  if (audienceModesRoot && lastDerivedDashboardState) {
+    renderAudienceModes(lastDerivedDashboardState);
+  }
+}
+
+function renderAudienceModes(derivedState) {
+  if (!audienceModesRoot) {
+    return;
+  }
+
+  audienceModesRoot.innerHTML = `
+    <div class="audience-mode-switch" role="tablist" aria-label="Dashboard audience mode">
+      ${AUDIENCE_MODES.map(
+        (mode) => `
+          <button
+            class="audience-mode-button${mode.id === activeAudienceMode ? " is-active" : ""}"
+            type="button"
+            role="tab"
+            aria-selected="${mode.id === activeAudienceMode ? "true" : "false"}"
+            data-audience-mode="${escapeHtml(mode.id)}"
+          >
+            ${escapeHtml(mode.label)}
+          </button>
+        `,
+      ).join("")}
+    </div>
+    <p class="section-description">Current mode: ${escapeHtml(AUDIENCE_MODES.find((mode) => mode.id === activeAudienceMode)?.label || "Executive View")}.</p>
+  `;
+
+  for (const button of audienceModesRoot.querySelectorAll("[data-audience-mode]")) {
+    button.addEventListener("click", () => setAudienceMode(button.dataset.audienceMode));
+  }
+}
+
+function deriveDashboardState(payload) {
+  const launchHeader = (decisionModel.deriveLaunchDecisionHeader || (() => ({})))(payload);
+  const proofChain = (decisionModel.deriveRagProofChain || (() => []))(payload);
+  const liveOnyxProject = (decisionModel.deriveLiveOnyxProject || (() => ({})))(payload, launchHeader);
+  const packet = (decisionModel.buildLaunchGatePacket || (() => ({})))(payload);
+  const failedRequired = proofChain.filter((item) => item.required && item.status === "FAIL");
+  const unknownRequired = proofChain.filter((item) => item.required && item.status === "UNKNOWN");
+  return { launchHeader, proofChain, liveOnyxProject, packet, failedRequired, unknownRequired };
+}
+
+function renderLaunchDecisionHeader(derivedState) {
+  if (!launchDecisionRoot) {
+    return;
+  }
+  const header = derivedState.launchHeader || {};
+  const isNoGo = String(header.decision || "").toUpperCase() === "NO-GO";
+  launchDecisionRoot.innerHTML = `
+    <article class="launch-decision-header ${isNoGo ? "launch-decision-nogo" : ""}">
+      <div class="launch-decision-topline">
+        <span class="${statusClass(isNoGo ? "critical" : "neutral")}">${escapeHtml(header.decision || "UNKNOWN")}</span>
+        <span class="${evidenceModeClass(header.evidenceMode)}">${escapeHtml(header.evidenceMode || "UNKNOWN")}</span>
+      </div>
+      <ul class="decision-list">
+        <li><span>Runtime</span><strong>${escapeHtml(header.runtime || "Unknown")}</strong></li>
+        <li><span>Proof backing decision</span><strong>Launch gate + RAG proof chain</strong></li>
+        <li><span>Top blocker</span><strong>${escapeHtml(header.topBlocker || "No blocking control currently detected.")}</strong></li>
+        <li><span>Required action</span><strong>${escapeHtml(header.requiredAction || "Maintain monitoring and evidence retention.")}</strong></li>
+        <li><span>Last proven</span><strong>${escapeHtml(header.lastProvenAt ? formatTimestamp(header.lastProvenAt) : "Not proven yet.")}</strong></li>
+      </ul>
+      ${
+        header.evidenceMode && header.evidenceMode !== "LIVE"
+          ? `<p class="section-description">This decision is not based on fully proven live production evidence.</p>`
+          : ""
+      }
+    </article>
+  `;
+}
+
+function renderRagProofChain(derivedState) {
+  if (!ragProofChainRoot) {
+    return;
+  }
+  const items = Array.isArray(derivedState.proofChain) ? derivedState.proofChain : [];
+  ragProofChainRoot.innerHTML = `
+    <div class="proof-chain-list">
+      ${items
+        .map(
+          (item) => `
+            <article class="proof-chain-item status-${escapeHtml((item.status || "UNKNOWN").toLowerCase())}">
+              <div class="card-topline">
+                <strong>${escapeHtml(item.label || "Control")}</strong>
+                <span class="${statusClass(trustControlStatusPresentation(item.status).uiStatus)}">${escapeHtml(item.status || "UNKNOWN")}</span>
+              </div>
+              <p>${escapeHtml(item.reason || "No reason supplied.")}</p>
+              <div class="hero-meta">
+                <span class="${evidenceModeClass(item.evidenceMode)}">${escapeHtml(item.evidenceMode || "UNKNOWN")}</span>
+                <span class="chip">${item.required ? "Required" : "Optional"}</span>
+                ${item.proofHref ? `<a class="chip" href="${escapeHtml(item.proofHref)}">Open proof</a>` : '<span class="chip">No proof link</span>'}
+              </div>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderLiveOnyxProject(derivedState) {
+  if (!liveOnyxProjectRoot) {
+    return;
+  }
+  const project = derivedState.liveOnyxProject || {};
+  liveOnyxProjectRoot.innerHTML = `
+    <article class="decision-panel">
+      <div class="card-topline">
+        <span class="${statusClass(project.status === "BLOCKED" ? "critical" : "neutral")}">${escapeHtml(project.status || "UNKNOWN")}</span>
+        <span class="${evidenceModeClass(project.evidenceMode)}">${escapeHtml(project.evidenceMode || "UNKNOWN")}</span>
+      </div>
+      <p>${escapeHtml(project.explanation || "")}</p>
+      <ul class="decision-list">
+        <li><span>Onyx runtime source</span><strong>${escapeHtml(project.runtimeSource || "/onyx")}</strong></li>
+        <li><span>Trust control plane</span><strong>${escapeHtml(project.trustRoot || "/trust")}</strong></li>
+        <li><span>Dashboard path</span><strong>${escapeHtml(project.dashboardPath || "/trust/frontend/main-dashboard")}</strong></li>
+        <li><span>Launch gate</span><strong>${escapeHtml(project.launchGatePath || "/trust/launch-gate")}</strong></li>
+        <li><span>Evidence</span><strong>${escapeHtml(project.evidencePath || "/trust/evidence")}</strong></li>
+        <li><span>Policies</span><strong>${escapeHtml(project.policiesPath || "/trust/policies")}</strong></li>
+        <li><span>Telemetry</span><strong>${escapeHtml(project.telemetryPath || "/trust/telemetry")}</strong></li>
+        <li><span>Live runtime proof available</span><strong>${escapeHtml(project.evidenceMode === "LIVE" && project.status === "CONNECTED" ? "Yes" : "No / not proven")}</strong></li>
+        <li><span>Last checked</span><strong>${escapeHtml(project.lastCheckedAt ? formatTimestamp(project.lastCheckedAt) : "Not proven yet.")}</strong></li>
+      </ul>
+      <div class="decision-links">
+        <a href="${escapeHtml(project.governedLaunchPath || "/launch/onyx?path=/app&mode=live&view=embedded")}">Open Onyx workspace</a>
+        <a href="#launch-gate">View Trust dashboard evidence</a>
+        <a href="/api/control-plane/live-log">View live log</a>
+        <a href="/raw/docs/onyx-integration.md">View Onyx integration docs</a>
+      </div>
+      <p class="section-description"><code>${escapeHtml(project.onyxBaseUrlEnv || "CONTROL_PLANE_ONYX_BASE_URL")}</code>, <code>${escapeHtml(project.onyxApiBaseUrlEnv || "CONTROL_PLANE_ONYX_API_BASE_URL")}</code>, <code>${escapeHtml(project.readinessEndpoint || "/api/security/readiness")}</code>, <code>${escapeHtml(project.overviewEndpoint || "/api/control-plane/overview")}</code>, <code>${escapeHtml(project.liveLogEndpoint || "/api/control-plane/live-log")}</code></p>
+    </article>
+  `;
+}
+
+function renderWhyNotGoPanel(derivedState) {
+  if (!whyNotGoRoot) {
+    return;
+  }
+  const failed = derivedState.failedRequired || [];
+  const unknown = derivedState.unknownRequired || [];
+  const launchHeader = derivedState.launchHeader || {};
+  whyNotGoRoot.innerHTML = `
+    <article class="decision-panel">
+      <h3>RAG launch remains blocked when required proof is missing.</h3>
+      <p>${escapeHtml(launchHeader.topBlocker || "No blocking control currently detected.")}</p>
+      <ul class="decision-list">
+        <li><span>Failed required controls</span><strong>${escapeHtml(failed.map((item) => item.label).join(", ") || "None")}</strong></li>
+        <li><span>Unknown required controls</span><strong>${escapeHtml(unknown.map((item) => item.label).join(", ") || "None")}</strong></li>
+        <li><span>Required evidence to clear gate</span><strong>Current identity, policy, retrieval/source-boundary, secrets, telemetry, and launch-gate proof.</strong></li>
+      </ul>
+      <div class="decision-links">
+        <a href="#launch-gate">Open launch-gate evidence</a>
+        <a href="/raw/docs/strict-live-proof-matrix.md">Proof matrix</a>
+      </div>
+      <p class="section-description">Fail-closed behavior: if evidence is missing, stale, ambiguous, or non-live, production approval is withheld.</p>
+    </article>
+  `;
+}
+
+function downloadLaunchGatePacket(packet) {
+  const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "-");
+  const filename = `rag-launch-gate-packet-${timestamp}.json`;
+  const blob = new Blob([JSON.stringify(packet, null, 2)], { type: "application/json" });
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(href);
+}
+
+function renderLaunchGatePacketPanel(derivedState) {
+  if (!launchGatePacketRoot) {
+    return;
+  }
+  const packet = derivedState.packet || {};
+  launchGatePacketRoot.innerHTML = `
+    <article class="decision-panel">
+      <p>Export an evidence-backed bundle for review, audit, and launch-governance sign-off.</p>
+      <div class="hero-meta">
+        <span class="${statusClass(packet.decision === "NO-GO" ? "critical" : "neutral")}">${escapeHtml(packet.decision || "UNKNOWN")}</span>
+        <span class="${evidenceModeClass(packet.evidenceMode)}">${escapeHtml(packet.evidenceMode || "UNKNOWN")}</span>
+      </div>
+      <button class="hero-action-button" id="download-launch-gate-packet" type="button">Download Launch Gate Packet</button>
+    </article>
+  `;
+  const button = launchGatePacketRoot.querySelector("#download-launch-gate-packet");
+  if (button) {
+    button.addEventListener("click", () => downloadLaunchGatePacket(packet));
+  }
+}
+
 function scheduleLiveLogRefresh(intervalMs) {
   window.clearTimeout(liveLogTimer);
   liveLogTimer = window.setTimeout(loadLiveLog, intervalMs);
@@ -2223,7 +2437,15 @@ async function loadLiveLog() {
 }
 
 function renderDashboardPayload(payload) {
+  const derivedState = deriveDashboardState(payload);
+  lastDerivedDashboardState = derivedState;
   renderDecisionHero(payload);
+  renderLaunchDecisionHeader(derivedState);
+  renderAudienceModes(derivedState);
+  renderLiveOnyxProject(derivedState);
+  renderRagProofChain(derivedState);
+  renderWhyNotGoPanel(derivedState);
+  renderLaunchGatePacketPanel(derivedState);
   renderRuntimePortfolio(payload);
   renderHomepagePanels(payload);
   renderTrustScorecard(payload);
@@ -2262,16 +2484,6 @@ function defaultRuntimePortfolio() {
       evidence_href: "#retrieval-boundaries",
       primary_controls: ["Retrieval boundaries", "Tenant/source policy", "Data-path governance"],
     },
-    {
-      name: "Onyx Agent",
-      runtime_key: "onyx",
-      runtime_class: "Tool Governance",
-      description: "Onyx runtime lane with tool, MCP, and authorization governance.",
-      status: "neutral",
-      launch_href: "/launch/onyx/agent?mode=live&view=embedded",
-      evidence_href: "#tool-mcp-governance",
-      primary_controls: ["Tool authorization", "MCP allowlists", "Agent capability controls"],
-    },
   ];
 }
 
@@ -2285,7 +2497,9 @@ function renderRuntimePortfolio(payload) {
     ? portfolio.runtimes
     : defaultRuntimePortfolio();
 
-  const cards = runtimeItems.map((item) => normalizeRuntimeCard(item));
+  const cards = runtimeItems
+    .filter((item) => String(item?.runtime_key || item?.id || "").toLowerCase() === "onyx")
+    .map((item) => normalizeRuntimeCard(item));
   runtimePortfolioRoot.innerHTML = `
     <div class="decision-panels-root">
       ${cards
@@ -2309,6 +2523,7 @@ function renderRuntimePortfolio(payload) {
         )
         .join("")}
     </div>
+    <p class="section-description">Deferred scope: autonomous-agent governance, MCP hardening, tool authorization, and agent identity controls are future expansion and not part of current RAG launch approval.</p>
   `;
 }
 
@@ -2377,6 +2592,7 @@ function renderTrustScorecard(payload) {
     ? trustControlRows.map((row) => ({
         control: row.control || "Control",
         status: String(row.status || "NEEDS_ATTENTION").toUpperCase(),
+        evidenceMode: String(row.evidence_mode || readiness.evidence_mode || "unknown").toUpperCase(),
         lastChecked: formatTimestamp(row.last_checked || ""),
         proofLabel: row.control || "Evidence",
         proofHref: row.proof_href || "",
@@ -2386,6 +2602,7 @@ function renderTrustScorecard(payload) {
         {
           control: "Identity",
           status: legacyIdentity ? "PASS" : "MISSING_PROOF",
+          evidenceMode: String(readiness.evidence_mode || "unknown").toUpperCase(),
           lastChecked: latestCheckedLabelFromBadges(findStep("identity")?.meta_badges || []),
           proofLabel: findStep("identity")?.label || "Identity step",
           proofHref: findStep("identity")?.href || "",
@@ -2395,6 +2612,7 @@ function renderTrustScorecard(payload) {
   rows.push({
     control: "Launch Gate",
     status: String(readiness.decision || "").toUpperCase() === "GO" ? "PASS" : "FAIL",
+    evidenceMode: String(readiness.evidence_mode || "unknown").toUpperCase(),
     lastChecked: formatTimestamp(readiness.last_updated),
     proofLabel: launchReport?.label || governedFlow?.label || "Launch evidence",
     proofHref: launchReport?.href || governedFlow?.href || "#launch-gate",
@@ -2409,6 +2627,7 @@ function renderTrustScorecard(payload) {
           <tr>
             <th>Control</th>
             <th>Status</th>
+            <th>Evidence mode</th>
             <th>Last checked</th>
             <th>Proof</th>
             <th>Blocker / reason</th>
@@ -2421,6 +2640,7 @@ function renderTrustScorecard(payload) {
                 <tr>
                   <td>${escapeHtml(row.control)}</td>
                   <td><span class="${statusClass(row.statusPresentation.uiStatus)}">${escapeHtml(row.statusPresentation.label)}</span></td>
+                  <td><span class="${evidenceModeClass(row.evidenceMode)}">${escapeHtml(row.evidenceMode || "UNKNOWN")}</span></td>
                   <td>${escapeHtml(row.lastChecked || "Unavailable")}</td>
                   <td>${
                     row.proofHref
@@ -2446,7 +2666,7 @@ function renderDecisionHero(payload) {
     heroTitle.textContent = payload.title || "AI Trust & Security Control Plane";
   }
   if (heroCopy) {
-    heroCopy.textContent = payload.subtitle || "See if launch is safe, what is blocked, and what to do next.";
+    heroCopy.textContent = "Evidence-backed launch readiness for Onyx RAG: decision, blocker, required action, and proof mode.";
   }
 
   const readiness = payload.readiness || {};
@@ -2503,7 +2723,7 @@ function renderDecisionHero(payload) {
     liveRuntimeLink.setAttribute("href", onyxChatLaunchHref);
   }
   if (liveOnyxAgentLink) {
-    liveOnyxAgentLink.textContent = "Open Onyx Agent";
+    liveOnyxAgentLink.textContent = "Onyx Agent (future scope)";
     liveOnyxAgentLink.setAttribute("href", onyxAgentLaunchHref);
   }
   if (viewEvidenceLink) {
@@ -2511,6 +2731,7 @@ function renderDecisionHero(payload) {
   }
   if (runtimeLanesMeta) {
     runtimeLanesMeta.innerHTML = runtimeItems
+      .filter((item) => String(item?.runtime_key || "").toLowerCase() === "onyx")
       .map(
         (item) =>
           `<span class="chip">${escapeHtml(item.label || "Runtime")} = ${escapeHtml(item.type || "Lane")} · ${escapeHtml(
@@ -2522,6 +2743,7 @@ function renderDecisionHero(payload) {
     if (onyxRuntime) {
       runtimeLanesMeta.innerHTML += `<span class="chip">Onyx service health: ${escapeHtml(String(onyxRuntime.status || "unknown").toUpperCase())}</span>`;
     }
+    runtimeLanesMeta.innerHTML += '<span class="chip">Deferred: autonomous-agent, MCP, and tool-authorization controls are not in current RAG launch scope.</span>';
   }
 }
 
@@ -2698,5 +2920,6 @@ if (refreshDashboardButton) {
   });
 }
 
+setAudienceMode("executive");
 boot();
 loadLiveLog();

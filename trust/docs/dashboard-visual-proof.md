@@ -17,6 +17,19 @@ These SVGs show the cues to compare against live artifacts/tests:
 - passing strict-live flow: [dashboard-live-pass.svg](images/dashboard-live-pass.svg)
 - denied strict-live flow: [dashboard-live-deny.svg](images/dashboard-live-deny.svg)
 
+## Current RAG launch-readiness surfaces
+
+The main dashboard now includes a reviewer-first RAG safety strip near the top:
+
+- **Launch Decision Header** (GO / NO-GO / CONDITIONAL / UNKNOWN)
+- **Evidence mode badge** (`LIVE`, `PARTIAL`, `DEMO`, `SAMPLE`, `UNKNOWN`)
+- **Live Onyx Project** mapping (`/onyx` runtime + `/trust` control plane)
+- **RAG Proof Chain** (Identity → Policy → Retrieval Boundary → Source Boundary → Secrets → Telemetry → Launch Gate)
+- **Why not GO?** fail-closed rationale
+- **Download Launch Gate Packet** export bundle
+
+Interpretation rule: if evidence mode is not `LIVE`, reviewers should treat the page as non-production proof and avoid production launch approval.
+
 ## What good looks like (passing visual cues)
 
 Open [dashboard-live-pass.svg](images/dashboard-live-pass.svg) and verify:

@@ -236,15 +236,14 @@ def test_runtime_portfolio_exposes_runtime_specific_launch_and_governance_fields
     assert any("MCP" in control or "Tool" in control for control in onyx_agent["primary_controls"])
 
 
-def test_frontend_runtime_portfolio_has_dual_runtime_fallback_and_link_binding_logic() -> None:
+def test_frontend_runtime_portfolio_fallback_is_rag_first_and_keeps_compatibility_links() -> None:
     js = Path("frontend/main-dashboard/app.js").read_text(encoding="utf-8")
 
     assert "function defaultRuntimePortfolio()" in js
     assert 'runtime_key: "onyx"' in js
-    assert 'runtime_key: "onyx"' in js
     assert 'launch_href: "/launch/onyx?path=/app&mode=live&view=embedded"' in js
-    assert 'launch_href: "/launch/onyx/agent?mode=live&view=embedded"' in js
-    assert "runtimeByKey.get(\"onyx\")?.launch_href" in js
+    assert "filter((item) => String(item?.runtime_key || item?.id || \"\").toLowerCase() === \"onyx\")" in js
+    assert "Onyx Agent (future scope)" in js
     assert "runtimeByKey.get(\"onyx\")?.launch_href" in js
     assert "liveRuntimeLink.setAttribute(\"href\", onyxChatLaunchHref)" in js
     assert "liveOnyxAgentLink.setAttribute(\"href\", onyxAgentLaunchHref)" in js
