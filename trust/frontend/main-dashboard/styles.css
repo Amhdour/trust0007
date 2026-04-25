@@ -2835,6 +2835,16 @@ body[data-dashboard-view="runtime"] .hero-copy {
   border-top: 1px solid var(--line);
 }
 
+.list-compact {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.list-compact li + li {
+  margin-top: 4px;
+}
+
 .decision-failing-controls {
   margin-top: 12px;
 }

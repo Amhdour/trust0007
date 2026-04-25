@@ -31,6 +31,7 @@ const launchDecisionRoot = document.getElementById("launch-decision-root");
 const audienceModesRoot = document.getElementById("audience-modes-root");
 const liveOnyxProjectRoot = document.getElementById("live-onyx-project-root");
 const ragProofChainRoot = document.getElementById("rag-proof-chain-root");
+const realityGapRoot = document.getElementById("reality-gap-root");
 const whyNotGoRoot = document.getElementById("why-not-go-root");
 const launchGatePacketRoot = document.getElementById("launch-gate-packet-root");
 const liveRuntimeLink = document.getElementById("live-runtime-link");
@@ -2261,11 +2262,13 @@ function renderAudienceModes(derivedState) {
 function deriveDashboardState(payload) {
   const launchHeader = (decisionModel.deriveLaunchDecisionHeader || (() => ({})))(payload);
   const proofChain = (decisionModel.deriveRagProofChain || (() => []))(payload);
+  const readinessRubric = (decisionModel.deriveLiveReadinessRubric || (() => ({})))(payload, launchHeader, proofChain);
+  const realityGap = (decisionModel.deriveRealityGap || (() => ({})))(payload, launchHeader, readinessRubric);
   const liveOnyxProject = (decisionModel.deriveLiveOnyxProject || (() => ({})))(payload, launchHeader);
   const packet = (decisionModel.buildLaunchGatePacket || (() => ({})))(payload);
   const failedRequired = proofChain.filter((item) => item.required && item.status === "FAIL");
   const unknownRequired = proofChain.filter((item) => item.required && item.status === "UNKNOWN");
-  return { launchHeader, proofChain, liveOnyxProject, packet, failedRequired, unknownRequired };
+  return { launchHeader, proofChain, readinessRubric, realityGap, liveOnyxProject, packet, failedRequired, unknownRequired };
 }
 
 function renderLaunchDecisionHeader(derivedState) {
@@ -2322,6 +2325,57 @@ function renderRagProofChain(derivedState) {
         )
         .join("")}
     </div>
+  `;
+}
+
+function renderRealityGapPanel(derivedState) {
+  if (!realityGapRoot) {
+    return;
+  }
+  const realityGap = derivedState.realityGap || {};
+  const rubric = derivedState.readinessRubric || {};
+  const freshnessStatus = String(rubric.freshnessStatus || "UNKNOWN").toUpperCase();
+  const freshnessUiStatus = {
+    FRESH: "healthy",
+    STALE: "warning",
+    EXPIRED: "critical",
+    MISSING: "critical",
+    UNKNOWN: "neutral",
+  }[freshnessStatus] || "neutral";
+  const driftDetected = Boolean(realityGap.driftDetected);
+  const driftLabel = driftDetected ? "DRIFT DETECTED" : "IN SYNC";
+  const proofAge = Number.isFinite(Number(realityGap.proofAgeHours))
+    ? `${Number(realityGap.proofAgeHours).toFixed(2)}h`
+    : "Unknown";
+  const liveEligible = rubric.liveEligible === true;
+  const reasons = Array.isArray(rubric.reasons) && rubric.reasons.length ? rubric.reasons : ["No rubric explanation available."];
+  realityGapRoot.innerHTML = `
+    <article class="decision-panel">
+      <div class="card-topline">
+        <span class="${statusClass(driftDetected ? "warning" : "healthy")}">${escapeHtml(driftLabel)}</span>
+        <span class="${statusClass(freshnessUiStatus)}">Freshness: ${escapeHtml(freshnessStatus)}</span>
+        <span class="${statusClass(liveEligible ? "healthy" : "critical")}">LIVE eligible: ${liveEligible ? "YES" : "NO"}</span>
+      </div>
+      <p>${escapeHtml(realityGap.summary || "Reality gap analysis not available.")}</p>
+      <ul class="decision-list">
+        <li><span>Declared mode</span><strong>${escapeHtml(realityGap.declaredMode || "UNKNOWN")}</strong></li>
+        <li><span>Observed evidence mode</span><strong>${escapeHtml(realityGap.observedEvidenceMode || "UNKNOWN")}</strong></li>
+        <li><span>Last verified proof</span><strong>${escapeHtml(realityGap.lastVerifiedAt ? formatTimestamp(realityGap.lastVerifiedAt) : "Not available")}</strong></li>
+        <li><span>Proof age</span><strong>${escapeHtml(proofAge)}</strong></li>
+        <li><span>Freshness SLA</span><strong>${escapeHtml(
+          Number.isFinite(Number(rubric.staleAfterHours)) && Number.isFinite(Number(rubric.expiredAfterHours))
+            ? `stale>${rubric.staleAfterHours}h · expired>${rubric.expiredAfterHours}h`
+            : "No SLA configured",
+        )}</strong></li>
+      </ul>
+      <div class="decision-links">
+        <a href="#rag-proof-chain-title">Inspect proof chain</a>
+        <a href="#launch-gate">Inspect launch gate</a>
+      </div>
+      <ul class="list-compact">
+        ${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}
+      </ul>
+    </article>
   `;
 }
 
@@ -2514,6 +2568,7 @@ function renderDashboardPayload(payload) {
   renderAudienceModes(derivedState);
   renderLiveOnyxProject(derivedState);
   renderRagProofChain(derivedState);
+  renderRealityGapPanel(derivedState);
   renderWhyNotGoPanel(derivedState);
   renderLaunchGatePacketPanel(derivedState);
   renderRuntimePortfolio(payload);

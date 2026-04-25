@@ -8,6 +8,7 @@ This frontend is the dashboard-first homepage for the repository.
 - Current primary product surface is **Onyx governed RAG launch readiness**.
 - A top-level **Launch Decision Header** now presents decision, runtime, evidence mode, top blocker, required action, and last-proven timestamp.
 - A first-class **RAG Proof Chain** now renders: Identity → Policy → Retrieval Boundary → Source Boundary → Secrets → Telemetry → Launch Gate.
+- A first-class **Reality Gap Analysis** panel now compares declared mode vs observed evidence mode, reports proof freshness, and computes strict LIVE eligibility from required controls.
 - A **Live Onyx Project** panel now explains folder mapping and runtime wiring:
   - `/onyx` = runtime source
   - `/trust` = trust control plane
@@ -37,6 +38,7 @@ This frontend is the dashboard-first homepage for the repository.
 - `/trust/frontend/main-dashboard` is the reviewer dashboard served by `backend/api_gateway/server.py`.
 - The panel makes folder locations explicit so reviewers can quickly see where runtime, policy, evidence, telemetry, and launch-gate components live.
 - The panel shows runtime status plus evidence mode, and does **not** imply live connectivity unless evidence mode is `LIVE`.
+- Strict LIVE eligibility also requires all required proof-chain controls to pass and freshness to be inside SLA; stale/expired/missing proof fails closed.
 - The panel now includes an **Onyx Control** area that distinguishes:
   - direct runtime URL access (`Open Onyx`, opens the configured live app URL in a new tab), and
   - governed Trust launch path visibility (`/launch/onyx?path=/app&mode=live&view=embedded`) without claiming redirect enforcement unless backend launch-gate enforcement is wired.

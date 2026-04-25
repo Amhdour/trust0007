@@ -177,6 +177,105 @@
     };
   }
 
+  function parseTimestamp(value) {
+    if (!value) {
+      return null;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+    return parsed;
+  }
+
+  function freshnessHours(lastProvenAt, now = new Date()) {
+    const proven = parseTimestamp(lastProvenAt);
+    if (!proven) {
+      return Number.POSITIVE_INFINITY;
+    }
+    const deltaMs = now.getTime() - proven.getTime();
+    if (deltaMs < 0) {
+      return 0;
+    }
+    return deltaMs / (1000 * 60 * 60);
+  }
+
+  function deriveLiveReadinessRubric(payload = {}, launchHeader = null, proofChain = null, now = new Date()) {
+    const header = launchHeader || deriveLaunchDecisionHeader(payload);
+    const chain = Array.isArray(proofChain) ? proofChain : deriveRagProofChain(payload);
+    const requiredControls = chain.filter((node) => node.required && node.id !== "launch-gate");
+    const failingRequired = requiredControls.filter((node) => node.status === "FAIL");
+    const unknownRequired = requiredControls.filter((node) => node.status === "UNKNOWN");
+    const freshnessSla = payload?.trust_proof?.freshness_sla || {};
+    const staleAfterHours = Number(freshnessSla.stale_after_hours ?? freshnessSla.fresh_hours ?? 24);
+    const expiredAfterHours = Number(freshnessSla.expired_after_hours ?? staleAfterHours * 2);
+    const hoursSinceLastProof = freshnessHours(header.lastProvenAt, now);
+    const freshnessStatus = !Number.isFinite(hoursSinceLastProof)
+      ? "MISSING"
+      : hoursSinceLastProof > expiredAfterHours
+        ? "EXPIRED"
+        : hoursSinceLastProof > staleAfterHours
+          ? "STALE"
+          : "FRESH";
+    const liveEligible = header.evidenceMode === "LIVE"
+      && failingRequired.length === 0
+      && unknownRequired.length === 0
+      && freshnessStatus === "FRESH";
+
+    const reasons = [];
+    if (header.evidenceMode !== "LIVE") {
+      reasons.push(`Evidence mode is ${header.evidenceMode || "UNKNOWN"} (must be LIVE).`);
+    }
+    if (failingRequired.length) {
+      reasons.push(`Required controls failing: ${failingRequired.map((node) => node.label).join(", ")}.`);
+    }
+    if (unknownRequired.length) {
+      reasons.push(`Required controls unproven: ${unknownRequired.map((node) => node.label).join(", ")}.`);
+    }
+    if (freshnessStatus !== "FRESH") {
+      reasons.push(
+        freshnessStatus === "MISSING"
+          ? "No valid last-proven timestamp found."
+          : `Evidence freshness is ${freshnessStatus.toLowerCase()} (${hoursSinceLastProof.toFixed(1)}h old).`,
+      );
+    }
+    if (!reasons.length) {
+      reasons.push("All required controls passed with LIVE evidence and fresh proof.");
+    }
+
+    return {
+      liveEligible,
+      freshnessStatus,
+      hoursSinceLastProof: Number.isFinite(hoursSinceLastProof) ? Number(hoursSinceLastProof.toFixed(2)) : null,
+      staleAfterHours: Number.isFinite(staleAfterHours) ? staleAfterHours : null,
+      expiredAfterHours: Number.isFinite(expiredAfterHours) ? expiredAfterHours : null,
+      requiredControlCount: requiredControls.length,
+      failingRequired: failingRequired.map((node) => node.label),
+      unknownRequired: unknownRequired.map((node) => node.label),
+      reasons,
+    };
+  }
+
+  function deriveRealityGap(payload = {}, launchHeader = null, rubric = null) {
+    const header = launchHeader || deriveLaunchDecisionHeader(payload);
+    const readinessRubric = rubric || deriveLiveReadinessRubric(payload, header);
+    const declaredMode = String(payload?.data_mode?.label || payload?.data_mode?.display_label || "UNKNOWN").toUpperCase() || "UNKNOWN";
+    const observedEvidenceMode = String(header.evidenceMode || "UNKNOWN").toUpperCase();
+    const driftDetected = declaredMode && declaredMode !== observedEvidenceMode;
+    return {
+      declaredMode,
+      observedEvidenceMode,
+      driftDetected,
+      lastVerifiedAt: header.lastProvenAt || null,
+      proofAgeHours: readinessRubric.hoursSinceLastProof,
+      liveEligible: readinessRubric.liveEligible,
+      freshnessStatus: readinessRubric.freshnessStatus,
+      summary: driftDetected
+        ? `Declared mode ${declaredMode} does not match observed evidence mode ${observedEvidenceMode}.`
+        : `Declared and observed mode both resolve to ${observedEvidenceMode}.`,
+    };
+  }
+
   function getLiveOnyxProjectMap() {
     return [
       { path: "/onyx", description: "Onyx runtime source" },
@@ -285,6 +384,8 @@
     const header = deriveLaunchDecisionHeader(payload);
     const liveOnyxProject = deriveLiveOnyxProject(payload, header);
     const proofChain = deriveRagProofChain(payload);
+    const readinessRubric = deriveLiveReadinessRubric(payload, header, proofChain);
+    const realityGap = deriveRealityGap(payload, header, readinessRubric);
     const failingControls = proofChain.filter((node) => node.required && node.status === "FAIL").map((node) => node.label);
     const unknownControls = proofChain.filter((node) => node.required && node.status === "UNKNOWN").map((node) => node.label);
     const toStatus = (id) => proofChain.find((node) => node.id === id)?.status || "UNKNOWN";
@@ -311,6 +412,8 @@
         controls: Array.isArray(payload?.trust_proof?.controls) ? payload.trust_proof.controls.length : 0,
         deniedEvents: payload?.security_posture?.denied_events_count || 0,
       },
+      readinessRubric,
+      realityGap,
       failingControls,
       unknownControls,
       retrievalBoundaryStatus: toStatus("retrieval-boundary"),
@@ -331,6 +434,8 @@
     deriveOnyxRuntimeStatus,
     deriveRagProofChain,
     deriveLaunchDecisionHeader,
+    deriveLiveReadinessRubric,
+    deriveRealityGap,
     deriveLiveOnyxProject,
     getLiveOnyxProjectMap,
     getProjectFolderMap: getLiveOnyxProjectMap,
