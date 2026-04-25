@@ -6,6 +6,8 @@ const {
   deriveOnyxRuntimeStatus,
   deriveLaunchDecisionHeader,
   deriveRagProofChain,
+  deriveLiveReadinessRubric,
+  deriveRealityGap,
   deriveLiveOnyxProject,
   getLiveOnyxProjectMap,
   buildLaunchGatePacket,
@@ -75,4 +77,59 @@ test("buildLaunchGatePacket includes proof chain and live project mapping", () =
   assert.ok(Array.isArray(packet.proofChain));
   assert.equal(packet.liveOnyxProject.runtimeSource, "/onyx");
   assert.equal(packet.liveOnyxProject.trustRoot, "/trust");
+  assert.ok(packet.readinessRubric);
+  assert.ok(packet.realityGap);
+});
+
+test("deriveLiveReadinessRubric requires fresh live proof and passing required controls", () => {
+  const rubric = deriveLiveReadinessRubric(
+    {
+      readiness: {
+        decision: "GO",
+        evidence_mode: "live",
+        last_updated: "2026-04-25T11:30:00Z",
+      },
+      trust_proof: {
+        freshness_sla: { stale_after_hours: 4, expired_after_hours: 8 },
+        controls: [
+          { control: "Identity", status: "PASS" },
+          { control: "Policy", status: "PASS" },
+          { control: "Retrieval", status: "PASS" },
+          { control: "Evidence Provenance", status: "PASS" },
+          { control: "Audit", status: "PASS" },
+        ],
+      },
+    },
+    null,
+    null,
+    new Date("2026-04-25T12:00:00Z"),
+  );
+  assert.equal(rubric.freshnessStatus, "FRESH");
+  assert.equal(rubric.liveEligible, true);
+});
+
+test("deriveRealityGap flags drift between declared mode and observed mode", () => {
+  const header = deriveLaunchDecisionHeader({
+    readiness: { decision: "GO", evidence_mode: "sample", last_updated: "2026-04-25T11:00:00Z" },
+    data_mode: { label: "live" },
+  });
+  const rubric = deriveLiveReadinessRubric(
+    {
+      readiness: { decision: "GO", evidence_mode: "sample", last_updated: "2026-04-25T11:00:00Z" },
+      data_mode: { label: "live" },
+    },
+    header,
+    null,
+    new Date("2026-04-25T12:00:00Z"),
+  );
+  const gap = deriveRealityGap(
+    {
+      data_mode: { label: "live" },
+    },
+    header,
+    rubric,
+  );
+  assert.equal(gap.declaredMode, "LIVE");
+  assert.equal(gap.observedEvidenceMode, "SAMPLE");
+  assert.equal(gap.driftDetected, true);
 });
